@@ -10,6 +10,7 @@ enum Panel: Equatable {
 
 struct DashboardView: View {
     @State private var activePanel: Panel = .none
+    @State private var longPressActive: Bool = false
 
     var body: some View {
         // GeometryReader ignores safe area so panels slide in from the true
@@ -77,7 +78,8 @@ struct DashboardView: View {
                 }
             }
             .animation(.easeInOut(duration: 0.2), value: activePanel)
-            .gesture(swipeGesture)
+            // ExclusiveGesture: hold+drag takes priority over plain swipe
+            .gesture(ExclusiveGesture(longPressSwipeGesture, swipeGesture))
         }
         .ignoresSafeArea()
     }
@@ -128,39 +130,67 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Swipe Gesture
+    // MARK: - Plain Swipe Gesture
+    // Opens a panel from closed state; closes on reverse swipe.
 
     private var swipeGesture: some Gesture {
         DragGesture(minimumDistance: 40)
             .onEnded { value in
-                let dx = value.translation.width
-                let dy = value.translation.height
-                let adx = abs(dx)
-                let ady = abs(dy)
+                resolveSwipe(translation: value.translation, allowSwitch: false)
+            }
+    }
 
-                // Dismiss open panel on reverse swipe
-                if activePanel != .none {
-                    let threshold: CGFloat = 50
-                    switch activePanel {
-                    case .left   where dx < -threshold && adx > ady: activePanel = .none
-                    case .right  where dx >  threshold && adx > ady: activePanel = .none
-                    case .top    where dy < -threshold && ady > adx: activePanel = .none
-                    case .bottom where dy >  threshold && ady > adx: activePanel = .none
-                    default: break
-                    }
-                    return
-                }
+    // MARK: - Long Press + Swipe Gesture
+    // Hold 0.45 s → haptic fires → drag to open or switch any panel directly.
 
-                // Open panel based on dominant swipe direction
-                let threshold: CGFloat = 40
-                guard max(adx, ady) > threshold else { return }
-
-                if adx >= ady {
-                    activePanel = dx > 0 ? .left : .right
-                } else {
-                    activePanel = dy > 0 ? .top : .bottom
+    private var longPressSwipeGesture: some Gesture {
+        LongPressGesture(minimumDuration: 0.45)
+            .sequenced(before: DragGesture(minimumDistance: 10))
+            .onChanged { state in
+                if case .first(true) = state, !longPressActive {
+                    longPressActive = true
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 }
             }
+            .onEnded { state in
+                defer { longPressActive = false }
+                guard case .second(true, let drag?) = state else { return }
+                resolveSwipe(translation: drag.translation, allowSwitch: true)
+            }
+    }
+
+    // MARK: - Shared Resolution
+
+    private func resolveSwipe(translation: CGSize, allowSwitch: Bool) {
+        let dx = translation.width
+        let dy = translation.height
+        let adx = abs(dx)
+        let ady = abs(dy)
+
+        // Plain swipe with a panel open: only handle the close direction
+        if !allowSwitch, activePanel != .none {
+            let t: CGFloat = 50
+            switch activePanel {
+            case .left   where dx < -t && adx > ady: activePanel = .none
+            case .right  where dx >  t && adx > ady: activePanel = .none
+            case .top    where dy < -t && ady > adx: activePanel = .none
+            case .bottom where dy >  t && ady > adx: activePanel = .none
+            default: break
+            }
+            return
+        }
+
+        let threshold: CGFloat = allowSwitch ? 10 : 40
+        guard max(adx, ady) > threshold else { return }
+
+        let target: Panel = adx >= ady
+            ? (dx > 0 ? .left  : .right)
+            : (dy > 0 ? .top   : .bottom)
+
+        // Long-press can switch panels; plain swipe only opens from closed
+        if allowSwitch || activePanel == .none {
+            activePanel = target
+        }
     }
 }
 
