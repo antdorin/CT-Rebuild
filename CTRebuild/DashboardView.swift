@@ -37,50 +37,46 @@ struct DashboardView: View {
                 }
 
                 // ── Left Panel (swipe RIGHT to open) ──────────────────────────
+                // 97% wide × 94% tall (3% margin top, bottom, right)
                 if activePanel == .left {
-                    HStack(spacing: 0) {
-                        panelContent(label: "Left Panel", safeArea: safe)
-                            .frame(width: geo.size.width * 0.78)
-                        Spacer(minLength: 0)
-                    }
-                    .zIndex(11)
-                    .transition(.move(edge: .leading))
+                    panelContent(label: "Left Panel", safeArea: safe)
+                        .frame(width: geo.size.width * 0.97, height: geo.size.height * 0.94)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                        .zIndex(11)
+                        .transition(.move(edge: .leading))
                 }
 
                 // ── Right Panel (swipe LEFT to open) ──────────────────────────
+                // 97% wide × 94% tall (3% margin top, bottom, left)
                 if activePanel == .right {
-                    HStack(spacing: 0) {
-                        Spacer(minLength: 0)
-                        panelContent(label: "Right Panel", safeArea: safe)
-                            .frame(width: geo.size.width * 0.78)
-                    }
-                    .zIndex(11)
-                    .transition(.move(edge: .trailing))
+                    panelContent(label: "Right Panel", safeArea: safe)
+                        .frame(width: geo.size.width * 0.97, height: geo.size.height * 0.94)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                        .zIndex(11)
+                        .transition(.move(edge: .trailing))
                 }
 
                 // ── Top Panel (swipe DOWN to open) ────────────────────────────
+                // 94% wide × 97% tall (3% margin left, right, bottom)
                 if activePanel == .top {
-                    VStack(spacing: 0) {
-                        panelContent(label: "Top Panel", safeArea: safe)
-                            .frame(height: geo.size.height * 0.55)
-                        Spacer(minLength: 0)
-                    }
-                    .zIndex(11)
-                    .transition(.move(edge: .top))
+                    panelContent(label: "Top Panel", safeArea: safe)
+                        .frame(width: geo.size.width * 0.94, height: geo.size.height * 0.97)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .zIndex(11)
+                        .transition(.move(edge: .top))
                 }
 
                 // ── Bottom Panel (swipe UP to open) ───────────────────────────
+                // 94% wide × 97% tall (3% margin left, right, top)
                 if activePanel == .bottom {
-                    VStack(spacing: 0) {
-                        Spacer(minLength: 0)
-                        panelContent(label: "Bottom Panel", safeArea: safe)
-                            .frame(height: geo.size.height * 0.55)
-                    }
-                    .zIndex(11)
-                    .transition(.move(edge: .bottom))
+                    panelContent(label: "Bottom Panel", safeArea: safe)
+                        .frame(width: geo.size.width * 0.94, height: geo.size.height * 0.97)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        .zIndex(11)
+                        .transition(.move(edge: .bottom))
                 }
             }
-            .animation(.easeInOut(duration: 0.3), value: activePanel)
+            .animation(.easeInOut(duration: 0.2), value: activePanel)
             .gesture(swipeGesture)
         }
         .ignoresSafeArea()
@@ -111,23 +107,23 @@ struct DashboardView: View {
 
     private func panelContent(label: String, safeArea: EdgeInsets) -> some View {
         ZStack(alignment: .topLeading) {
-            // Background bleeds behind notch / home indicator
-            Color(red: 0.07, green: 0.07, blue: 0.09)
+            // Translucent material — ignores safe area so blur fills panel edge-to-edge
+            Rectangle()
+                .fill(.ultraThinMaterial)
                 .ignoresSafeArea()
             VStack(alignment: .leading, spacing: 0) {
                 Text(label)
                     .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(.white)
-                    // Respect notch / status bar at top; 16 pt breathing room
+                    .foregroundColor(.primary)
+                    // Content respects notch / status bar
                     .padding(.top, safeArea.top + 16)
                     .padding(.horizontal, max(safeArea.leading, 24))
                 Rectangle()
-                    .fill(Color.white.opacity(0.1))
+                    .fill(Color.white.opacity(0.15))
                     .frame(height: 1)
                     .padding(.top, 14)
                 Spacer()
             }
-            // Reserve space at the bottom for the home indicator
             .padding(.bottom, safeArea.bottom)
         }
     }
