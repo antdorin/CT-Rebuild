@@ -11,6 +11,7 @@ enum Panel: Equatable {
 struct DashboardView: View {
     @State private var activePanel: Panel = .none
     @State private var longPressActive: Bool = false
+    private let screen = UIScreen.main.bounds
 
     var body: some View {
         // GeometryReader ignores safe area so panels slide in from the true
@@ -19,9 +20,6 @@ struct DashboardView: View {
         // text and interactive elements are never obscured.
         GeometryReader { geo in
             let safe = geo.safeAreaInsets
-            // geo.size excludes safe areas — add insets back for true screen dimensions
-            let fullW = geo.size.width  + safe.leading + safe.trailing
-            let fullH = geo.size.height + safe.top     + safe.bottom
 
             ZStack {
                 // ── Black Background — bleeds to all edges ────────────────────
@@ -43,7 +41,7 @@ struct DashboardView: View {
                 // ── Left Panel (swipe RIGHT to open) ──────────────────────────
                 if activePanel == .left {
                     panelContent(safeArea: safe)
-                        .frame(width: fullW * 0.97, height: fullH * 0.94)
+                        .frame(width: screen.width * 0.97, height: screen.height * 0.94)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                         .zIndex(11)
                         .transition(.move(edge: .leading))
@@ -52,7 +50,7 @@ struct DashboardView: View {
                 // ── Right Panel (swipe LEFT to open) ──────────────────────────
                 if activePanel == .right {
                     panelContent(safeArea: safe)
-                        .frame(width: fullW * 0.97, height: fullH * 0.94)
+                        .frame(width: screen.width * 0.97, height: screen.height * 0.94)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                         .zIndex(11)
                         .transition(.move(edge: .trailing))
@@ -61,7 +59,7 @@ struct DashboardView: View {
                 // ── Top Panel (swipe DOWN to open) ────────────────────────────
                 if activePanel == .top {
                     panelContent(safeArea: safe)
-                        .frame(width: fullW * 0.94, height: fullH * 0.97)
+                        .frame(width: screen.width * 0.94, height: screen.height * 0.97)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         .zIndex(11)
                         .transition(.move(edge: .top))
@@ -70,7 +68,7 @@ struct DashboardView: View {
                 // ── Bottom Panel (swipe UP to open) ───────────────────────────
                 if activePanel == .bottom {
                     panelContent(safeArea: safe)
-                        .frame(width: fullW * 0.94, height: fullH * 0.97)
+                        .frame(width: screen.width * 0.94, height: screen.height * 0.97)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                         .zIndex(11)
                         .transition(.move(edge: .bottom))
