@@ -1,5 +1,6 @@
 import SwiftUI
 import VisionKit
+import AVFoundation
 
 /// UIViewControllerRepresentable wrapping DataScannerViewController.
 /// - `isScanning` controls whether the camera feed is active.
@@ -53,22 +54,16 @@ final class ScannerContainerViewController: UIViewController {
     
     var isScanning: Bool = false {
         didSet {
-            // Only toggle the scanner if we are actually visible on screen
             guard isViewLoaded, view.window != nil else { return }
-            
-            if isScanning && !dataScanner.isScanning {
-                try? dataScanner.startScanning()
-            } else if !isScanning && dataScanner.isScanning {
-                dataScanner.stopScanning()
-            }
+            applyScanningState()
         }
     }
-    
+
     override func viewDidLoad() {
         super.viewDidLoad()
         addChild(dataScanner)
         view.addSubview(dataScanner.view)
-        
+
         dataScanner.view.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             dataScanner.view.topAnchor.constraint(equalTo: view.topAnchor),
@@ -78,18 +73,24 @@ final class ScannerContainerViewController: UIViewController {
         ])
         dataScanner.didMove(toParent: self)
     }
-    
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        // Now it's 100% physically on screen. Safe to start.
-        if isScanning && !dataScanner.isScanning {
-            try? dataScanner.startScanning()
-        }
+        applyScanningState()
     }
-    
+
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         if dataScanner.isScanning {
+            dataScanner.stopScanning()
+        }
+    }
+
+    private func applyScanningState() {
+        if isScanning && !dataScanner.isScanning {
+            guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else { return }
+            try? dataScanner.startScanning()
+        } else if !isScanning && dataScanner.isScanning {
             dataScanner.stopScanning()
         }
     }

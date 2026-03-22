@@ -1,11 +1,13 @@
 import SwiftUI
 import VisionKit
+import AVFoundation
 
 struct BottomPanelView: View {
     let safeArea: EdgeInsets
 
     @State private var mode: CameraMode = .scan
     @State private var isScanning = false
+    @State private var cameraAuthorized = false
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -18,7 +20,7 @@ struct BottomPanelView: View {
                 VStack(spacing: 0) {
                     // ── Camera area — top 70% ─────────────────────────────────
                     ZStack(alignment: .top) {
-                        if DataScannerViewController.isSupported && DataScannerViewController.isAvailable {
+                        if cameraAuthorized && DataScannerViewController.isSupported && DataScannerViewController.isAvailable {
                             DataScannerView(
                                 isScanning: isScanning && mode == .scan,
                                 onScan: { _ in
@@ -50,8 +52,27 @@ struct BottomPanelView: View {
                 }
             }
         }
-        .onAppear  { isScanning = true  }
+        .onAppear  { requestCameraAccess() }
         .onDisappear { isScanning = false }
+    }
+
+    // MARK: - Camera Permission
+
+    private func requestCameraAccess() {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            cameraAuthorized = true
+            isScanning = true
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    cameraAuthorized = granted
+                    isScanning = granted
+                }
+            }
+        default:
+            cameraAuthorized = false
+        }
     }
 
     // MARK: - Mode Picker
