@@ -7,7 +7,6 @@ struct RightPanelView: View {
 
     @State private var isZoomedOut = false
     @AppStorage("rightPanelSelectedIndex") private var selectedIndex = 0
-    @Namespace private var wheelNamespace
 
     var body: some View {
         GeometryReader { geo in
@@ -18,16 +17,15 @@ struct RightPanelView: View {
                     RightWheelSelector(
                         selectedIndex: $selectedIndex,
                         isZoomedOut: $isZoomedOut,
-                        namespace: wheelNamespace,
                         panelSize: geo.size
                     )
-                    .transition(.opacity)
+                    .transition(.opacity.animation(.easeInOut(duration: 0.2)))
                 } else {
                     RightPageContent(index: selectedIndex)
                         .frame(width: geo.size.width, height: geo.size.height)
-                        .matchedGeometryEffect(id: "rpage_\(selectedIndex)", in: wheelNamespace)
+                        .transition(.pageTransition)
                         .onTapGesture(count: 2) {
-                            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                            withAnimation(.slideBck) {
                                 isZoomedOut = true
                             }
                         }
@@ -67,7 +65,6 @@ struct RightPageContent: View {
 private struct RightWheelSelector: View {
     @Binding var selectedIndex: Int
     @Binding var isZoomedOut: Bool
-    var namespace: Namespace.ID
     let panelSize: CGSize
 
     private let itemCount = 7
@@ -97,7 +94,6 @@ private struct RightWheelSelector: View {
                     .clipShape(RoundedRectangle(cornerRadius: 20))
                     .overlay(RoundedRectangle(cornerRadius: 20)
                         .stroke(Color.white.opacity(0.12), lineWidth: 0.5))
-                    .matchedGeometryEffect(id: "rpage_\(index)", in: namespace)
                     .offset(y: totalOffset)
                     .rotation3DEffect(
                         .degrees(Double(distanceFromCenter) * -35),
@@ -107,7 +103,7 @@ private struct RightWheelSelector: View {
                     .scaleEffect(1.0 - abs(distanceFromCenter) * 0.15)
                     .opacity(1.0 - abs(distanceFromCenter) * 0.4)
                     .onTapGesture {
-                        withAnimation(.spring()) {
+                        withAnimation(selectedIndex == index ? .slideFwd : .spring(response: 0.3, dampingFraction: 0.85)) {
                             if selectedIndex == index { isZoomedOut = false }
                             else { selectedIndex = index }
                         }

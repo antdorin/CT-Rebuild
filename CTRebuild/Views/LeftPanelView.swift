@@ -9,7 +9,6 @@ struct LeftPanelView: View {
     @State private var columnPage: Int = 0
     @State private var occupiedBins: Set<String> = []
     @State private var isZoomedOut = false
-    @Namespace private var wheelNamespace
 
     private let levelLabels = ["A", "B", "C", "D", "E", "F"]
     private let totalColumns = 3  // 1, 2, 3 — wraps infinitely
@@ -31,18 +30,17 @@ struct LeftPanelView: View {
                     LeftWheelSelector(
                         columnPage: $columnPage,
                         isZoomedOut: $isZoomedOut,
-                        namespace: wheelNamespace,
                         panelSize: geo.size,
                         safeArea: safeArea,
                         totalColumns: totalColumns,
                         colNum: colNum
                     )
-                    .transition(.opacity)
+                    .transition(.opacity.animation(.easeInOut(duration: 0.2)))
                 } else {
                     leftPageContent(geo: geo)
-                        .matchedGeometryEffect(id: "lpage_\(colNum(for: columnPage))", in: wheelNamespace)
+                        .transition(.pageTransition)
                         .onTapGesture(count: 2) {
-                            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                            withAnimation(.slideBck) {
                                 isZoomedOut = true
                             }
                         }
@@ -188,7 +186,6 @@ struct LeftPanelView: View {
 private struct LeftWheelSelector: View {
     @Binding var columnPage: Int
     @Binding var isZoomedOut: Bool
-    var namespace: Namespace.ID
     let panelSize: CGSize
     let safeArea: EdgeInsets
     let totalColumns: Int
@@ -232,7 +229,6 @@ private struct LeftWheelSelector: View {
                     .clipShape(RoundedRectangle(cornerRadius: 18))
                     .overlay(RoundedRectangle(cornerRadius: 18)
                         .stroke(Color.white.opacity(0.14), lineWidth: 0.5))
-                    .matchedGeometryEffect(id: "lpage_\(col)", in: namespace)
                     .offset(y: totalOffset)
                     .rotation3DEffect(
                         .degrees(Double(distCenter) * -35),
@@ -242,7 +238,7 @@ private struct LeftWheelSelector: View {
                     .scaleEffect(1.0 - abs(distCenter) * 0.15)
                     .opacity(1.0 - abs(distCenter) * 0.4)
                     .onTapGesture {
-                        withAnimation(.spring()) {
+                        withAnimation(colNum(columnPage) == col ? .slideFwd : .spring(response: 0.3, dampingFraction: 0.85)) {
                             if colNum(columnPage) == col { isZoomedOut = false }
                             else { columnPage = virtualPage }
                         }
