@@ -23,8 +23,8 @@ struct DashboardView: View {
             let safe = geo.safeAreaInsets
 
             ZStack {
-                // ── Black Background — bleeds to all edges ────────────────────
-                Color.black
+                // ── Adaptive Background — black in dark mode, white in light ──
+                Color(uiColor: .systemBackground)
                     .ignoresSafeArea()
 
                 // ── Placeholder Dashboard Content ─────────────────────────────
@@ -96,10 +96,10 @@ struct DashboardView: View {
             Spacer()
             Image(systemName: "shield.fill")
                 .font(.system(size: 60))
-                .foregroundColor(.white.opacity(0.05))
+                .foregroundColor(.primary.opacity(0.05))
             Text("DASHBOARD")
                 .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundColor(.white.opacity(0.07))
+                .foregroundColor(.primary.opacity(0.07))
                 .tracking(6)
             Spacer()
         }
@@ -136,10 +136,10 @@ struct DashboardView: View {
     }
 
     // MARK: - Long Press + Swipe Gesture
-    // Hold 0.01 s → haptic fires → drag to open or switch any panel directly.
+    // Hold 0.2 s → haptic fires → drag to open or switch any panel directly.
 
     private var longPressSwipeGesture: some Gesture {
-        LongPressGesture(minimumDuration: 0.01)
+        LongPressGesture(minimumDuration: 0.2)
             .sequenced(before: DragGesture(minimumDistance: 10))
             .onChanged { state in
                 if case .first(true) = state, !longPressActive {
@@ -155,7 +155,7 @@ struct DashboardView: View {
     }
 
     private func handleDashboardTripleTap() {
-        forceLightMode = true
+        forceLightMode.toggle()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
