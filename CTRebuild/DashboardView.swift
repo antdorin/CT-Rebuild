@@ -126,8 +126,9 @@ struct DashboardView: View {
             TopPanelView(safeArea: safeArea)
         case .bottom:
             BottomPanelView(safeArea: safeArea)
+        case .right:
+            RightPanelView(safeArea: safeArea)
         default:
-            // Translucent material — ignores safe area so blur fills panel edge-to-edge
             Rectangle()
                 .fill(.ultraThinMaterial)
                 .ignoresSafeArea()
