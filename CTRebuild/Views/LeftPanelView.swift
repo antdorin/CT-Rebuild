@@ -58,7 +58,7 @@ struct LeftPanelView: View {
                     }
                     .frame(width: geo.size.width, height: pageH)
                     .clipped()
-                    .gesture(
+                    .simultaneousGesture(
                         DragGesture()
                             .onChanged { dragOffset = $0.translation.height }
                             .onEnded { value in
