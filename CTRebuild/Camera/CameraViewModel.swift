@@ -21,13 +21,14 @@ final class CameraViewModel: NSObject, ObservableObject {
     @Published private(set) var permission: CameraPermission = .undetermined
     @Published private(set) var lastScan: ScanResult? = nil
 
-    // Session & layer exposed to the preview view
+    // Session exposed to the preview view
     let session = AVCaptureSession()
-    private(set) var previewLayer: AVCaptureVideoPreviewLayer?
 
     // Background queue — session never runs on main thread
     private let sessionQueue = DispatchQueue(label: "com.ctrebuild.camera.session", qos: .userInitiated)
     private var isConfigured = false
+    // Stored so we can nil its delegate on stop, breaking the AVFoundation retain cycle
+    private var metadataOutput: AVCaptureMetadataOutput?
 
     // MARK: - Permission
 
@@ -35,23 +36,15 @@ final class CameraViewModel: NSObject, ObservableObject {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
             permission = .authorized
-            // startSession() will be called by the caller (onAppear)
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                 DispatchQueue.main.async {
                     self?.permission = granted ? .authorized : .denied
-                    // startSession wasn't called when undetermined — start it now
                     if granted { self?.startSession() }
                 }
             }
         default:
             permission = .denied
-        }
-    }
-
-    deinit {
-        sessionQueue.sync {
-            if session.isRunning { session.stopRunning() }
         }
     }
 
@@ -68,8 +61,11 @@ final class CameraViewModel: NSObject, ObservableObject {
 
     func stopSession() {
         sessionQueue.async { [weak self] in
-            guard let self, self.session.isRunning else { return }
-            self.session.stopRunning()
+            guard let self else { return }
+            // Nil out the delegate first — this breaks the AVFoundation strong-reference
+            // cycle so CameraViewModel can be deallocated when the panel closes.
+            self.metadataOutput?.setMetadataObjectsDelegate(nil, queue: .main)
+            if self.session.isRunning { self.session.stopRunning() }
         }
     }
 
@@ -104,6 +100,7 @@ final class CameraViewModel: NSObject, ObservableObject {
         ]
         output.metadataObjectTypes = supported.filter { output.availableMetadataObjectTypes.contains($0) }
         output.setMetadataObjectsDelegate(self, queue: .main)
+        metadataOutput = output
     }
 }
 
