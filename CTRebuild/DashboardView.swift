@@ -75,8 +75,8 @@ struct DashboardView: View {
                         .transition(.move(edge: .bottom))
                 }
             }
-            .animation(.easeInOut(duration: 0.1), value: activePanel)
-            // LongPress fires haptic immediately at 0.2 s (no sequencing delay).
+            .animation(.easeInOut(duration: 0.07), value: activePanel)
+            // LongPress fires haptic immediately at 0.07 s (no sequencing delay).
             // Drag reads longPressActive to decide threshold + switch behaviour.
             // simultaneousGesture ensures close swipe fires even when child views
             // (e.g. left-panel grid) have their own DragGestures active.
@@ -122,6 +122,8 @@ struct DashboardView: View {
         switch panel {
         case .left:
             LeftPanelView(safeArea: safeArea)
+        case .top:
+            TopPanelView(safeArea: safeArea)
         case .bottom:
             BottomPanelView(safeArea: safeArea)
         default:
