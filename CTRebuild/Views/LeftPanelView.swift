@@ -7,7 +7,6 @@ struct LeftPanelView: View {
 
     // Virtual index — can grow negative/positive without clamping (infinite)
     @State private var columnPage: Int = 0
-    @State private var dragOffset: CGFloat = 0
     @State private var occupiedBins: Set<String> = []
 
     private let levelLabels = ["A", "B", "C", "D", "E", "F"]
@@ -53,23 +52,19 @@ struct LeftPanelView: View {
                             let page = columnPage + offset
                             gridPage(colNum: colNum(for: page), cellSize: cellSize)
                                 .frame(width: geo.size.width, height: pageH)
-                                .offset(y: CGFloat(offset) * pageH + dragOffset)
+                                .offset(y: CGFloat(offset) * pageH)
                         }
                     }
                     .frame(width: geo.size.width, height: pageH)
                     .clipped()
                     .simultaneousGesture(
                         DragGesture()
-                            .onChanged { dragOffset = $0.translation.height }
                             .onEnded { value in
                                 let threshold = pageH * 0.2
-                                withAnimation(.easeInOut(duration: 0.22)) {
-                                    if value.translation.height < -threshold {
-                                        columnPage += 1
-                                    } else if value.translation.height > threshold {
-                                        columnPage -= 1
-                                    }
-                                    dragOffset = 0
+                                if value.translation.height < -threshold {
+                                    columnPage += 1
+                                } else if value.translation.height > threshold {
+                                    columnPage -= 1
                                 }
                             }
                     )
@@ -98,7 +93,7 @@ struct LeftPanelView: View {
         VStack(spacing: 0) {
             Spacer(minLength: 0)
             VStack(spacing: 12) {
-                sectionGrid(colNum: colNum, sectionLetter: "A", positions: 4, cellSize: cellSize)
+                sectionGrid(colNum: colNum, sectionLetter: "A", positions: 4, blankCount: 2, cellSize: cellSize)
                 sectionGrid(colNum: colNum, sectionLetter: "B", positions: 6, cellSize: cellSize)
             }
             .padding(.horizontal, 8)
@@ -109,7 +104,7 @@ struct LeftPanelView: View {
     // MARK: - Section Grid
 
     @ViewBuilder
-    private func sectionGrid(colNum: Int, sectionLetter: String, positions: Int, cellSize: CGFloat) -> some View {
+    private func sectionGrid(colNum: Int, sectionLetter: String, positions: Int, blankCount: Int = 0, cellSize: CGFloat) -> some View {
         let columnCode = "\(colNum)\(sectionLetter)"
 
         VStack(spacing: 4) {
@@ -118,9 +113,25 @@ struct LeftPanelView: View {
                     ForEach(1...positions, id: \.self) { pos in
                         binCell(code: "\(columnCode)-\(pos)\(level)", size: cellSize)
                     }
+                    ForEach(0..<blankCount, id: \.self) { _ in
+                        blankCell(size: cellSize)
+                    }
                 }
             }
         }
+    }
+
+    // MARK: - Blank Cell
+
+    @ViewBuilder
+    private func blankCell(size: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: 6)
+            .fill(Color.white.opacity(0.02))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.white.opacity(0.04), lineWidth: 0.5)
+            )
+            .frame(width: size, height: size)
     }
 
     // MARK: - Bin Cell
