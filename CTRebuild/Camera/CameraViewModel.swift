@@ -2,7 +2,8 @@ import AVFoundation
 
 // MARK: - Scan Result
 
-struct ScanResult: Equatable {
+struct ScanResult: Equatable, Identifiable {
+    var id: String { value }
     let value: String
     let symbology: AVMetadataObject.ObjectType
 }

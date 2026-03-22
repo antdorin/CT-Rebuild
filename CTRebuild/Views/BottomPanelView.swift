@@ -8,6 +8,8 @@ struct BottomPanelView: View {
     @State private var zoomAtDragStart: CGFloat? = nil   // nil = not dragging
     @State private var showZoomBadge: Bool = false
     @State private var zoomBadgeTask: DispatchWorkItem? = nil
+    // Modal routing
+    @State private var pendingScan: ScanResult? = nil
 
     var body: some View {
         ZStack {
@@ -116,6 +118,18 @@ struct BottomPanelView: View {
         }
         .onDisappear {
             viewModel.stopSession()
+        }
+        // When a new scan arrives, pause duplicate firing and route to the correct modal
+        .onChange(of: viewModel.lastScan) { scan in
+            guard let scan else { return }
+            pendingScan = scan
+        }
+        .sheet(item: $pendingScan) { scan in
+            if let record = ScanStore.shared.record(for: scan.value) {
+                AssignedItemModal(record: record) { pendingScan = nil }
+            } else {
+                UnassignedItemModal(rawBarcode: scan.value) { pendingScan = nil }
+            }
         }
     }
 
