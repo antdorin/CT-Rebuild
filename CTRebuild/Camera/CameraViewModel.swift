@@ -29,6 +29,10 @@ final class CameraViewModel: NSObject, ObservableObject {
     private var isConfigured = false
     // Stored so we can nil its delegate on stop, breaking the AVFoundation retain cycle
     private var metadataOutput: AVCaptureMetadataOutput?
+    // Set by CameraPreviewView — used to transform bounding boxes to screen coords
+    weak var previewLayer: AVCaptureVideoPreviewLayer?
+    @Published private(set) var scanTrackingRect: CGRect? = nil
+    private var trackingClearWork: DispatchWorkItem?
 
     // MARK: - Permission
 
@@ -60,6 +64,9 @@ final class CameraViewModel: NSObject, ObservableObject {
     }
 
     func stopSession() {
+        trackingClearWork?.cancel()
+        trackingClearWork = nil
+        scanTrackingRect = nil
         sessionQueue.async { [weak self] in
             guard let self else { return }
             // Nil out the delegate first — this breaks the AVFoundation strong-reference
@@ -115,6 +122,16 @@ extension CameraViewModel: AVCaptureMetadataOutputObjectsDelegate {
         guard let object = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
               let value = object.stringValue,
               !value.isEmpty else { return }
+
+        // Transform barcode bounds from camera coords → preview-layer screen coords
+        if let layer = previewLayer,
+           let transformed = layer.transformedMetadataObject(for: object) {
+            scanTrackingRect = transformed.bounds
+            trackingClearWork?.cancel()
+            let work = DispatchWorkItem { [weak self] in self?.scanTrackingRect = nil }
+            trackingClearWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: work)
+        }
 
         let result = ScanResult(value: value, symbology: object.type)
         guard result != lastScan else { return }   // de-duplicate rapid repeats

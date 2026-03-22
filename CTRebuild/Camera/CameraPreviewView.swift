@@ -2,14 +2,16 @@ import SwiftUI
 import AVFoundation
 
 /// A SwiftUI view that hosts an AVCaptureVideoPreviewLayer.
-/// Pass in the shared `AVCaptureSession` from `CameraViewModel`.
+/// Accepts the full CameraViewModel so it can wire up the previewLayer reference
+/// needed for bounding-box coordinate transforms.
 struct CameraPreviewView: UIViewRepresentable {
-    let session: AVCaptureSession
+    let viewModel: CameraViewModel
 
     func makeUIView(context: Context) -> PreviewUIView {
         let view = PreviewUIView()
-        view.previewLayer.session = session
+        view.previewLayer.session = viewModel.session
         view.previewLayer.videoGravity = .resizeAspectFill
+        viewModel.previewLayer = view.previewLayer
         return view
     }
 

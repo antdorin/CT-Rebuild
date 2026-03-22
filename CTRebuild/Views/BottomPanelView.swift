@@ -22,7 +22,7 @@ struct BottomPanelView: View {
 
                         switch viewModel.permission {
                         case .authorized:
-                            CameraPreviewView(session: viewModel.session)
+                            CameraPreviewView(viewModel: viewModel)
                         case .denied:
                             deniedView
                         case .undetermined:
@@ -30,7 +30,15 @@ struct BottomPanelView: View {
                             ProgressView()
                                 .tint(.white)
                         }
+
+                        // ── Target lock-on reticle ────────────────────────
+                        if let rect = viewModel.scanTrackingRect {
+                            scanReticle(rect: rect)
+                                .transition(.opacity)
+                                .allowsHitTesting(false)
+                        }
                     }
+                    .animation(.easeOut(duration: 0.12), value: viewModel.scanTrackingRect != nil)
                     .frame(height: geo.size.height * 0.70)
                     .clipped()
 
@@ -65,6 +73,47 @@ struct BottomPanelView: View {
         }
         .onDisappear {
             viewModel.stopSession()
+        }
+    }
+
+    // MARK: - Scan Reticle
+
+    private func scanReticle(rect: CGRect) -> some View {
+        Canvas { ctx, _ in
+            let arm: CGFloat = min(rect.width, rect.height) * 0.30
+            let lw: CGFloat = 2.5
+            let bright = GraphicsContext.Shading.color(.green.opacity(0.9))
+
+            // Subtle full-box outline
+            ctx.stroke(Path(rect), with: .color(.green.opacity(0.18)), lineWidth: 0.6)
+
+            // Top-left corner
+            var p = Path()
+            p.move(to:    CGPoint(x: rect.minX,       y: rect.minY + arm))
+            p.addLine(to: CGPoint(x: rect.minX,       y: rect.minY))
+            p.addLine(to: CGPoint(x: rect.minX + arm, y: rect.minY))
+            ctx.stroke(p, with: bright, lineWidth: lw)
+
+            // Top-right corner
+            p = Path()
+            p.move(to:    CGPoint(x: rect.maxX - arm, y: rect.minY))
+            p.addLine(to: CGPoint(x: rect.maxX,       y: rect.minY))
+            p.addLine(to: CGPoint(x: rect.maxX,       y: rect.minY + arm))
+            ctx.stroke(p, with: bright, lineWidth: lw)
+
+            // Bottom-left corner
+            p = Path()
+            p.move(to:    CGPoint(x: rect.minX,       y: rect.maxY - arm))
+            p.addLine(to: CGPoint(x: rect.minX,       y: rect.maxY))
+            p.addLine(to: CGPoint(x: rect.minX + arm, y: rect.maxY))
+            ctx.stroke(p, with: bright, lineWidth: lw)
+
+            // Bottom-right corner
+            p = Path()
+            p.move(to:    CGPoint(x: rect.maxX - arm, y: rect.maxY))
+            p.addLine(to: CGPoint(x: rect.maxX,       y: rect.maxY))
+            p.addLine(to: CGPoint(x: rect.maxX,       y: rect.maxY - arm))
+            ctx.stroke(p, with: bright, lineWidth: lw)
         }
     }
 
