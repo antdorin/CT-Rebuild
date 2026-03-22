@@ -1,0 +1,8 @@
+<Application x:Class="CTHub.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <!-- Base colours that adapt to system theme via triggers in individual windows -->
+    </Application.Resources>
+</Application>

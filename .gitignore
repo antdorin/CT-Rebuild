@@ -28,6 +28,10 @@ xcuserdata/
 .build/
 *.resolved
 
+# .NET / CT-Hub
+CT-Hub/bin/
+CT-Hub/obj/
+
 # Fastlane
 fastlane/report.xml
 fastlane/Preview.html

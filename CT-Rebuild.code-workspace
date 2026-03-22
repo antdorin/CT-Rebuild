@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "CT-Rebuild (iOS)",
+			"path": "."
+		},
+		{
+			"name": "CT-Hub (Desktop)",
+			"path": "CT-Hub"
+		}
+	],
+	"settings": {}
+}
