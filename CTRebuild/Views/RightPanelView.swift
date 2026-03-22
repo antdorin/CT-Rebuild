@@ -4,10 +4,19 @@ struct RightPanelView: View {
     let safeArea: EdgeInsets
 
     @State private var isZoomedOut = false
-    @State private var selectedIndex = 0
+    @AppStorage("rightPanelSelectedIndex") private var selectedIndex = 0
     @Namespace private var wheelNamespace
 
-    let items: [Color] = [.red, .blue, .green, .purple, .orange, .pink, .yellow]
+    // 7 distinct grey shades from dark → light
+    let items: [Color] = [
+        Color(white: 0.18),
+        Color(white: 0.26),
+        Color(white: 0.34),
+        Color(white: 0.42),
+        Color(white: 0.50),
+        Color(white: 0.58),
+        Color(white: 0.66),
+    ]
 
     var body: some View {
         ZStack {
@@ -28,7 +37,7 @@ struct RightPanelView: View {
                     .overlay(
                         Text("Page \(selectedIndex + 1)")
                             .font(.system(size: 40, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
+                            .foregroundColor(.white.opacity(0.85))
                     )
                     .ignoresSafeArea()
                     .onTapGesture(count: 2) {
@@ -49,19 +58,27 @@ private struct VerticalWheelSelector: View {
     var namespace: Namespace.ID
     let items: [Color]
 
-    @State private var dragOffset: CGFloat = 0
+    // @GestureState resets to 0 atomically when the gesture ends,
+    // eliminating the one-frame jump caused by selectedIndex and dragOffset
+    // updating in separate passes.
+    @GestureState private var dragOffset: CGFloat = 0
 
     var body: some View {
         ZStack {
             ForEach(0..<items.count, id: \.self) { index in
-                let baseOffset       = CGFloat(index - selectedIndex) * 130
-                let totalOffset      = baseOffset + dragOffset
+                let baseOffset         = CGFloat(index - selectedIndex) * 130
+                let totalOffset        = baseOffset + dragOffset
                 let distanceFromCenter = totalOffset / 130
 
                 RoundedRectangle(cornerRadius: 20)
                     .fill(items[index])
                     .matchedGeometryEffect(id: "page_\(index)", in: namespace)
                     .frame(width: 280, height: 160)
+                    .overlay(
+                        Text("Page \(index + 1)")
+                            .font(.system(size: 22, weight: .semibold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.75))
+                    )
                     .offset(y: totalOffset)
                     .rotation3DEffect(
                         .degrees(Double(distanceFromCenter) * -35),
@@ -81,18 +98,16 @@ private struct VerticalWheelSelector: View {
         .contentShape(Rectangle())
         .gesture(
             DragGesture()
-                .onChanged { value in
-                    dragOffset = value.translation.height
+                .updating($dragOffset) { value, state, _ in
+                    state = value.translation.height
                 }
                 .onEnded { value in
                     let velocity  = value.predictedEndTranslation.height
-                    let threshold: CGFloat = 65
+                    let threshold: CGFloat = 80
                     let moveCount = -Int((velocity / threshold).rounded())
-
+                    let target    = max(0, min(items.count - 1, selectedIndex + moveCount))
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                        let targetIndex = selectedIndex + moveCount
-                        selectedIndex   = max(0, min(items.count - 1, targetIndex))
-                        dragOffset      = 0
+                        selectedIndex = target
                     }
                 }
         )
