@@ -30,6 +30,8 @@
 		<key>UIColorName</key>
 		<string>LaunchBackground</string>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Camera is used to scan QR codes and barcodes in the warehouse.</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

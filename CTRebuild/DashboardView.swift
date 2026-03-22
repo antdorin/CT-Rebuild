@@ -40,7 +40,7 @@ struct DashboardView: View {
 
                 // ── Left Panel (swipe RIGHT to open) ──────────────────────────
                 if activePanel == .left {
-                    panelContent(safeArea: safe)
+                    panelContent(for: .left, safeArea: safe)
                         .frame(width: screen.width * 0.97, height: screen.height * 0.94)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                         .zIndex(11)
@@ -49,7 +49,7 @@ struct DashboardView: View {
 
                 // ── Right Panel (swipe LEFT to open) ──────────────────────────
                 if activePanel == .right {
-                    panelContent(safeArea: safe)
+                    panelContent(for: .right, safeArea: safe)
                         .frame(width: screen.width * 0.97, height: screen.height * 0.94)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                         .zIndex(11)
@@ -58,7 +58,7 @@ struct DashboardView: View {
 
                 // ── Top Panel (swipe DOWN to open) ────────────────────────────
                 if activePanel == .top {
-                    panelContent(safeArea: safe)
+                    panelContent(for: .top, safeArea: safe)
                         .frame(width: screen.width * 0.94, height: screen.height * 0.97)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         .zIndex(11)
@@ -67,7 +67,7 @@ struct DashboardView: View {
 
                 // ── Bottom Panel (swipe UP to open) ───────────────────────────
                 if activePanel == .bottom {
-                    panelContent(safeArea: safe)
+                    panelContent(for: .bottom, safeArea: safe)
                         .frame(width: screen.width * 0.94, height: screen.height * 0.97)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                         .zIndex(11)
@@ -104,8 +104,12 @@ struct DashboardView: View {
 
     // MARK: - Panel Content
 
-    private func panelContent(safeArea: EdgeInsets) -> some View {
-        ZStack {
+    @ViewBuilder
+    private func panelContent(for panel: Panel, safeArea: EdgeInsets) -> some View {
+        switch panel {
+        case .bottom:
+            BottomPanelView(safeArea: safeArea)
+        default:
             // Translucent material — ignores safe area so blur fills panel edge-to-edge
             Rectangle()
                 .fill(.ultraThinMaterial)
@@ -127,7 +131,7 @@ struct DashboardView: View {
     // Hold 0.45 s → haptic fires → drag to open or switch any panel directly.
 
     private var longPressSwipeGesture: some Gesture {
-        LongPressGesture(minimumDuration: 0.45)
+        LongPressGesture(minimumDuration: 0.10)
             .sequenced(before: DragGesture(minimumDistance: 10))
             .onChanged { state in
                 if case .first(true) = state, !longPressActive {
