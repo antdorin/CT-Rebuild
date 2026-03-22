@@ -34,19 +34,7 @@ struct TopPanelView: View {
                     .padding(.top, safeArea.top + 16)
                     .padding(.bottom, 8)
 
-                Spacer(minLength: 0)
-
-                // ── Display ───────────────────────────────────────────────────
-                Text(formattedDisplay)
-                    .font(.system(size: 48, weight: .thin, design: .monospaced))
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.35)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
-
-                // ── Button grid ───────────────────────────────────────────────
+                // ── Display + Button grid anchored to bottom ──────────────────
                 GeometryReader { geo in
                     let hPad: CGFloat = 16
                     let spacing: CGFloat = 10
@@ -54,23 +42,35 @@ struct TopPanelView: View {
                     let btnW = (geo.size.width - hPad * 2 - spacing * (cols - 1)) / cols
                     let btnH = btnW * 0.82
 
-                    VStack(spacing: spacing) {
-                        ForEach(rows.indices, id: \.self) { r in
-                            HStack(spacing: spacing) {
-                                ForEach(rows[r].indices, id: \.self) { c in
-                                    let key = rows[r][c]
-                                    calcButton(key: key,
-                                               width: key == .digit(0) ? btnW * 2 + spacing : btnW,
-                                               height: btnH)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(spacing: 0) {
+                        Spacer(minLength: 0)
+
+                        Text(formattedDisplay)
+                            .font(.system(size: 48, weight: .thin, design: .monospaced))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.35)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
                             .padding(.horizontal, hPad)
+                            .padding(.bottom, 12)
+
+                        VStack(spacing: spacing) {
+                            ForEach(rows.indices, id: \.self) { r in
+                                HStack(spacing: spacing) {
+                                    ForEach(rows[r].indices, id: \.self) { c in
+                                        let key = rows[r][c]
+                                        calcButton(key: key,
+                                                   width: key == .digit(0) ? btnW * 2 + spacing : btnW,
+                                                   height: btnH)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, hPad)
+                            }
                         }
+                        .padding(.bottom, safeArea.bottom + 16)
                     }
-                    .frame(maxHeight: .infinity, alignment: .bottom)
                 }
-                .padding(.bottom, safeArea.bottom + 16)
             }
         }
     }
@@ -93,16 +93,15 @@ struct TopPanelView: View {
     @ViewBuilder
     private func calcButton(key: CalcKey, width: CGFloat, height: CGFloat) -> some View {
         let (label, fg, bg) = appearance(for: key)
-        let isActiveOp = pendingOp == operatorForKey(key) && !freshEntry
 
         Button {
             handle(key)
         } label: {
             Text(label)
                 .font(.system(size: height * 0.38, weight: .regular, design: .rounded))
-                .foregroundColor(isActiveOp ? bg : fg)
+                .foregroundColor(fg)
                 .frame(width: width, height: height)
-                .background(isActiveOp ? fg : bg, in: RoundedRectangle(cornerRadius: height * 0.28))
+                .background(bg, in: RoundedRectangle(cornerRadius: height * 0.28))
         }
         .buttonStyle(.plain)
     }

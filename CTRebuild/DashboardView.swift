@@ -11,7 +11,6 @@ enum Panel: Equatable {
 struct DashboardView: View {
     @State private var activePanel: Panel = .none
     @State private var longPressActive: Bool = false
-    @State private var forceLightMode: Bool = false
     private let screen = UIScreen.main.bounds
 
     var body: some View {
@@ -82,16 +81,9 @@ struct DashboardView: View {
             // (e.g. left-panel grid) have their own DragGestures active.
             .simultaneousGesture(dragGesture)
             .simultaneousGesture(longPressHapticGesture)
-            .simultaneousGesture(
-                TapGesture(count: 3)
-                    .onEnded {
-                        handleDashboardTripleTap()
-                    }
-            )
         }
         .ignoresSafeArea()
         .background(Color(uiColor: .systemBackground).ignoresSafeArea())
-        .preferredColorScheme(forceLightMode ? .light : nil)
     }
 
     // MARK: - Placeholder Content
@@ -157,11 +149,6 @@ struct DashboardView: View {
                 longPressActive = true
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             }
-    }
-
-    private func handleDashboardTripleTap() {
-        forceLightMode.toggle()
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     // MARK: - Shared Resolution
