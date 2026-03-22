@@ -110,7 +110,6 @@ private struct RightWheelSelector: View {
                     }
             }
         }
-        .drawingGroup()
         .contentShape(Rectangle())
         .gesture(
             DragGesture()
