@@ -66,14 +66,14 @@ private struct VerticalWheelSelector: View {
     var body: some View {
         ZStack {
             ForEach(0..<items.count, id: \.self) { index in
-                let baseOffset         = CGFloat(index - selectedIndex) * 130
+                let baseOffset         = CGFloat(index - selectedIndex) * 580
                 let totalOffset        = baseOffset + dragOffset
-                let distanceFromCenter = totalOffset / 130
+                let distanceFromCenter = totalOffset / 580
 
                 RoundedRectangle(cornerRadius: 20)
                     .fill(items[index])
                     .matchedGeometryEffect(id: "page_\(index)", in: namespace)
-                    .frame(width: 280, height: 160)
+                    .frame(width: 320, height: 560)
                     .overlay(
                         Text("Page \(index + 1)")
                             .font(.system(size: 22, weight: .semibold, design: .rounded))
@@ -102,8 +102,8 @@ private struct VerticalWheelSelector: View {
                     state = value.translation.height
                 }
                 .onEnded { value in
-                    // Base shift: how many 130-pt item slots did the finger cross?
-                    let dragMoves = -Int((value.translation.height / 130).rounded())
+                    // Base shift: how many 580-pt item slots did the finger cross?
+                    let dragMoves = -Int((value.translation.height / 580).rounded())
 
                     // Flick boost: pure velocity delta (predicted minus actual).
                     // Only adds ±1 — never lets a fast swipe skip multiple pages.
