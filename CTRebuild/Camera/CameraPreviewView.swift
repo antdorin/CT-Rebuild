@@ -1,32 +1,50 @@
 import SwiftUI
-import AVFoundation
+import VisionKit
 
-// UIViewRepresentable that hosts AVCaptureVideoPreviewLayer.
-// Pass the session from CameraViewModel; the preview updates automatically
-// whenever the session is running.
-struct CameraPreviewView: UIViewRepresentable {
-    let session: AVCaptureSession
+/// UIViewControllerRepresentable wrapping DataScannerViewController.
+/// - `isScanning` controls whether the camera feed is active.
+/// - `onScan` fires with the decoded string value whenever a barcode/QR is recognized.
+struct DataScannerView: UIViewControllerRepresentable {
+    var isScanning: Bool
+    var onScan: (String) -> Void
 
-    func makeUIView(context: Context) -> PreviewUIView {
-        let view = PreviewUIView()
-        view.previewLayer.session = session
-        view.previewLayer.videoGravity = .resizeAspectFill
-        return view
+    func makeUIViewController(context: Context) -> DataScannerViewController {
+        let vc = DataScannerViewController(
+            recognizedDataTypes: [.barcode()],   // covers QR + all 1-D/2-D formats
+            qualityLevel: .fast,
+            recognizesMultipleItems: false,
+            isHighlightingEnabled: true
+        )
+        vc.delegate = context.coordinator
+        return vc
     }
 
-    func updateUIView(_ uiView: PreviewUIView, context: Context) {
-        // session is set once; no updates needed
+    func updateUIViewController(_ vc: DataScannerViewController, context: Context) {
+        if isScanning {
+            try? vc.startScanning()
+        } else {
+            vc.stopScanning()
+        }
     }
 
-    // MARK: - Host UIView
+    func makeCoordinator() -> Coordinator { Coordinator(onScan: onScan) }
 
-    final class PreviewUIView: UIView {
-        override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
-        var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
+    // MARK: - Coordinator
 
-        override func layoutSubviews() {
-            super.layoutSubviews()
-            previewLayer.frame = bounds
+    final class Coordinator: NSObject, DataScannerViewControllerDelegate {
+        let onScan: (String) -> Void
+        init(onScan: @escaping (String) -> Void) { self.onScan = onScan }
+
+        func dataScanner(
+            _ dataScanner: DataScannerViewController,
+            didAdd addedItems: [RecognizedItem],
+            allItems: [RecognizedItem]
+        ) {
+            guard let item = addedItems.first else { return }
+            switch item {
+            case .barcode(let b): onScan(b.payloadStringValue ?? "")
+            default: break
+            }
         }
     }
 }

@@ -1,9 +1,11 @@
 import SwiftUI
+import VisionKit
 
 struct BottomPanelView: View {
     let safeArea: EdgeInsets
 
-    @StateObject private var vm = CameraViewModel()
+    @State private var mode: CameraMode = .scan
+    @State private var isScanning = false
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -14,11 +16,28 @@ struct BottomPanelView: View {
 
             GeometryReader { geo in
                 VStack(spacing: 0) {
-                    // ── Camera preview — top 70% ──────────────────────────────
+                    // ── Camera area — top 70% ─────────────────────────────────
                     ZStack(alignment: .top) {
-                        CameraPreviewView(session: vm.session)
+                        if DataScannerViewController.isSupported && DataScannerViewController.isAvailable {
+                            DataScannerView(
+                                isScanning: isScanning && mode == .scan,
+                                onScan: { _ in
+                                    // TODO: forward scanned value to WarehouseAPIService
+                                }
+                            )
                             .frame(height: geo.size.height * 0.70)
                             .clipped()
+                        } else {
+                            // Simulator fallback — plain dark rect
+                            Rectangle()
+                                .fill(Color.black.opacity(0.6))
+                                .frame(height: geo.size.height * 0.70)
+                                .overlay(
+                                    Text("Camera unavailable")
+                                        .font(.caption)
+                                        .foregroundColor(.white.opacity(0.4))
+                                )
+                        }
 
                         // Mode toggle floated at top of camera area
                         modePicker
@@ -31,19 +50,16 @@ struct BottomPanelView: View {
                 }
             }
         }
-        .onAppear  { vm.start() }
-        .onDisappear { vm.stop() }
+        .onAppear  { isScanning = true  }
+        .onDisappear { isScanning = false }
     }
 
     // MARK: - Mode Picker
 
     private var modePicker: some View {
-        Picker("Mode", selection: Binding(
-            get: { vm.mode },
-            set: { vm.switchMode(to: $0) }
-        )) {
-            ForEach(CameraMode.allCases) { mode in
-                Text(mode.rawValue).tag(mode)
+        Picker("Mode", selection: $mode) {
+            ForEach(CameraMode.allCases) { m in
+                Text(m.rawValue).tag(m)
             }
         }
         .pickerStyle(.segmented)
