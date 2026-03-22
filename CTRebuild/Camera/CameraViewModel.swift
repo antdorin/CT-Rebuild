@@ -1,5 +1,4 @@
 import AVFoundation
-import Observation
 
 // MARK: - Scan Result
 
@@ -16,12 +15,11 @@ enum CameraPermission {
 
 // MARK: - CameraViewModel
 
-@Observable
-final class CameraViewModel: NSObject {
+final class CameraViewModel: NSObject, ObservableObject {
 
     // Public state observed by the UI
-    private(set) var permission: CameraPermission = .undetermined
-    private(set) var lastScan: ScanResult? = nil
+    @Published private(set) var permission: CameraPermission = .undetermined
+    @Published private(set) var lastScan: ScanResult? = nil
 
     // Session & layer exposed to the preview view
     let session = AVCaptureSession()

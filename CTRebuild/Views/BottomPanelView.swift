@@ -4,7 +4,7 @@ import AVFoundation
 struct BottomPanelView: View {
     let safeArea: EdgeInsets
 
-    @State private var viewModel = CameraViewModel()
+    @StateObject private var viewModel = CameraViewModel()
 
     var body: some View {
         ZStack {
