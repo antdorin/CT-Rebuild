@@ -141,8 +141,6 @@ struct LeftPanelView: View {
     }
 }
 
-
-    var body: some View {
         ZStack {
             Rectangle()
                 .fill(.ultraThinMaterial)
