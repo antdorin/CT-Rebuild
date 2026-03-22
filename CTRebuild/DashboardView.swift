@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 // MARK: - Panel State
 
@@ -87,6 +88,9 @@ struct DashboardView: View {
         }
         .ignoresSafeArea()
         .background(Color(uiColor: .systemBackground).ignoresSafeArea())
+        .onAppear {
+            AVCaptureDevice.requestAccess(for: .video) { _ in }
+        }
         .preferredColorScheme(forceLightMode ? .light : nil)
     }
 
