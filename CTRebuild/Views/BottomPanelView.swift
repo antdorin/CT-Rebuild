@@ -134,7 +134,7 @@ struct BottomPanelView: View {
                     recentScans.removeFirst(recentScans.count - maxRecent)
                 }
             }
-            pendingScan = scan
+            // Modal only opens when the user taps a row — not automatically on scan
         }
         .sheet(item: $pendingScan) { scan in
             if let record = ScanStore.shared.record(for: scan.value) {
