@@ -76,8 +76,10 @@ struct DashboardView: View {
                 }
             }
             .animation(.easeInOut(duration: 0.1), value: activePanel)
-            // ExclusiveGesture: hold+drag takes priority over plain swipe
-            .gesture(ExclusiveGesture(longPressSwipeGesture, swipeGesture))
+            // LongPress fires haptic immediately at 0.2 s (no sequencing delay).
+            // Drag reads longPressActive to decide threshold + switch behaviour.
+            .gesture(dragGesture)
+            .simultaneousGesture(longPressHapticGesture)
             .simultaneousGesture(
                 TapGesture(count: 3)
                     .onEnded {
@@ -126,32 +128,27 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Plain Swipe Gesture
-    // Opens a panel from closed state; closes on reverse swipe.
+    // MARK: - Drag Gesture
+    // minimumDistance: 10 — the 40 pt threshold for plain swipes is enforced
+    // inside resolveSwipe so long-press+drag stays responsive at low distances.
 
-    private var swipeGesture: some Gesture {
-        DragGesture(minimumDistance: 40)
+    private var dragGesture: some Gesture {
+        DragGesture(minimumDistance: 10)
             .onEnded { value in
-                resolveSwipe(translation: value.translation, allowSwitch: false)
+                let wasLongPress = longPressActive
+                longPressActive = false
+                resolveSwipe(translation: value.translation, allowSwitch: wasLongPress)
             }
     }
 
-    // MARK: - Long Press + Swipe Gesture
-    // Hold 0.2 s → haptic fires → drag to open or switch any panel directly.
+    // MARK: - Long Press Haptic Gesture
+    // Fires immediately when 0.2 s elapses — no sequencing, no extra touch needed.
 
-    private var longPressSwipeGesture: some Gesture {
+    private var longPressHapticGesture: some Gesture {
         LongPressGesture(minimumDuration: 0.2)
-            .sequenced(before: DragGesture(minimumDistance: 10))
-            .onChanged { state in
-                if case .first(true) = state, !longPressActive {
-                    longPressActive = true
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                }
-            }
-            .onEnded { state in
-                defer { longPressActive = false }
-                guard case .second(true, let drag?) = state else { return }
-                resolveSwipe(translation: drag.translation, allowSwitch: true)
+            .onEnded { _ in
+                longPressActive = true
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             }
     }
 
