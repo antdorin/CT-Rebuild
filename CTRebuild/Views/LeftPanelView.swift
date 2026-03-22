@@ -196,9 +196,9 @@ private struct LeftWheelSelector: View {
     let totalColumns: Int
     let colNum: (Int) -> Int
 
-    private let cardW: CGFloat = 280
-    private let cardH: CGFloat = 480
-    private let spacing: CGFloat = 500
+    private let cardW: CGFloat = 320
+    private let cardH: CGFloat = 560
+    private let spacing: CGFloat = 580
 
     @State private var dragOffset: CGFloat = 0
 
@@ -242,6 +242,7 @@ private struct LeftWheelSelector: View {
                     )
                     .scaleEffect(1.0 - abs(distCenter) * 0.15)
                     .opacity(1.0 - abs(distCenter) * 0.4)
+                    .zIndex(1.0 - abs(distCenter) * 0.5)
                     .onTapGesture {
                         withAnimation(colNum(columnPage) == col ? .slideFwd : .spring(response: 0.3, dampingFraction: 0.85)) {
                             if colNum(columnPage) == col { isPPOpen = false }
@@ -250,6 +251,7 @@ private struct LeftWheelSelector: View {
                     }
             }
         }
+        .frame(width: panelSize.width, height: panelSize.height)
         .contentShape(Rectangle())
         .gesture(
             DragGesture()

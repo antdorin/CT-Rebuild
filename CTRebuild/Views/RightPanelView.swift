@@ -105,6 +105,7 @@ private struct RightWheelSelector: View {
                     )
                     .scaleEffect(1.0 - abs(distanceFromCenter) * 0.15)
                     .opacity(1.0 - abs(distanceFromCenter) * 0.4)
+                    .zIndex(1.0 - abs(distanceFromCenter) * 0.5)
                     .onTapGesture {
                         withAnimation(selectedIndex == index ? .slideFwd : .spring(response: 0.3, dampingFraction: 0.85)) {
                             if selectedIndex == index { isPPOpen = false }
@@ -113,6 +114,7 @@ private struct RightWheelSelector: View {
                     }
             }
         }
+        .frame(width: panelSize.width, height: panelSize.height)
         .contentShape(Rectangle())
         .gesture(
             DragGesture()
