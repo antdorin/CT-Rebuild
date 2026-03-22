@@ -35,16 +35,23 @@ final class CameraViewModel: NSObject, ObservableObject {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
             permission = .authorized
-            configureSessionIfNeeded()
+            // startSession() will be called by the caller (onAppear)
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                 DispatchQueue.main.async {
                     self?.permission = granted ? .authorized : .denied
-                    if granted { self?.configureSessionIfNeeded() }
+                    // startSession wasn't called when undetermined — start it now
+                    if granted { self?.startSession() }
                 }
             }
         default:
             permission = .denied
+        }
+    }
+
+    deinit {
+        sessionQueue.sync {
+            if session.isRunning { session.stopRunning() }
         }
     }
 
