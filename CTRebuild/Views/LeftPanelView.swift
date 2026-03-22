@@ -5,12 +5,19 @@ import SwiftUI
 struct LeftPanelView: View {
     let safeArea: EdgeInsets
 
+    // Virtual index — can grow negative/positive without clamping (infinite)
     @State private var columnPage: Int = 0
     @State private var dragOffset: CGFloat = 0
     @State private var occupiedBins: Set<String> = []
 
     private let levelLabels = ["A", "B", "C", "D", "E", "F"]
-    private let totalColumns = 3
+    private let totalColumns = 3  // 1, 2, 3 — wraps infinitely
+
+    // Real column number 1–3, wraps circularly
+    private func colNum(for page: Int) -> Int {
+        let m = page % totalColumns
+        return m < 0 ? m + totalColumns + 1 : m + 1
+    }
 
     var body: some View {
         ZStack {
@@ -19,12 +26,7 @@ struct LeftPanelView: View {
                 .ignoresSafeArea()
 
             GeometryReader { geo in
-                // B has 6 cells + 5 gaps, A has 4 cells + 3 gaps, 1 gap between sections, 16pt H padding
-                // Total: 10 cells + (5+3+1)×4 + 16 = 10c + 52
-                let cellSize = max((geo.size.width - 52) / 10, 30)
-                let headerHeight: CGFloat = safeArea.top + 44
-                let dotsHeight: CGFloat = safeArea.bottom + 32
-                let pageHeight = geo.size.height - headerHeight - dotsHeight
+                let cellSize = max((geo.size.width - 16 - CGFloat(5) * 4) / 6, 44)
 
                 VStack(spacing: 0) {
                     // ── Header ────────────────────────────────────────────────
@@ -32,65 +34,66 @@ struct LeftPanelView: View {
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundColor(.secondary.opacity(0.5))
                         .tracking(4)
-                        .frame(height: headerHeight, alignment: .bottom)
-                        .padding(.bottom, 8)
+                        .padding(.top, safeArea.top + 16)
+                        .padding(.bottom, 12)
 
-                    // ── Vertical infinite paged grid ──────────────────────────
+                    // ── Vertical swipeable pages ──────────────────────────────
+                    // Render prev, current, next so transitions are seamless
                     ZStack {
-                        ForEach([-1, 0, 1], id: \.self) { offset in
-                            let page = ((columnPage + offset) % totalColumns + totalColumns) % totalColumns
-                            gridPage(page: page, cellSize: cellSize)
-                                .frame(width: geo.size.width, height: pageHeight)
-                                .offset(y: CGFloat(offset) * pageHeight + dragOffset)
+                        ForEach(-1...1, id: \.self) { offset in
+                            let page = columnPage + offset
+                            gridPage(colNum: colNum(for: page), cellSize: cellSize)
+                                .frame(width: geo.size.width, height: geo.size.height * 0.88)
+                                .offset(y: CGFloat(offset) * (geo.size.height * 0.88) + dragOffset)
                         }
                     }
-                    .frame(width: geo.size.width, height: pageHeight)
+                    .frame(width: geo.size.width, height: geo.size.height * 0.88)
                     .clipped()
                     .gesture(
                         DragGesture()
                             .onChanged { dragOffset = $0.translation.height }
                             .onEnded { value in
-                                let threshold = pageHeight * 0.25
-                                withAnimation(.easeInOut(duration: 0.2)) {
+                                let threshold = geo.size.height * 0.2
+                                withAnimation(.easeInOut(duration: 0.22)) {
                                     if value.translation.height < -threshold {
-                                        columnPage = (columnPage + 1) % totalColumns
+                                        columnPage += 1
                                     } else if value.translation.height > threshold {
-                                        columnPage = ((columnPage - 1) % totalColumns + totalColumns) % totalColumns
+                                        columnPage -= 1
                                     }
                                     dragOffset = 0
                                 }
                             }
                     )
 
-                    // ── Page dots ─────────────────────────────────────────────
+                    // ── Page indicator ────────────────────────────────────────
                     HStack(spacing: 6) {
                         ForEach(0..<totalColumns, id: \.self) { i in
                             Circle()
-                                .fill(i == columnPage ? Color.white : Color.white.opacity(0.25))
+                                .fill(colNum(for: columnPage) == i + 1
+                                      ? Color.white
+                                      : Color.white.opacity(0.25))
                                 .frame(width: 6, height: 6)
                         }
                     }
-                    .frame(height: dotsHeight, alignment: .top)
-                    .padding(.top, 10)
+                    .padding(.top, 8)
+                    .padding(.bottom, safeArea.bottom + 12)
                 }
             }
         }
     }
 
     // MARK: - Grid Page
-    // B section (6 wide) on the left, A section (4 wide) on the right
 
     @ViewBuilder
-    private func gridPage(page: Int, cellSize: CGFloat) -> some View {
-        let colNum = page + 1
-
-        HStack(alignment: .top, spacing: 4) {
-            sectionGrid(colNum: colNum, sectionLetter: "B", positions: 6, cellSize: cellSize)
-            sectionGrid(colNum: colNum, sectionLetter: "A", positions: 4, cellSize: cellSize)
+    private func gridPage(colNum: Int, cellSize: CGFloat) -> some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 12) {
+                sectionGrid(colNum: colNum, sectionLetter: "A", positions: 4, cellSize: cellSize)
+                sectionGrid(colNum: colNum, sectionLetter: "B", positions: 6, cellSize: cellSize)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 8)
         }
-        .padding(.horizontal, 8)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(.top, 4)
     }
 
     // MARK: - Section Grid
@@ -115,25 +118,20 @@ struct LeftPanelView: View {
     @ViewBuilder
     private func binCell(code: String, size: CGFloat) -> some View {
         let taken = occupiedBins.contains(code)
-        VStack(alignment: .leading, spacing: 0) {
-            Text(code)
-                .font(.system(size: max(size * 0.16, 7), weight: .regular, design: .monospaced))
-                .foregroundColor(taken ? .white.opacity(0.2) : .white.opacity(0.85))
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-                .padding(.top, 3)
-                .padding(.leading, 3)
-            Spacer()
-        }
-        .frame(width: size, height: size)
-        .background(
+        let fontSize = max(size * 0.17, 8)
+
+        ZStack(alignment: .top) {
             RoundedRectangle(cornerRadius: 6)
                 .fill(taken ? Color.white.opacity(0.04) : Color.white.opacity(0.06))
-        )
-        .overlay(
             RoundedRectangle(cornerRadius: 6)
                 .stroke(Color.white.opacity(taken ? 0.06 : 0.12), lineWidth: 0.5)
-        )
+            Text(code)
+                .font(.system(size: fontSize, weight: .regular, design: .monospaced))
+                .foregroundColor(taken ? .white.opacity(0.25) : .white)
+                .padding(.top, 5)
+                .padding(.horizontal, 2)
+        }
+        .frame(width: size, height: size)
         .onTapGesture {
             guard !taken else { return }
             print("[BinGrid] selected: \(code)")
