@@ -200,7 +200,7 @@ private struct LeftWheelSelector: View {
     private let cardH: CGFloat = 480
     private let spacing: CGFloat = 500
 
-    @GestureState private var dragOffset: CGFloat = 0
+    @State private var dragOffset: CGFloat = 0
 
     private var previewScale: CGFloat {
         guard panelSize.width > 0 else { return 1 }
@@ -253,8 +253,8 @@ private struct LeftWheelSelector: View {
         .contentShape(Rectangle())
         .gesture(
             DragGesture()
-                .updating($dragOffset) { value, state, _ in
-                    state = value.translation.height
+                .onChanged { value in
+                    dragOffset = value.translation.height
                 }
                 .onEnded { value in
                     let dragMoves = -Int((value.translation.height / spacing).rounded())
@@ -262,6 +262,7 @@ private struct LeftWheelSelector: View {
                     let flickBoost: Int = velocityDelta > 250 ? -1 : velocityDelta < -250 ? 1 : 0
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                         columnPage += dragMoves + flickBoost
+                        dragOffset = 0
                     }
                 }
         )

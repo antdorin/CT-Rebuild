@@ -75,7 +75,7 @@ private struct RightWheelSelector: View {
     private let cardH: CGFloat = 560
     private let spacing: CGFloat = 580
 
-    @GestureState private var dragOffset: CGFloat = 0
+    @State private var dragOffset: CGFloat = 0
 
     private var previewScale: CGFloat {
         guard panelSize.width > 0 else { return 1 }
@@ -116,8 +116,8 @@ private struct RightWheelSelector: View {
         .contentShape(Rectangle())
         .gesture(
             DragGesture()
-                .updating($dragOffset) { value, state, _ in
-                    state = value.translation.height
+                .onChanged { value in
+                    dragOffset = value.translation.height
                 }
                 .onEnded { value in
                     let dragMoves = -Int((value.translation.height / spacing).rounded())
@@ -126,6 +126,7 @@ private struct RightWheelSelector: View {
                     let target = max(0, min(itemCount - 1, selectedIndex + dragMoves + flickBoost))
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                         selectedIndex = target
+                        dragOffset = 0
                     }
                 }
         )
