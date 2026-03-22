@@ -86,14 +86,12 @@ struct LeftPanelView: View {
 
     @ViewBuilder
     private func gridPage(colNum: Int, cellSize: CGFloat) -> some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(spacing: 12) {
-                sectionGrid(colNum: colNum, sectionLetter: "A", positions: 4, cellSize: cellSize)
-                sectionGrid(colNum: colNum, sectionLetter: "B", positions: 6, cellSize: cellSize)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 8)
+        VStack(spacing: 12) {
+            sectionGrid(colNum: colNum, sectionLetter: "A", positions: 4, cellSize: cellSize)
+            sectionGrid(colNum: colNum, sectionLetter: "B", positions: 6, cellSize: cellSize)
         }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
     }
 
     // MARK: - Section Grid
