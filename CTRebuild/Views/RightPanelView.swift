@@ -75,6 +75,7 @@ private struct RightWheelSelector: View {
     private let cardH: CGFloat = 560
     private let spacing: CGFloat = 580
 
+    @State private var virtualPage: Int = 0
     @State private var dragOffset: CGFloat = 0
 
     private var previewScale: CGFloat {
@@ -82,34 +83,46 @@ private struct RightWheelSelector: View {
         return cardW / panelSize.width
     }
 
+    // Maps any virtual page to a real 0–(itemCount-1) index, wrapping circularly
+    private func realIndex(_ page: Int) -> Int {
+        let m = page % itemCount
+        return m < 0 ? m + itemCount : m
+    }
+
     var body: some View {
         ZStack {
-            ForEach(0..<itemCount, id: \.self) { index in
-                let baseOffset         = CGFloat(index - selectedIndex) * spacing
-                let totalOffset        = baseOffset + dragOffset
-                let distanceFromCenter = totalOffset / spacing
+            ForEach(-1...itemCount, id: \.self) { offset in
+                let vp             = virtualPage - (virtualPage % itemCount) + offset
+                let real           = realIndex(vp)
+                let baseOffset     = CGFloat(vp - virtualPage) * spacing
+                let totalOffset    = baseOffset + dragOffset
+                let distCenter     = totalOffset / spacing
 
-                RightPageContent(index: index)
+                RightPageContent(index: real)
                     .frame(width: panelSize.width, height: panelSize.height)
                     .scaleEffect(previewScale, anchor: .center)
                     .frame(width: cardW, height: cardH)
                     .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                    .overlay(RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.12), lineWidth: 0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    .overlay(RoundedRectangle(cornerRadius: 18)
+                        .stroke(Color.white.opacity(0.14), lineWidth: 0.5))
                     .offset(y: totalOffset)
                     .rotation3DEffect(
-                        .degrees(Double(distanceFromCenter) * -35),
+                        .degrees(Double(distCenter) * -35),
                         axis: (x: 1, y: 0, z: 0),
                         perspective: 0.5
                     )
-                    .scaleEffect(1.0 - abs(distanceFromCenter) * 0.15)
-                    .opacity(1.0 - abs(distanceFromCenter) * 0.4)
-                    .zIndex(1.0 - abs(distanceFromCenter) * 0.5)
+                    .scaleEffect(1.0 - abs(distCenter) * 0.15)
+                    .opacity(1.0 - abs(distCenter) * 0.4)
+                    .zIndex(1.0 - abs(distCenter) * 0.5)
                     .onTapGesture {
-                        withAnimation(selectedIndex == index ? .slideFwd : .spring(response: 0.3, dampingFraction: 0.85)) {
-                            if selectedIndex == index { isPPOpen = false }
-                            else { selectedIndex = index }
+                        withAnimation(realIndex(virtualPage) == real ? .slideFwd : .spring(response: 0.3, dampingFraction: 0.85)) {
+                            if realIndex(virtualPage) == real {
+                                isPPOpen = false
+                            } else {
+                                virtualPage = vp
+                                selectedIndex = real
+                            }
                         }
                     }
             }
@@ -125,12 +138,15 @@ private struct RightWheelSelector: View {
                     let dragMoves = -Int((value.translation.height / spacing).rounded())
                     let velocityDelta = value.predictedEndTranslation.height - value.translation.height
                     let flickBoost: Int = velocityDelta > 250 ? -1 : velocityDelta < -250 ? 1 : 0
-                    let target = max(0, min(itemCount - 1, selectedIndex + dragMoves + flickBoost))
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                        selectedIndex = target
+                        virtualPage += dragMoves + flickBoost
+                        selectedIndex = realIndex(virtualPage)
                         dragOffset = 0
                     }
                 }
         )
+        .onAppear {
+            virtualPage = selectedIndex
+        }
     }
 }
