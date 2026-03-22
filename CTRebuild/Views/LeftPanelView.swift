@@ -26,7 +26,17 @@ struct LeftPanelView: View {
                 .ignoresSafeArea()
 
             GeometryReader { geo in
-                let cellSize = max((geo.size.width - 16 - CGFloat(5) * 4) / 6, 44)
+                // ── Cell size: constrained by both width (6 cols) and height (12 rows) ──
+                // Header: safeTop + 16 top pad + ~14 text + 12 bottom pad = safeTop + 42
+                // Dots:   8 top pad + 6 dot + 12 bottom pad + safeBottom = 26 + safeBottom
+                let headerH = safeArea.top + 42
+                let dotsH   = safeArea.bottom + 26
+                let pageH   = geo.size.height - headerH - dotsH
+                // 12 rows, 10 row-gaps of 4pt, 12pt section gap, 16pt page vertical padding
+                let cellH = (pageH - 16 - 12 - 10 * 4) / 12
+                // 6 columns, 5 col-gaps of 4pt, 16pt page horizontal padding
+                let cellW = (geo.size.width - 16 - 5 * 4) / 6
+                let cellSize = max(min(cellW, cellH), 28)
 
                 VStack(spacing: 0) {
                     // ── Header ────────────────────────────────────────────────
@@ -38,22 +48,21 @@ struct LeftPanelView: View {
                         .padding(.bottom, 12)
 
                     // ── Vertical swipeable pages ──────────────────────────────
-                    // Render prev, current, next so transitions are seamless
                     ZStack {
                         ForEach(-1...1, id: \.self) { offset in
                             let page = columnPage + offset
                             gridPage(colNum: colNum(for: page), cellSize: cellSize)
-                                .frame(width: geo.size.width, height: geo.size.height * 0.88)
-                                .offset(y: CGFloat(offset) * (geo.size.height * 0.88) + dragOffset)
+                                .frame(width: geo.size.width, height: pageH)
+                                .offset(y: CGFloat(offset) * pageH + dragOffset)
                         }
                     }
-                    .frame(width: geo.size.width, height: geo.size.height * 0.88)
+                    .frame(width: geo.size.width, height: pageH)
                     .clipped()
                     .gesture(
                         DragGesture()
                             .onChanged { dragOffset = $0.translation.height }
                             .onEnded { value in
-                                let threshold = geo.size.height * 0.2
+                                let threshold = pageH * 0.2
                                 withAnimation(.easeInOut(duration: 0.22)) {
                                     if value.translation.height < -threshold {
                                         columnPage += 1
@@ -86,12 +95,15 @@ struct LeftPanelView: View {
 
     @ViewBuilder
     private func gridPage(colNum: Int, cellSize: CGFloat) -> some View {
-        VStack(spacing: 12) {
-            sectionGrid(colNum: colNum, sectionLetter: "A", positions: 4, cellSize: cellSize)
-            sectionGrid(colNum: colNum, sectionLetter: "B", positions: 6, cellSize: cellSize)
+        VStack(spacing: 0) {
+            Spacer(minLength: 0)
+            VStack(spacing: 12) {
+                sectionGrid(colNum: colNum, sectionLetter: "A", positions: 4, cellSize: cellSize)
+                sectionGrid(colNum: colNum, sectionLetter: "B", positions: 6, cellSize: cellSize)
+            }
+            .padding(.horizontal, 8)
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
     }
 
     // MARK: - Section Grid
