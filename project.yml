@@ -19,6 +19,7 @@ targets:
       path: CTRebuild/Info.plist
       properties:
         UILaunchScreen: {}
+        NSCameraUsageDescription: "Camera is used to scan QR codes and barcodes in the warehouse."
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ctrebuild.app
