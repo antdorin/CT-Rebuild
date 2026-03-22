@@ -17,6 +17,8 @@ targets:
           - "**/*.DS_Store"
     info:
       path: CTRebuild/Info.plist
+      properties:
+        UILaunchScreen: {}
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ctrebuild.app
