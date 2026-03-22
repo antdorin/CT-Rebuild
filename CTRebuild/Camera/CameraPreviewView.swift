@@ -8,30 +8,16 @@ struct DataScannerView: UIViewControllerRepresentable {
     var isScanning: Bool
     var onScan: (String) -> Void
 
-    func makeUIViewController(context: Context) -> DataScannerViewController {
-        let vc = DataScannerViewController(
-            recognizedDataTypes: [.barcode()],   // covers QR + all 1-D/2-D formats
-            qualityLevel: .fast,
-            recognizesMultipleItems: false,
-            isHighlightingEnabled: true
-        )
-        vc.delegate = context.coordinator
+    func makeUIViewController(context: Context) -> ScannerContainerViewController {
+        let vc = ScannerContainerViewController()
+        vc.dataScanner.delegate = context.coordinator
         return vc
     }
 
-    func updateUIViewController(_ vc: DataScannerViewController, context: Context) {
-        // Keep coordinator closure current after re-renders
+    func updateUIViewController(_ uiViewController: ScannerContainerViewController, context: Context) {
         context.coordinator.onScan = onScan
-        // Defer start/stop — calling startScanning() synchronously during SwiftUI
-        // layout (before the VC view is in the window) causes an internal crash.
-        let shouldScan = isScanning
-        DispatchQueue.main.async {
-            if shouldScan {
-                try? vc.startScanning()
-            } else {
-                vc.stopScanning()
-            }
-        }
+        // Safely pass the requested state down; the container handles the timing.
+        uiViewController.isScanning = isScanning
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(onScan: onScan) }
@@ -48,10 +34,64 @@ struct DataScannerView: UIViewControllerRepresentable {
             allItems: [RecognizedItem]
         ) {
             guard let item = addedItems.first else { return }
-            switch item {
-            case .barcode(let b): onScan(b.payloadStringValue ?? "")
-            default: break
+            if case .barcode(let b) = item {
+                onScan(b.payloadStringValue ?? "")
             }
         }
     }
 }
+
+// MARK: - Native Container
+
+final class ScannerContainerViewController: UIViewController {
+    let dataScanner = DataScannerViewController(
+        recognizedDataTypes: [.barcode()],
+        qualityLevel: .fast,
+        recognizesMultipleItems: false,
+        isHighlightingEnabled: true
+    )
+    
+    var isScanning: Bool = false {
+        didSet {
+            // Only toggle the scanner if we are actually visible on screen
+            guard isViewLoaded, view.window != nil else { return }
+            
+            if isScanning && !dataScanner.isScanning {
+                try? dataScanner.startScanning()
+            } else if !isScanning && dataScanner.isScanning {
+                dataScanner.stopScanning()
+            }
+        }
+    }
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        addChild(dataScanner)
+        view.addSubview(dataScanner.view)
+        
+        dataScanner.view.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            dataScanner.view.topAnchor.constraint(equalTo: view.topAnchor),
+            dataScanner.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            dataScanner.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            dataScanner.view.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+        ])
+        dataScanner.didMove(toParent: self)
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // Now it's 100% physically on screen. Safe to start.
+        if isScanning && !dataScanner.isScanning {
+            try? dataScanner.startScanning()
+        }
+    }
+    
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        if dataScanner.isScanning {
+            dataScanner.stopScanning()
+        }
+    }
+}
+
