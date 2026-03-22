@@ -1,5 +1,7 @@
 import SwiftUI
 
+// MARK: - Right Panel
+
 struct RightPanelView: View {
     let safeArea: EdgeInsets
 
@@ -7,78 +9,95 @@ struct RightPanelView: View {
     @AppStorage("rightPanelSelectedIndex") private var selectedIndex = 0
     @Namespace private var wheelNamespace
 
-    // 7 distinct grey shades from dark → light
-    let items: [Color] = [
-        Color(white: 0.18),
-        Color(white: 0.26),
-        Color(white: 0.34),
-        Color(white: 0.42),
-        Color(white: 0.50),
-        Color(white: 0.58),
-        Color(white: 0.66),
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                Color.black.ignoresSafeArea()
+
+                if isZoomedOut {
+                    RightWheelSelector(
+                        selectedIndex: $selectedIndex,
+                        isZoomedOut: $isZoomedOut,
+                        namespace: wheelNamespace,
+                        panelSize: geo.size
+                    )
+                    .transition(.opacity)
+                } else {
+                    RightPageContent(index: selectedIndex)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .matchedGeometryEffect(id: "rpage_\(selectedIndex)", in: wheelNamespace)
+                        .onTapGesture(count: 2) {
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                                isZoomedOut = true
+                            }
+                        }
+                }
+            }
+        }
+        .ignoresSafeArea()
+    }
+}
+
+// MARK: - Right Page Content
+
+/// Full-page content for each right-panel slot.
+/// Replace the body per index as real content is added.
+struct RightPageContent: View {
+    let index: Int
+
+    private let shades: [Color] = [
+        Color(white: 0.18), Color(white: 0.26), Color(white: 0.34),
+        Color(white: 0.42), Color(white: 0.50), Color(white: 0.58), Color(white: 0.66),
     ]
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
-
-            if isZoomedOut {
-                VerticalWheelSelector(
-                    selectedIndex: $selectedIndex,
-                    isZoomedOut: $isZoomedOut,
-                    namespace: wheelNamespace,
-                    items: items
-                )
-                .transition(.opacity)
-            } else {
-                RoundedRectangle(cornerRadius: 30)
-                    .fill(items[selectedIndex])
-                    .matchedGeometryEffect(id: "page_\(selectedIndex)", in: wheelNamespace)
-                    .overlay(
-                        Text("Page \(selectedIndex + 1)")
-                            .font(.system(size: 40, weight: .bold, design: .rounded))
-                            .foregroundColor(.white.opacity(0.85))
-                    )
-                    .ignoresSafeArea()
-                    .onTapGesture(count: 2) {
-                        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                            isZoomedOut = true
-                        }
-                    }
+            shades[index % shades.count].ignoresSafeArea()
+            VStack(spacing: 16) {
+                Text("Page \(index + 1)")
+                    .font(.system(size: 40, weight: .bold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.85))
             }
         }
     }
 }
 
-// MARK: - Vertical Wheel Selector
+// MARK: - Right Wheel Selector
 
-private struct VerticalWheelSelector: View {
+private struct RightWheelSelector: View {
     @Binding var selectedIndex: Int
     @Binding var isZoomedOut: Bool
     var namespace: Namespace.ID
-    let items: [Color]
+    let panelSize: CGSize
 
-    // @GestureState resets to 0 atomically when the gesture ends,
-    // eliminating the one-frame jump caused by selectedIndex and dragOffset
-    // updating in separate passes.
+    private let itemCount = 7
+    private let cardW: CGFloat = 320
+    private let cardH: CGFloat = 560
+    private let spacing: CGFloat = 580
+
     @GestureState private var dragOffset: CGFloat = 0
+
+    private var previewScale: CGFloat {
+        guard panelSize.width > 0 else { return 1 }
+        return cardW / panelSize.width
+    }
 
     var body: some View {
         ZStack {
-            ForEach(0..<items.count, id: \.self) { index in
-                let baseOffset         = CGFloat(index - selectedIndex) * 580
+            ForEach(0..<itemCount, id: \.self) { index in
+                let baseOffset         = CGFloat(index - selectedIndex) * spacing
                 let totalOffset        = baseOffset + dragOffset
-                let distanceFromCenter = totalOffset / 580
+                let distanceFromCenter = totalOffset / spacing
 
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(items[index])
-                    .matchedGeometryEffect(id: "page_\(index)", in: namespace)
-                    .frame(width: 320, height: 560)
-                    .overlay(
-                        Text("Page \(index + 1)")
-                            .font(.system(size: 22, weight: .semibold, design: .rounded))
-                            .foregroundColor(.white.opacity(0.75))
-                    )
+                RightPageContent(index: index)
+                    .frame(width: panelSize.width, height: panelSize.height)
+                    .scaleEffect(previewScale, anchor: .center)
+                    .frame(width: cardW, height: cardH)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .overlay(RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.white.opacity(0.12), lineWidth: 0.5))
+                    .matchedGeometryEffect(id: "rpage_\(index)", in: namespace)
                     .offset(y: totalOffset)
                     .rotation3DEffect(
                         .degrees(Double(distanceFromCenter) * -35),
@@ -102,15 +121,10 @@ private struct VerticalWheelSelector: View {
                     state = value.translation.height
                 }
                 .onEnded { value in
-                    // Base shift: how many 580-pt item slots did the finger cross?
-                    let dragMoves = -Int((value.translation.height / 580).rounded())
-
-                    // Flick boost: pure velocity delta (predicted minus actual).
-                    // Only adds ±1 — never lets a fast swipe skip multiple pages.
+                    let dragMoves = -Int((value.translation.height / spacing).rounded())
                     let velocityDelta = value.predictedEndTranslation.height - value.translation.height
                     let flickBoost: Int = velocityDelta > 250 ? -1 : velocityDelta < -250 ? 1 : 0
-
-                    let target = max(0, min(items.count - 1, selectedIndex + dragMoves + flickBoost))
+                    let target = max(0, min(itemCount - 1, selectedIndex + dragMoves + flickBoost))
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                         selectedIndex = target
                     }
