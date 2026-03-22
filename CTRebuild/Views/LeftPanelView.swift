@@ -8,7 +8,8 @@ struct LeftPanelView: View {
     // Virtual index — can grow negative/positive without clamping (infinite)
     @State private var columnPage: Int = 0
     @State private var occupiedBins: Set<String> = []
-    @State private var isZoomedOut = false
+    // true = Panel Page Picker is open; false = full-page content shown
+    @State private var isPPOpen = false
 
     private let levelLabels = ["A", "B", "C", "D", "E", "F"]
     private let totalColumns = 3  // 1, 2, 3 — wraps infinitely
@@ -26,10 +27,10 @@ struct LeftPanelView: View {
                     .fill(.ultraThinMaterial)
                     .ignoresSafeArea()
 
-                if isZoomedOut {
+                if isPPOpen {
                     LeftWheelSelector(
                         columnPage: $columnPage,
-                        isZoomedOut: $isZoomedOut,
+                        isPPOpen: $isPPOpen,
                         panelSize: geo.size,
                         safeArea: safeArea,
                         totalColumns: totalColumns,
@@ -41,7 +42,7 @@ struct LeftPanelView: View {
                         .transition(.pageTransition)
                         .onTapGesture(count: 2) {
                             withAnimation(.slideBck) {
-                                isZoomedOut = true
+                                isPPOpen = true
                             }
                         }
                 }
@@ -183,9 +184,11 @@ struct LeftPanelView: View {
 
 // MARK: - Left Wheel Selector
 
+// MARK: - Left Panel Page Picker
+
 private struct LeftWheelSelector: View {
     @Binding var columnPage: Int
-    @Binding var isZoomedOut: Bool
+    @Binding var isPPOpen: Bool
     let panelSize: CGSize
     let safeArea: EdgeInsets
     let totalColumns: Int
@@ -239,7 +242,7 @@ private struct LeftWheelSelector: View {
                     .opacity(1.0 - abs(distCenter) * 0.4)
                     .onTapGesture {
                         withAnimation(colNum(columnPage) == col ? .slideFwd : .spring(response: 0.3, dampingFraction: 0.85)) {
-                            if colNum(columnPage) == col { isZoomedOut = false }
+                            if colNum(columnPage) == col { isPPOpen = false }
                             else { columnPage = virtualPage }
                         }
                     }

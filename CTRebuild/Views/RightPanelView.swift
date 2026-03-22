@@ -5,7 +5,8 @@ import SwiftUI
 struct RightPanelView: View {
     let safeArea: EdgeInsets
 
-    @State private var isZoomedOut = false
+    // true = Panel Page Picker is open; false = full-page content shown
+    @State private var isPPOpen = false
     @AppStorage("rightPanelSelectedIndex") private var selectedIndex = 0
 
     var body: some View {
@@ -13,10 +14,10 @@ struct RightPanelView: View {
             ZStack {
                 Color.black.ignoresSafeArea()
 
-                if isZoomedOut {
+                if isPPOpen {
                     RightWheelSelector(
                         selectedIndex: $selectedIndex,
-                        isZoomedOut: $isZoomedOut,
+                        isPPOpen: $isPPOpen,
                         panelSize: geo.size
                     )
                     .transition(.opacity.animation(.easeInOut(duration: 0.2)))
@@ -26,7 +27,7 @@ struct RightPanelView: View {
                         .transition(.pageTransition)
                         .onTapGesture(count: 2) {
                             withAnimation(.slideBck) {
-                                isZoomedOut = true
+                                isPPOpen = true
                             }
                         }
                 }
@@ -60,11 +61,11 @@ struct RightPageContent: View {
     }
 }
 
-// MARK: - Right Wheel Selector
+// MARK: - Right Panel Page Picker
 
 private struct RightWheelSelector: View {
     @Binding var selectedIndex: Int
-    @Binding var isZoomedOut: Bool
+    @Binding var isPPOpen: Bool
     let panelSize: CGSize
 
     private let itemCount = 7
@@ -104,7 +105,7 @@ private struct RightWheelSelector: View {
                     .opacity(1.0 - abs(distanceFromCenter) * 0.4)
                     .onTapGesture {
                         withAnimation(selectedIndex == index ? .slideFwd : .spring(response: 0.3, dampingFraction: 0.85)) {
-                            if selectedIndex == index { isZoomedOut = false }
+                            if selectedIndex == index { isPPOpen = false }
                             else { selectedIndex = index }
                         }
                     }
