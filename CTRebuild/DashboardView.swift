@@ -118,6 +118,8 @@ struct DashboardView: View {
     @ViewBuilder
     private func panelContent(for panel: Panel, safeArea: EdgeInsets) -> some View {
         switch panel {
+        case .left:
+            LeftPanelView(safeArea: safeArea)
         case .bottom:
             BottomPanelView(safeArea: safeArea)
         default:
