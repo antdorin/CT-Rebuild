@@ -5,6 +5,9 @@ struct BottomPanelView: View {
     let safeArea: EdgeInsets
 
     @StateObject private var viewModel = CameraViewModel()
+    @State private var zoomAtDragStart: CGFloat? = nil   // nil = not dragging
+    @State private var showZoomBadge: Bool = false
+    @State private var zoomBadgeTask: DispatchWorkItem? = nil
 
     var body: some View {
         ZStack {
@@ -37,10 +40,50 @@ struct BottomPanelView: View {
                                 .transition(.opacity)
                                 .allowsHitTesting(false)
                         }
+
+                        // ── Zoom level badge ──────────────────────────────
+                        if showZoomBadge {
+                            Text(String(format: "%.1f×", viewModel.zoomFactor))
+                                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(.black.opacity(0.55), in: Capsule())
+                                .transition(.opacity)
+                                .allowsHitTesting(false)
+                        }
                     }
                     .animation(.easeOut(duration: 0.12), value: viewModel.scanTrackingRect != nil)
+                    .animation(.easeOut(duration: 0.2), value: showZoomBadge)
                     .frame(height: geo.size.height * 0.70)
                     .clipped()
+                    // Vertical drag to zoom (simultaneous so horizontal close still works)
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 5)
+                            .onChanged { value in
+                                let adx = abs(value.translation.width)
+                                let ady = abs(value.translation.height)
+                                guard ady > adx else { return }
+                                // Capture baseline on first vertical movement
+                                if zoomAtDragStart == nil {
+                                    zoomAtDragStart = viewModel.zoomFactor
+                                }
+                                if let base = zoomAtDragStart {
+                                    // 200 pt up/down = 2× zoom change (log scale feel)
+                                    let newZoom = base * pow(2.0, -value.translation.height / 200)
+                                    viewModel.setZoom(newZoom)
+                                }
+                                showZoomBadge = true
+                                zoomBadgeTask?.cancel()
+                            }
+                            .onEnded { _ in
+                                zoomAtDragStart = nil
+                                // Auto-hide badge after 1.5 s
+                                let task = DispatchWorkItem { showZoomBadge = false }
+                                zoomBadgeTask = task
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: task)
+                            }
+                    )
 
                     // ── Results area — bottom 30% ─────────────────────────────
                     VStack(spacing: 6) {

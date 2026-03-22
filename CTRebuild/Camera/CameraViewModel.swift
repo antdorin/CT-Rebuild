@@ -33,6 +33,9 @@ final class CameraViewModel: NSObject, ObservableObject {
     weak var previewLayer: AVCaptureVideoPreviewLayer?
     @Published private(set) var scanTrackingRect: CGRect? = nil
     private var trackingClearWork: DispatchWorkItem?
+    // Zoom
+    private weak var captureDevice: AVCaptureDevice?
+    @Published private(set) var zoomFactor: CGFloat = 1.0
 
     // MARK: - Permission
 
@@ -95,6 +98,7 @@ final class CameraViewModel: NSObject, ObservableObject {
               session.canAddInput(input) else { return }
 
         session.addInput(input)
+        captureDevice = device   // store for zoom control
 
         let output = AVCaptureMetadataOutput()
         guard session.canAddOutput(output) else { return }
@@ -108,6 +112,23 @@ final class CameraViewModel: NSObject, ObservableObject {
         output.metadataObjectTypes = supported.filter { output.availableMetadataObjectTypes.contains($0) }
         output.setMetadataObjectsDelegate(self, queue: .main)
         metadataOutput = output
+    }
+
+    // MARK: - Zoom
+
+    func setZoom(_ factor: CGFloat) {
+        guard let device = captureDevice else { return }
+        let minZ = device.minAvailableVideoZoomFactor
+        let maxZ = min(device.maxAvailableVideoZoomFactor, 10.0)
+        let clamped = max(minZ, min(maxZ, factor))
+        sessionQueue.async {
+            try? device.lockForConfiguration()
+            device.videoZoomFactor = clamped
+            device.unlockForConfiguration()
+            DispatchQueue.main.async { [weak self] in
+                self?.zoomFactor = clamped
+            }
+        }
     }
 }
 
