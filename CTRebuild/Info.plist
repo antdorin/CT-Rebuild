@@ -25,8 +25,8 @@
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<false/>
 	</dict>
-	<key>UILaunchStoryboardName</key>
-	<string>LaunchScreen</string>
+	<key>UILaunchScreen</key>
+	<dict/>
 	<key>NSCameraUsageDescription</key>
 	<string>Camera is used to scan QR codes and barcodes in the warehouse.</string>
 	<key>UISupportedInterfaceOrientations</key>
