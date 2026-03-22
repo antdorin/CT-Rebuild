@@ -102,10 +102,15 @@ private struct VerticalWheelSelector: View {
                     state = value.translation.height
                 }
                 .onEnded { value in
-                    let velocity  = value.predictedEndTranslation.height
-                    let threshold: CGFloat = 80
-                    let moveCount = -Int((velocity / threshold).rounded())
-                    let target    = max(0, min(items.count - 1, selectedIndex + moveCount))
+                    // Base shift: how many 130-pt item slots did the finger cross?
+                    let dragMoves = -Int((value.translation.height / 130).rounded())
+
+                    // Flick boost: pure velocity delta (predicted minus actual).
+                    // Only adds ±1 — never lets a fast swipe skip multiple pages.
+                    let velocityDelta = value.predictedEndTranslation.height - value.translation.height
+                    let flickBoost: Int = velocityDelta > 250 ? -1 : velocityDelta < -250 ? 1 : 0
+
+                    let target = max(0, min(items.count - 1, selectedIndex + dragMoves + flickBoost))
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                         selectedIndex = target
                     }
