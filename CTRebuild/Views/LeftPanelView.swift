@@ -245,6 +245,7 @@ private struct LeftWheelSelector: View {
                     }
             }
         }
+        .drawingGroup()
         .contentShape(Rectangle())
         .gesture(
             DragGesture()
@@ -266,7 +267,7 @@ private struct LeftWheelSelector: View {
     @ViewBuilder
     private func leftPageSnapshot(col: Int) -> some View {
         ZStack {
-            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+            Color(white: 0.12).ignoresSafeArea()
             VStack(spacing: 0) {
                 Text("BIN GRID")
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
