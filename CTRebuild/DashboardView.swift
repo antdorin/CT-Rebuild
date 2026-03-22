@@ -84,9 +84,10 @@ struct DashboardView: View {
                         handleDashboardTripleTap()
                     }
             )
-            .preferredColorScheme(forceLightMode ? .light : nil)
         }
         .ignoresSafeArea()
+        .background(Color(uiColor: .systemBackground).ignoresSafeArea())
+        .preferredColorScheme(forceLightMode ? .light : nil)
     }
 
     // MARK: - Placeholder Content
