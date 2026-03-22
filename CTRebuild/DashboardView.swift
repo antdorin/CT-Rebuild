@@ -11,6 +11,7 @@ enum Panel: Equatable {
 struct DashboardView: View {
     @State private var activePanel: Panel = .none
     @State private var longPressActive: Bool = false
+    @State private var forceLightMode: Bool = false
     private let screen = UIScreen.main.bounds
 
     var body: some View {
@@ -74,9 +75,16 @@ struct DashboardView: View {
                         .transition(.move(edge: .bottom))
                 }
             }
-            .animation(.easeInOut(duration: 0.2), value: activePanel)
+            .animation(.easeInOut(duration: 0.1), value: activePanel)
             // ExclusiveGesture: hold+drag takes priority over plain swipe
             .gesture(ExclusiveGesture(longPressSwipeGesture, swipeGesture))
+            .simultaneousGesture(
+                TapGesture(count: 3)
+                    .onEnded {
+                        handleDashboardTripleTap()
+                    }
+            )
+            .preferredColorScheme(forceLightMode ? .light : nil)
         }
         .ignoresSafeArea()
     }
@@ -128,10 +136,10 @@ struct DashboardView: View {
     }
 
     // MARK: - Long Press + Swipe Gesture
-    // Hold 0.0005 s → haptic fires → drag to open or switch any panel directly.
+    // Hold 0.01 s → haptic fires → drag to open or switch any panel directly.
 
     private var longPressSwipeGesture: some Gesture {
-        LongPressGesture(minimumDuration: 0.005)
+        LongPressGesture(minimumDuration: 0.01)
             .sequenced(before: DragGesture(minimumDistance: 10))
             .onChanged { state in
                 if case .first(true) = state, !longPressActive {
@@ -144,6 +152,11 @@ struct DashboardView: View {
                 guard case .second(true, let drag?) = state else { return }
                 resolveSwipe(translation: drag.translation, allowSwitch: true)
             }
+    }
+
+    private func handleDashboardTripleTap() {
+        forceLightMode = true
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     // MARK: - Shared Resolution
