@@ -12,7 +12,9 @@ struct RightPanelView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                Color.black.ignoresSafeArea()
+                if !isPPOpen {
+                    Color.black.ignoresSafeArea()
+                }
 
                 if isPPOpen {
                     RightWheelSelector(
