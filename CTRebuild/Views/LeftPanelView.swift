@@ -60,6 +60,9 @@ struct LeftPanelView: View {
                     .simultaneousGesture(
                         DragGesture()
                             .onEnded { value in
+                                let adx = abs(value.translation.width)
+                                let ady = abs(value.translation.height)
+                                guard ady > adx else { return } // let horizontal pass to dashboard
                                 let threshold = pageH * 0.2
                                 if value.translation.height < -threshold {
                                     columnPage += 1

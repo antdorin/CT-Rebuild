@@ -78,7 +78,9 @@ struct DashboardView: View {
             .animation(.easeInOut(duration: 0.1), value: activePanel)
             // LongPress fires haptic immediately at 0.2 s (no sequencing delay).
             // Drag reads longPressActive to decide threshold + switch behaviour.
-            .gesture(dragGesture)
+            // simultaneousGesture ensures close swipe fires even when child views
+            // (e.g. left-panel grid) have their own DragGestures active.
+            .simultaneousGesture(dragGesture)
             .simultaneousGesture(longPressHapticGesture)
             .simultaneousGesture(
                 TapGesture(count: 3)
@@ -144,10 +146,10 @@ struct DashboardView: View {
     }
 
     // MARK: - Long Press Haptic Gesture
-    // Fires immediately when 0.2 s elapses — no sequencing, no extra touch needed.
+    // Fires immediately when 0.1 s elapses — no sequencing, no extra touch needed.
 
     private var longPressHapticGesture: some Gesture {
-        LongPressGesture(minimumDuration: 0.2)
+        LongPressGesture(minimumDuration: 0.1)
             .onEnded { _ in
                 longPressActive = true
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
