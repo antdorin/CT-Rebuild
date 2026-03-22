@@ -20,10 +20,17 @@ struct DataScannerView: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ vc: DataScannerViewController, context: Context) {
-        if isScanning {
-            try? vc.startScanning()
-        } else {
-            vc.stopScanning()
+        // Keep coordinator closure current after re-renders
+        context.coordinator.onScan = onScan
+        // Defer start/stop — calling startScanning() synchronously during SwiftUI
+        // layout (before the VC view is in the window) causes an internal crash.
+        let shouldScan = isScanning
+        DispatchQueue.main.async {
+            if shouldScan {
+                try? vc.startScanning()
+            } else {
+                vc.stopScanning()
+            }
         }
     }
 
@@ -32,7 +39,7 @@ struct DataScannerView: UIViewControllerRepresentable {
     // MARK: - Coordinator
 
     final class Coordinator: NSObject, DataScannerViewControllerDelegate {
-        let onScan: (String) -> Void
+        var onScan: (String) -> Void
         init(onScan: @escaping (String) -> Void) { self.onScan = onScan }
 
         func dataScanner(
