@@ -10,6 +10,8 @@ struct BottomPanelView: View {
     @State private var zoomBadgeTask: DispatchWorkItem? = nil
     // Modal routing
     @State private var pendingScan: ScanResult? = nil
+    @State private var recentScans: [ScanResult] = []
+    private let maxRecent = 20
 
     var body: some View {
         ZStack {
@@ -88,27 +90,30 @@ struct BottomPanelView: View {
                     )
 
                     // ── Results area — bottom 30% ─────────────────────────────
-                    VStack(spacing: 6) {
-                        if let scan = viewModel.lastScan {
-                            Text(scan.value)
-                                .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                                .foregroundColor(.primary)
-                                .lineLimit(2)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 16)
-                            Text(scan.symbology.rawValue)
-                                .font(.system(size: 10, weight: .regular, design: .monospaced))
-                                .foregroundColor(.secondary)
+                    Group {
+                        if recentScans.isEmpty {
+                            VStack {
+                                Spacer()
+                                Text("AWAITING SCAN")
+                                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                    .foregroundColor(.secondary.opacity(0.4))
+                                    .tracking(4)
+                                Spacer()
+                            }
+                            .frame(maxWidth: .infinity)
                         } else {
-                            Text("AWAITING SCAN")
-                                .font(.system(size: 10, weight: .medium, design: .monospaced))
-                                .foregroundColor(.secondary.opacity(0.4))
-                                .tracking(4)
+                            ScrollView(.vertical, showsIndicators: false) {
+                                LazyVStack(spacing: 0) {
+                                    ForEach(recentScans.reversed()) { scan in
+                                        recentScanRow(scan: scan)
+                                    }
+                                }
+                                .padding(.vertical, 6)
+                            }
                         }
                     }
                     .frame(height: geo.size.height * 0.30)
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 12)
                 }
             }
         }
@@ -122,6 +127,13 @@ struct BottomPanelView: View {
         // When a new scan arrives, pause duplicate firing and route to the correct modal
         .onChange(of: viewModel.lastScan) { scan in
             guard let scan else { return }
+            // Append to recent list (dedupe consecutive identical scans, cap at max)
+            if recentScans.last?.value != scan.value {
+                recentScans.append(scan)
+                if recentScans.count > maxRecent {
+                    recentScans.removeFirst(recentScans.count - maxRecent)
+                }
+            }
             pendingScan = scan
         }
         .sheet(item: $pendingScan) { scan in
@@ -172,6 +184,49 @@ struct BottomPanelView: View {
             p.addLine(to: CGPoint(x: rect.maxX,       y: rect.maxY - arm))
             ctx.stroke(p, with: bright, lineWidth: lw)
         }
+    }
+
+    // MARK: - Recent Scan Row
+
+    @ViewBuilder
+    private func recentScanRow(scan: ScanResult) -> some View {
+        let isAssigned = ScanStore.shared.record(for: scan.value) != nil
+        Button {
+            pendingScan = scan
+        } label: {
+            HStack(spacing: 10) {
+                // Status dot
+                Circle()
+                    .fill(isAssigned ? Color.green.opacity(0.75) : Color.orange.opacity(0.75))
+                    .frame(width: 7, height: 7)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(scan.value)
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                    Text(scan.symbology.rawValue)
+                        .font(.system(size: 9, weight: .regular, design: .monospaced))
+                        .foregroundColor(.secondary.opacity(0.6))
+                }
+
+                Spacer()
+
+                Text(isAssigned ? "ASSIGNED" : "UNASSIGNED")
+                    .font(.system(size: 8, weight: .medium, design: .monospaced))
+                    .foregroundColor(isAssigned ? .green.opacity(0.8) : .orange.opacity(0.8))
+                    .tracking(1)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(.secondary.opacity(0.4))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        Divider().opacity(0.2).padding(.horizontal, 14)
     }
 
     // MARK: - Denied State
