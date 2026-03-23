@@ -1,5 +1,7 @@
 using System.IO;
 using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -59,6 +61,7 @@ public sealed class HubServer
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
+    public const int DiscoveryPort      = 5052; // UDP port desktop listens on for CT-DISCOVER probes
     public const int DiscoveryReplyPort = 5051; // UDP port phone listens on (desktop broadcasts here)
 
     public Task StartAsync()
@@ -68,6 +71,7 @@ public sealed class HubServer
         _listener.Prefixes.Add($"http://+:{Port}/");
         _listener.Start();
         _ = AcceptLoopAsync(_cts.Token);
+        _ = DiscoveryLoopAsync(_cts.Token); // always runs: replies to direct CT-DISCOVER probes
         return Task.CompletedTask;
     }
 
@@ -110,13 +114,19 @@ public sealed class HubServer
     {
         using var udp = new System.Net.Sockets.UdpClient();
         udp.EnableBroadcast = true;
-        var endpoint = new IPEndPoint(IPAddress.Broadcast, DiscoveryReplyPort);
-        var payload  = Encoding.UTF8.GetBytes($"CT-HUB:{Port}");
+        var payload = Encoding.UTF8.GetBytes($"CT-HUB:{Port}");
         try
         {
             while (!ct.IsCancellationRequested)
             {
-                await udp.SendAsync(payload, payload.Length, endpoint);
+                // Send to every subnet-directed broadcast address on active LAN adapters.
+                // 255.255.255.255 (limited broadcast) is filtered by most Wi-Fi APs;
+                // subnet-directed (e.g. 192.168.1.255) is forwarded to all subnet hosts.
+                foreach (var ep in GetBroadcastEndpoints())
+                {
+                    try { await udp.SendAsync(payload, payload.Length, ep); }
+                    catch { /* skip unreachable adapter */ }
+                }
                 LastBeaconTime = DateTime.Now;
                 await Task.Delay(3_000, ct);
             }
@@ -125,6 +135,57 @@ public sealed class HubServer
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[HubServer] Broadcast error: {ex.Message}");
+        }
+    }
+
+    // Returns per-adapter subnet-directed broadcast endpoints.
+    // Falls back to 255.255.255.255 only if no adapters are found.
+    private static List<IPEndPoint> GetBroadcastEndpoints()
+    {
+        var result = new List<IPEndPoint>();
+        foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+        {
+            if (ni.OperationalStatus != OperationalStatus.Up) continue;
+            if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+            foreach (var ua in ni.GetIPProperties().UnicastAddresses)
+            {
+                if (ua.Address.AddressFamily != AddressFamily.InterNetwork) continue;
+                var mask = ua.IPv4Mask?.GetAddressBytes();
+                if (mask == null || mask.Length != 4) continue;
+                var ip    = ua.Address.GetAddressBytes();
+                var bcast = new byte[4];
+                for (int i = 0; i < 4; i++)
+                    bcast[i] = (byte)(ip[i] | ~mask[i]);
+                result.Add(new IPEndPoint(new IPAddress(bcast), DiscoveryReplyPort));
+            }
+        }
+        if (result.Count == 0)
+            result.Add(new IPEndPoint(IPAddress.Broadcast, DiscoveryReplyPort));
+        return result;
+    }
+
+    // Listens on UDP 5052 for "CT-DISCOVER" probes sent by the phone.
+    // Replies immediately so the phone doesn't have to wait for the next 3-second beacon.
+    private async Task DiscoveryLoopAsync(CancellationToken ct)
+    {
+        using var udp = new System.Net.Sockets.UdpClient();
+        udp.Client.SetSocketOption(
+            System.Net.Sockets.SocketOptionLevel.Socket,
+            System.Net.Sockets.SocketOptionName.ReuseAddress, true);
+        udp.Client.Bind(new IPEndPoint(IPAddress.Any, DiscoveryPort));
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                var result = await udp.ReceiveAsync(ct);
+                var msg = Encoding.UTF8.GetString(result.Buffer).Trim();
+                if (msg != "CT-DISCOVER") continue;
+                var reply   = Encoding.UTF8.GetBytes($"CT-HUB:{Port}");
+                var replyEp = new IPEndPoint(result.RemoteEndPoint.Address, DiscoveryReplyPort);
+                await udp.SendAsync(reply, reply.Length, replyEp);
+            }
+            catch (OperationCanceledException) { break; }
+            catch { /* ignore malformed packets */ }
         }
     }
 
