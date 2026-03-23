@@ -9,6 +9,13 @@ struct TopPanelView: View {
 
     @State private var selectedTab: Int? = nil
 
+    // Read directly from UIKit — reliable even when parent ignores safe area
+    private var topInset: CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first?.keyWindow?.safeAreaInsets.top ?? 50
+    }
+
     var body: some View {
         ZStack {
             if selectedTab != nil {
@@ -19,7 +26,7 @@ struct TopPanelView: View {
             }
 
             VStack(spacing: 0) {
-                Spacer().frame(height: safeArea.top + 16)
+                Spacer().frame(height: topInset + 16)
 
                 TopTabBar(selected: $selectedTab)
                     .padding(.horizontal, 20)
