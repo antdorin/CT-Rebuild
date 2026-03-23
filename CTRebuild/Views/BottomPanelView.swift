@@ -73,8 +73,8 @@ struct BottomPanelView: View {
                                     zoomAtDragStart = viewModel.zoomFactor
                                 }
                                 if let base = zoomAtDragStart {
-                                    // 175 pt up/down = 2× zoom change (log scale feel)
-                                    let newZoom = base * pow(2.0, -value.translation.height / 175)
+                                    // 80 pt up/down = 2× zoom change
+                                    let newZoom = base * pow(2.0, -value.translation.height / 80)
                                     viewModel.setZoom(newZoom)
                                 }
                                 showZoomBadge = true
@@ -82,10 +82,11 @@ struct BottomPanelView: View {
                             }
                             .onEnded { _ in
                                 zoomAtDragStart = nil
-                                // Auto-hide badge after 1.5 s
+                                viewModel.setZoom(1.0)
+                                // Auto-hide badge after 0.8 s
                                 let task = DispatchWorkItem { showZoomBadge = false }
                                 zoomBadgeTask = task
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: task)
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: task)
                             }
                     )
 

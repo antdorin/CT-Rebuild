@@ -263,8 +263,8 @@ private class SpeechManager: ObservableObject {
     @Published var isRecording = false
     @Published var isAvailable = false
 
-    private let recognizer = SFSpeechRecognizer()
-    private let engine = AVAudioEngine()
+    private let recognizer: SFSpeechRecognizer? = SFSpeechRecognizer(locale: Locale(identifier: "en-US")) ?? SFSpeechRecognizer()
+    private var engine = AVAudioEngine()
     private var task: SFSpeechRecognitionTask?
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var tapInstalled = false
@@ -280,15 +280,19 @@ private class SpeechManager: ObservableObject {
     func startRecording(onCommit: @escaping (String) -> Void) {
         guard !tapInstalled, let rec = recognizer, rec.isAvailable else { return }
         self.onCommit = onCommit
+        // Fresh engine each session — reusing a stopped engine can crash
+        engine = AVAudioEngine()
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.record, mode: .measurement, options: .duckOthers)
+            try session.setCategory(.playAndRecord, mode: .measurement,
+                                    options: [.duckOthers, .allowBluetooth, .defaultToSpeaker])
             try session.setActive(true, options: .notifyOthersOnDeactivation)
 
-            request = SFSpeechAudioBufferRecognitionRequest()
-            request?.shouldReportPartialResults = true
+            let req = SFSpeechAudioBufferRecognitionRequest()
+            req.shouldReportPartialResults = true
+            request = req
 
-            task = rec.recognitionTask(with: request!) { [weak self] result, error in
+            task = rec.recognitionTask(with: req) { [weak self] result, error in
                 guard let self else { return }
                 if let result {
                     let text = result.bestTranscription.formattedString
@@ -298,17 +302,19 @@ private class SpeechManager: ObservableObject {
                         if isFinal { self.flush(); self.stopEngine() }
                     }
                 }
-                if error != nil { DispatchQueue.main.async { self.stopEngine() } }
+                if let error, (error as NSError).code != 301 {
+                    DispatchQueue.main.async { self.stopEngine() }
+                }
             }
 
             let node = engine.inputNode
-            engine.prepare()
             let fmt = node.inputFormat(forBus: 0)
             guard fmt.sampleRate > 0 else { stopEngine(); return }
             node.installTap(onBus: 0, bufferSize: 1024, format: fmt) { [weak self] buf, _ in
                 self?.request?.append(buf)
             }
             tapInstalled = true
+            engine.prepare()
             try engine.start()
             isRecording = true
         } catch {
@@ -329,8 +335,11 @@ private class SpeechManager: ObservableObject {
     }
 
     private func stopEngine() {
+        if tapInstalled {
+            engine.inputNode.removeTap(onBus: 0)
+            tapInstalled = false
+        }
         engine.stop()
-        if tapInstalled { engine.inputNode.removeTap(onBus: 0); tapInstalled = false }
         request?.endAudio(); request = nil
         task?.cancel(); task = nil
         onCommit = nil
