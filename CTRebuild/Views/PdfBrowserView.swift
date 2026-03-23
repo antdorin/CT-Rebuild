@@ -596,14 +596,4 @@ private struct PdfKitView: UIViewRepresentable {
         }
     }
 }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
-                .padding(.horizontal, 16)
-
-                Spacer()
-            }
-        }
-    }
+}
