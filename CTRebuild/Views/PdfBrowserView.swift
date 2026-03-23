@@ -596,4 +596,3 @@ private struct PdfKitView: UIViewRepresentable {
         }
     }
 }
-}
