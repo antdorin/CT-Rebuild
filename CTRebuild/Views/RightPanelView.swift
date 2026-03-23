@@ -106,7 +106,6 @@ private struct RightWheelSelector: View {
                 let distCenter     = totalOffset / spacing
 
                 RightPageContent(index: real, safeArea: safeArea)
-                    .allowsHitTesting(false)
                     .frame(width: panelSize.width, height: panelSize.height)
                     .scaleEffect(previewScale, anchor: .center)
                     .frame(width: cardW, height: cardH)
@@ -114,6 +113,20 @@ private struct RightWheelSelector: View {
                     .clipShape(RoundedRectangle(cornerRadius: 18))
                     .overlay(RoundedRectangle(cornerRadius: 18)
                         .stroke(Color.white.opacity(0.14), lineWidth: 0.5))
+                    .overlay(
+                        Color.clear
+                            .contentShape(RoundedRectangle(cornerRadius: 18))
+                            .onTapGesture {
+                                withAnimation(realIndex(virtualPage) == real ? .slideFwd : .spring(response: 0.3, dampingFraction: 0.85)) {
+                                    if realIndex(virtualPage) == real {
+                                        isPPOpen = false
+                                    } else {
+                                        virtualPage = vp
+                                        selectedIndex = real
+                                    }
+                                }
+                            }
+                    )
                     .offset(y: totalOffset)
                     .rotation3DEffect(
                         .degrees(Double(distCenter) * -35),
@@ -123,16 +136,6 @@ private struct RightWheelSelector: View {
                     .scaleEffect(1.0 - abs(distCenter) * 0.15)
                     .opacity(1.0 - abs(distCenter) * 0.4)
                     .zIndex(1.0 - abs(distCenter) * 0.5)
-                    .onTapGesture {
-                        withAnimation(realIndex(virtualPage) == real ? .slideFwd : .spring(response: 0.3, dampingFraction: 0.85)) {
-                            if realIndex(virtualPage) == real {
-                                isPPOpen = false
-                            } else {
-                                virtualPage = vp
-                                selectedIndex = real
-                            }
-                        }
-                    }
             }
         }
         .frame(width: panelSize.width, height: panelSize.height)
@@ -143,7 +146,7 @@ private struct RightWheelSelector: View {
                     dragOffset = value.translation.height
                 }
                 .onEnded { value in
-                    let dragMoves = -Int((value.translation.height / spacing).rounded())
+                    let dragMoves = -Int((value.translation.height / 150).rounded())
                     let velocityDelta = value.predictedEndTranslation.height - value.translation.height
                     let flickBoost: Int = velocityDelta > 250 ? -1 : velocityDelta < -250 ? 1 : 0
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
