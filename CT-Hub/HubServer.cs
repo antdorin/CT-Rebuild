@@ -59,6 +59,9 @@ public sealed class HubServer
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
+    public const int DiscoveryPort = 5052;      // UDP port desktop listens on
+    public const int DiscoveryReplyPort = 5051; // UDP port phone listens on
+
     public Task StartAsync()
     {
         _cts = new CancellationTokenSource();
@@ -66,6 +69,7 @@ public sealed class HubServer
         _listener.Prefixes.Add($"http://+:{Port}/");
         _listener.Start();
         _ = AcceptLoopAsync(_cts.Token);
+        _ = DiscoveryLoopAsync(_cts.Token);
         return Task.CompletedTask;
     }
 
@@ -74,6 +78,35 @@ public sealed class HubServer
         _cts?.Cancel();
         _listener?.Stop();
         _listener?.Close();
+    }
+
+    // ── UDP discovery responder ───────────────────────────────────────────────
+    // Listens for "CT-DISCOVER" on UDP 5052, replies "CT-HUB:{Port}" back to
+    // the sender on port 5051. Zero overhead when idle — only answers when asked.
+
+    private async Task DiscoveryLoopAsync(CancellationToken ct)
+    {
+        using var udp = new System.Net.Sockets.UdpClient();
+        udp.Client.SetSocketOption(
+            System.Net.Sockets.SocketOptionLevel.Socket,
+            System.Net.Sockets.SocketOptionName.ReuseAddress, true);
+        udp.Client.Bind(new IPEndPoint(IPAddress.Any, DiscoveryPort));
+
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                var result = await udp.ReceiveAsync(ct);
+                var msg = System.Text.Encoding.UTF8.GetString(result.Buffer).Trim();
+                if (msg != "CT-DISCOVER") continue;
+
+                var reply = System.Text.Encoding.UTF8.GetBytes($"CT-HUB:{Port}");
+                var replyEp = new IPEndPoint(result.RemoteEndPoint.Address, DiscoveryReplyPort);
+                await udp.SendAsync(reply, reply.Length, replyEp);
+            }
+            catch (OperationCanceledException) { break; }
+            catch { /* ignore malformed packets */ }
+        }
     }
 
     // ── Accept loop ───────────────────────────────────────────────────────────

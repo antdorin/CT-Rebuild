@@ -8,6 +8,8 @@ struct HubSettingsView: View {
     @State private var savedUrls: [String] = HubClient.savedUrls()
     @State private var activeUrl: String = UserDefaults.standard.string(forKey: HubClient.activeUrlKey) ?? ""
     @State private var newUrlText: String = ""
+    @State private var discovering: Bool = false
+    @State private var discoverStatus: String = ""
 
     var body: some View {
         ZStack {
@@ -29,6 +31,41 @@ struct HubSettingsView: View {
                         .foregroundColor(.secondary.opacity(0.4))
                         .tracking(3)
                         .padding(.horizontal, 20)
+
+                    // Auto-discover button
+                    Button {
+                        startDiscovery()
+                    } label: {
+                        HStack(spacing: 8) {
+                            if discovering {
+                                ProgressView()
+                                    .progressViewStyle(.circular)
+                                    .tint(.white)
+                                    .scaleEffect(0.75)
+                            } else {
+                                Image(systemName: "antenna.radiowaves.left.and.right")
+                            }
+                            Text(discovering ? "Searching..." : "Find Hub on Network")
+                                .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.orange.opacity(discovering ? 0.4 : 0.85))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(discovering)
+                    .padding(.horizontal, 20)
+
+                    if !discoverStatus.isEmpty {
+                        Text(discoverStatus)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 20)
+                    }
 
                     HStack(spacing: 10) {
                         TextField("http://192.168.1.x:5050", text: $newUrlText)
@@ -92,6 +129,24 @@ struct HubSettingsView: View {
     }
 
     // MARK: - Actions
+
+    private func startDiscovery() {
+        discovering = true
+        discoverStatus = "Looking for hub..."
+        Task {
+            let found = await HubDiscovery.discover()
+            await MainActor.run {
+                discovering = false
+                if let url = found {
+                    discoverStatus = "Found: \(url)"
+                    newUrlText = url
+                    addUrl()
+                } else {
+                    discoverStatus = "No hub found on this network."
+                }
+            }
+        }
+    }
 
     private func addUrl() {
         let trimmed = newUrlText.trimmingCharacters(in: .whitespacesAndNewlines)
