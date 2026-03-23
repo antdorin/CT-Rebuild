@@ -3,6 +3,8 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using CTHub.Models;
+using CTHub.Services;
+using Microsoft.Win32;
 
 namespace CTHub;
 
@@ -60,6 +62,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             ClientCountText = n == 1 ? "1 client connected" : $"{n} clients connected";
         };
         timer.Start();
+
+        // Load PDF folder and bind list
+        PdfFileList.ItemsSource = _hub.PdfFolder.FileNames;
+        if (!string.IsNullOrEmpty(_hub.PdfFolder.CurrentFolder))
+            PdfFolderPathText.Text = _hub.PdfFolder.CurrentFolder;
     }
 
     // Updates the last-broadcast timestamp shown in the status bar.
@@ -167,4 +174,23 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
     private void OnPropertyChanged([CallerMemberName] string? name = null)
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+    // ── PDF Folder handlers ───────────────────────────────────────────────────
+
+    private void PdfFolder_Browse(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Select PDF folder",
+            Multiselect = false
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            var folder = dialog.FolderName;
+            _hub.PdfFolder.SetFolder(folder);
+            PdfFolderPathText.Text = folder;
+            Touch();
+        }
+    }
 }

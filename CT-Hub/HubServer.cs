@@ -21,10 +21,11 @@ public sealed class HubServer
     private HttpListener? _listener;
     private CancellationTokenSource? _cts;
 
-    public readonly WebSocketManager WsManager = new();
+    public readonly WebSocketManager  WsManager = new();
     public readonly JsonStore<ChaseTacticalEntry> ChaseTactical;
     public readonly JsonStore<ToughHookEntry>     ToughHooks;
     public readonly JsonStore<QrClassMapping>     QrMappings;
+    public readonly PdfFolderService  PdfFolder = new();
 
     private static readonly JsonSerializerOptions _jsonOpts = new()
     {
@@ -48,6 +49,8 @@ public sealed class HubServer
         QrMappings = new JsonStore<QrClassMapping>(
             Path.Combine(dataDir, "qr_class_mappings.json"),
             e => e.Id, WsManager, "qr_class_mappings");
+
+        PdfFolder.LoadSavedFolder();
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -156,6 +159,43 @@ public sealed class HubServer
                 case ("DELETE", _) when path.StartsWith("/api/qr_class_mappings/"):
                     await QrMappings.DeleteAsync(path["/api/qr_class_mappings/".Length..]);
                     res.StatusCode = 204; break;
+
+                // ── PDF folder listing ────────────────────────────────────
+                case ("GET", "/api/pdfs"):
+                    await WriteJsonAsync(res, PdfFolder.FileNames.ToList()); break;
+
+                // ── PDF file download ─────────────────────────────────────
+                case ("GET", _) when path.StartsWith("/api/pdfs/"):
+                {
+                    var filename = Uri.UnescapeDataString(path["/api/pdfs/".Length..]);
+                    var folder   = PdfFolder.CurrentFolder;
+
+                    // Block path traversal: no directory separators, must resolve inside folder
+                    if (string.IsNullOrWhiteSpace(folder)
+                        || filename.Contains('/') || filename.Contains('\\')
+                        || filename.Contains("..")
+                        || !filename.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                    {
+                        res.StatusCode = 400; break;
+                    }
+
+                    var fullPath = Path.GetFullPath(Path.Combine(folder, filename));
+                    var folderFull = Path.GetFullPath(folder);
+
+                    if (!fullPath.StartsWith(folderFull + Path.DirectorySeparatorChar)
+                        && !fullPath.Equals(folderFull, StringComparison.OrdinalIgnoreCase))
+                    {
+                        res.StatusCode = 400; break;
+                    }
+
+                    if (!File.Exists(fullPath)) { res.StatusCode = 404; break; }
+
+                    var bytes = await File.ReadAllBytesAsync(fullPath);
+                    res.ContentType     = "application/pdf";
+                    res.ContentLength64 = bytes.Length;
+                    await res.OutputStream.WriteAsync(bytes);
+                    break;
+                }
 
                 default:
                     res.StatusCode = 404; break;

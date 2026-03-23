@@ -20,11 +20,12 @@ struct RightPanelView: View {
                     RightWheelSelector(
                         selectedIndex: $selectedIndex,
                         isPPOpen: $isPPOpen,
-                        panelSize: geo.size
+                        panelSize: geo.size,
+                        safeArea: safeArea
                     )
                     .transition(.opacity.animation(.easeInOut(duration: 0.2)))
                 } else {
-                    RightPageContent(index: selectedIndex)
+                    RightPageContent(index: selectedIndex, safeArea: safeArea)
                         .frame(width: geo.size.width, height: geo.size.height)
                         .transition(.pageTransition)
                         .onTapGesture(count: 2) {
@@ -41,23 +42,30 @@ struct RightPanelView: View {
 
 // MARK: - Right Page Content
 
-/// Full-page content for each right-panel slot.
-/// Replace the body per index as real content is added.
+/// Full-page content for each right-panel slot (1-indexed display).
 struct RightPageContent: View {
     let index: Int
+    let safeArea: EdgeInsets
 
     private let shades: [Color] = [
         Color(white: 0.18), Color(white: 0.26), Color(white: 0.34),
-        Color(white: 0.42), Color(white: 0.50), Color(white: 0.58), Color(white: 0.66),
+        Color(white: 0.42), Color(white: 0.50), Color(white: 0.58),
     ]
 
     var body: some View {
-        ZStack {
-            shades[index % shades.count].ignoresSafeArea()
-            VStack(spacing: 16) {
-                Text("Page \(index + 1)")
-                    .font(.system(size: 40, weight: .bold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.85))
+        switch index {
+        case 6:  // Page 7 — PDF Browser
+            PdfBrowserView(safeArea: safeArea)
+        case 7:  // Page 8 — Hub Settings
+            HubSettingsView(safeArea: safeArea)
+        default: // Pages 1–6 — placeholders
+            ZStack {
+                shades[index % shades.count].ignoresSafeArea()
+                VStack(spacing: 16) {
+                    Text("Page \(index + 1)")
+                        .font(.system(size: 40, weight: .bold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.85))
+                }
             }
         }
     }
@@ -69,8 +77,9 @@ private struct RightWheelSelector: View {
     @Binding var selectedIndex: Int
     @Binding var isPPOpen: Bool
     let panelSize: CGSize
+    let safeArea: EdgeInsets
 
-    private let itemCount = 7
+    private let itemCount = 8
     private let cardW: CGFloat = 320
     private let cardH: CGFloat = 560
     private let spacing: CGFloat = 580
@@ -98,7 +107,7 @@ private struct RightWheelSelector: View {
                 let totalOffset    = baseOffset + dragOffset
                 let distCenter     = totalOffset / spacing
 
-                RightPageContent(index: real)
+                RightPageContent(index: real, safeArea: safeArea)
                     .frame(width: panelSize.width, height: panelSize.height)
                     .scaleEffect(previewScale, anchor: .center)
                     .frame(width: cardW, height: cardH)

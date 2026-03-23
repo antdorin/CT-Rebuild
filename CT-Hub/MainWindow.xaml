@@ -204,6 +204,33 @@
                 </DockPanel>
             </TabItem>
 
+            <!-- ── PDF Folder ─────────────────────────────────────────────── -->
+            <TabItem Header="PDF Folder">
+                <DockPanel>
+                    <ToolBar DockPanel.Dock="Top" Background="#252526">
+                        <Button Style="{StaticResource ToolbarButton}"
+                                Content="📂  Browse…"
+                                Click="PdfFolder_Browse"/>
+                        <Separator/>
+                        <TextBlock x:Name="PdfFolderPathText"
+                                   Text="No folder selected"
+                                   Foreground="#9CDCFE"
+                                   FontFamily="Consolas"
+                                   FontSize="12"
+                                   VerticalAlignment="Center"
+                                   Margin="8,0"/>
+                    </ToolBar>
+                    <ListBox x:Name="PdfFileList"
+                             Background="#252526"
+                             Foreground="#D4D4D4"
+                             BorderBrush="#3C3C3C"
+                             BorderThickness="1"
+                             FontFamily="Consolas"
+                             FontSize="13"
+                             Padding="4"/>
+                </DockPanel>
+            </TabItem>
+
         </TabControl>
     </DockPanel>
 </Window>
