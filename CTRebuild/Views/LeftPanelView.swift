@@ -261,7 +261,7 @@ private struct LeftWheelSelector: View {
                     dragOffset = value.translation.height
                 }
                 .onEnded { value in
-                    let dragMoves = -Int((value.translation.height / 150).rounded())
+                    let dragMoves = -Int((value.translation.height / 270).rounded())
                     let velocityDelta = value.predictedEndTranslation.height - value.translation.height
                     let flickBoost: Int = velocityDelta > 250 ? -1 : velocityDelta < -250 ? 1 : 0
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
