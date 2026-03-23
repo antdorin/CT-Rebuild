@@ -100,14 +100,13 @@ private struct RightWheelSelector: View {
 
     var body: some View {
         ZStack {
-            ForEach(-1...itemCount, id: \.self) { offset in
-                let vp             = virtualPage - (virtualPage % itemCount) + offset
+            ForEach((virtualPage - itemCount)...(virtualPage + itemCount), id: \.self) { vp in
                 let real           = realIndex(vp)
-                let baseOffset     = CGFloat(vp - virtualPage) * spacing
-                let totalOffset    = baseOffset + dragOffset
+                let totalOffset    = CGFloat(vp - virtualPage) * spacing + dragOffset
                 let distCenter     = totalOffset / spacing
 
                 RightPageContent(index: real, safeArea: safeArea)
+                    .allowsHitTesting(false)
                     .frame(width: panelSize.width, height: panelSize.height)
                     .scaleEffect(previewScale, anchor: .center)
                     .frame(width: cardW, height: cardH)

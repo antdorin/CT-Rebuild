@@ -219,14 +219,13 @@ private struct LeftWheelSelector: View {
 
     var body: some View {
         ZStack {
-            ForEach(-1...totalColumns, id: \.self) { index in
-                let virtualPage    = columnPage - (columnPage % totalColumns) + index
-                let col            = colNum(virtualPage)
-                let baseOffset     = CGFloat(virtualPage - columnPage) * spacing
-                let totalOffset    = baseOffset + dragOffset
+            ForEach((columnPage - totalColumns - 1)...(columnPage + totalColumns + 1), id: \.self) { vp in
+                let col            = colNum(vp)
+                let totalOffset    = CGFloat(vp - columnPage) * spacing + dragOffset
                 let distCenter     = totalOffset / spacing
 
                 leftPageSnapshot(col: col)
+                    .allowsHitTesting(false)
                     .frame(width: panelSize.width, height: panelSize.height)
                     .scaleEffect(previewScale, anchor: .center)
                     .frame(width: cardW, height: cardH)
@@ -246,7 +245,7 @@ private struct LeftWheelSelector: View {
                     .onTapGesture {
                         withAnimation(colNum(columnPage) == col ? .slideFwd : .spring(response: 0.3, dampingFraction: 0.85)) {
                             if colNum(columnPage) == col { isPPOpen = false }
-                            else { columnPage = virtualPage }
+                            else { columnPage = vp }
                         }
                     }
             }
