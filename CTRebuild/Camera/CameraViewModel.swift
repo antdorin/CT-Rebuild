@@ -113,6 +113,17 @@ final class CameraViewModel: NSObject, ObservableObject {
         output.metadataObjectTypes = supported.filter { output.availableMetadataObjectTypes.contains($0) }
         output.setMetadataObjectsDelegate(self, queue: .main)
         metadataOutput = output
+
+        // Request 60 fps if the device supports it
+        if let format = device.formats.last(where: {
+            $0.videoSupportedFrameRateRanges.contains(where: { $0.maxFrameRate >= 60 })
+        }) {
+            try? device.lockForConfiguration()
+            device.activeFormat = format
+            device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: 60)
+            device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: 60)
+            device.unlockForConfiguration()
+        }
     }
 
     // MARK: - Zoom
