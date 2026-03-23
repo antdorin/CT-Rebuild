@@ -11,12 +11,15 @@ struct TopPanelView: View {
 
     var body: some View {
         ZStack {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .ignoresSafeArea()
+            if selectedTab != nil {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+            }
 
             VStack(spacing: 0) {
-                Spacer().frame(height: safeArea.top + 12)
+                Spacer().frame(height: safeArea.top + 16)
 
                 TopTabBar(selected: $selectedTab)
                     .padding(.horizontal, 20)
@@ -38,7 +41,7 @@ struct TopPanelView: View {
                 }
             }
         }
-        .animation(.easeInOut(duration: 0.18), value: selectedTab == nil)
+        .animation(.easeInOut(duration: 0.18), value: selectedTab)
     }
 }
 
@@ -50,15 +53,15 @@ private struct TopTabBar: View {
     private let labels = ["CALC", "NOTES", "—"]
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             ForEach(labels.indices, id: \.self) { i in
                 Button { selected = i } label: {
                     Text(labels[i])
-                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
                         .tracking(2)
                         .foregroundColor(selected == i ? .black : .secondary)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 7)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
                         .background(
                             Capsule().fill(selected == i ? Color.orange : Color(white: 0.2))
                         )
