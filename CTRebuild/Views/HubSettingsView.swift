@@ -151,6 +151,9 @@ struct HubSettingsView: View {
                     discoverStatus = "Found: \(url)"
                     newUrlText = url
                     addUrl()
+                    // Always activate the freshly discovered URL and connect,
+                    // regardless of how many saved URLs already exist.
+                    setActive(url)
                 } else {
                     discoverStatus = "No hub found on this network."
                 }

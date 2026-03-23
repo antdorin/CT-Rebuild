@@ -49,6 +49,15 @@ final class HubClient: ObservableObject {
         wsTask = task
         task.resume()
         reconnectDelay = 2
+        // Send a ping immediately so the server registers the connection,
+        // and set isConnected as soon as the ping is acknowledged.
+        task.sendPing { [weak self] error in
+            guard let self else { return }
+            DispatchQueue.main.async {
+                self.isConnected = (error == nil)
+            }
+            if error != nil { self.scheduleReconnect() }
+        }
         receive(task: task)
     }
 
