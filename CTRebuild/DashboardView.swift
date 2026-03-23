@@ -1,5 +1,4 @@
 import SwiftUI
-import AudioToolbox
 
 // MARK: - Panel State
 
@@ -92,16 +91,10 @@ struct DashboardView: View {
     private func placeholderContent(safeArea: EdgeInsets) -> some View {
         VStack {
             Spacer()
-            Button {
-                AudioServicesPlaySystemSound(1104)
-                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-            } label: {
-                Image("CTHelmet")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 200, height: 200)
-            }
-            .buttonStyle(.plain)
+            Image("CTHelmet")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 320, height: 320)
             Spacer()
         }
         .padding(.top, safeArea.top)
