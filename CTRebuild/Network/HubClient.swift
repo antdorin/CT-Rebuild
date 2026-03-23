@@ -48,7 +48,6 @@ final class HubClient: ObservableObject {
         let task = URLSession.shared.webSocketTask(with: wsURL)
         wsTask = task
         task.resume()
-        isConnected = true
         reconnectDelay = 2
         receive(task: task)
     }
@@ -67,6 +66,7 @@ final class HubClient: ObservableObject {
             guard let self else { return }
             switch result {
             case .success(let msg):
+                DispatchQueue.main.async { self.isConnected = true }
                 self.handleMessage(msg)
                 self.receive(task: task)
             case .failure:

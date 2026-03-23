@@ -1,6 +1,4 @@
 import SwiftUI
-import Speech
-import AVFoundation
 
 // MARK: - Top Panel
 
@@ -216,135 +214,17 @@ private struct CalculatorContentView: View {
 
 private struct NotesContentView: View {
     let safeArea: EdgeInsets
-
     @AppStorage("topPanelNotes") private var notes: String = ""
-    @StateObject private var speech = SpeechManager()
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Spacer()
-                Button {
-                    if speech.isRecording {
-                        speech.stopRecording { appended in
-                            notes += (notes.isEmpty ? "" : " ") + appended
-                        }
-                    } else {
-                        speech.startRecording { appended in
-                            notes += (notes.isEmpty ? "" : " ") + appended
-                        }
-                    }
-                } label: {
-                    Image(systemName: speech.isRecording ? "mic.fill" : "mic")
-                        .font(.system(size: 20))
-                        .foregroundColor(speech.isRecording ? .red : .secondary)
-                        .padding(10)
-                }
-                .buttonStyle(.plain)
-                .disabled(!speech.isAvailable)
-            }
+        TextEditor(text: $notes)
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
+            .foregroundColor(.primary)
+            .font(.system(size: 15))
             .padding(.horizontal, 12)
-
-            TextEditor(text: $notes)
-                .scrollContentBackground(.hidden)
-                .background(Color.clear)
-                .foregroundColor(.primary)
-                .font(.system(size: 15))
-                .padding(.horizontal, 12)
-                .padding(.bottom, safeArea.bottom + 16)
-        }
-        .onAppear { speech.requestPermission() }
-    }
-}
-
-// MARK: - Speech Manager
-
-private class SpeechManager: ObservableObject {
-    @Published var isRecording = false
-    @Published var isAvailable = false
-
-    private let recognizer: SFSpeechRecognizer? = SFSpeechRecognizer(locale: Locale(identifier: "en-US")) ?? SFSpeechRecognizer()
-    private var engine = AVAudioEngine()
-    private var task: SFSpeechRecognitionTask?
-    private var request: SFSpeechAudioBufferRecognitionRequest?
-    private var tapInstalled = false
-    private var livePending = ""
-    private var onCommit: ((String) -> Void)?
-
-    func requestPermission() {
-        SFSpeechRecognizer.requestAuthorization { [weak self] status in
-            DispatchQueue.main.async { self?.isAvailable = (status == .authorized) }
-        }
-    }
-
-    func startRecording(onCommit: @escaping (String) -> Void) {
-        guard !tapInstalled, let rec = recognizer, rec.isAvailable else { return }
-        self.onCommit = onCommit
-        // Fresh engine each session — reusing a stopped engine can crash
-        engine = AVAudioEngine()
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .measurement,
-                                    options: [.duckOthers, .allowBluetooth, .defaultToSpeaker])
-            try session.setActive(true, options: .notifyOthersOnDeactivation)
-
-            let req = SFSpeechAudioBufferRecognitionRequest()
-            req.shouldReportPartialResults = true
-            request = req
-
-            task = rec.recognitionTask(with: req) { [weak self] result, error in
-                guard let self else { return }
-                if let result {
-                    let text = result.bestTranscription.formattedString
-                    let isFinal = result.isFinal
-                    DispatchQueue.main.async {
-                        self.livePending = text
-                        if isFinal { self.flush(); self.stopEngine() }
-                    }
-                }
-                if let error, (error as NSError).code != 301 {
-                    DispatchQueue.main.async { self.stopEngine() }
-                }
-            }
-
-            let node = engine.inputNode
-            let fmt = node.inputFormat(forBus: 0)
-            guard fmt.sampleRate > 0 else { stopEngine(); return }
-            node.installTap(onBus: 0, bufferSize: 1024, format: fmt) { [weak self] buf, _ in
-                self?.request?.append(buf)
-            }
-            tapInstalled = true
-            engine.prepare()
-            try engine.start()
-            isRecording = true
-        } catch {
-            stopEngine()
-        }
-    }
-
-    func stopRecording(_ completing: ((String) -> Void)? = nil) {
-        if let c = completing { onCommit = c }
-        flush()
-        stopEngine()
-    }
-
-    private func flush() {
-        guard !livePending.isEmpty else { return }
-        onCommit?(livePending)
-        livePending = ""
-    }
-
-    private func stopEngine() {
-        if tapInstalled {
-            engine.inputNode.removeTap(onBus: 0)
-            tapInstalled = false
-        }
-        engine.stop()
-        request?.endAudio(); request = nil
-        task?.cancel(); task = nil
-        onCommit = nil
-        isRecording = false
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            .padding(.top, 8)
+            .padding(.bottom, safeArea.bottom + 16)
     }
 }
 
