@@ -10,9 +10,9 @@ enum Panel: Equatable {
 
 struct DashboardView: View {
     @State private var activePanel: Panel = .none
+    @State private var longPressActive: Bool = false
     private let screen = UIScreen.main.bounds
-    /// How close to the screen edge a swipe must start to trigger a panel (pt).
-    private let edgeZone: CGFloat = 30
+    @ObservedObject private var gestureSettings = GestureSettings.shared
 
     var body: some View {
         // GeometryReader ignores safe area so panels slide in from the true
@@ -76,7 +76,12 @@ struct DashboardView: View {
                 }
             }
             .animation(.easeInOut(duration: 0.07), value: activePanel)
+            // LongPress fires haptic immediately at 0.07 s (no sequencing delay).
+            // Drag reads longPressActive to decide threshold + switch behaviour.
+            // simultaneousGesture ensures close swipe fires even when child views
+            // (e.g. left-panel grid) have their own DragGestures active.
             .simultaneousGesture(dragGesture)
+            .simultaneousGesture(longPressHapticGesture)
         }
         .ignoresSafeArea()
         .background(Color(uiColor: .systemBackground).ignoresSafeArea())
@@ -120,57 +125,114 @@ struct DashboardView: View {
     }
 
     // MARK: - Drag Gesture
+    // minimumDistance: 10 — the 40 pt threshold for plain swipes is enforced
+    // inside resolveSwipe so long-press+drag stays responsive at low distances.
 
     private var dragGesture: some Gesture {
         DragGesture(minimumDistance: 10)
             .onEnded { value in
-                resolveSwipe(value: value)
+                let wasLongPress = longPressActive
+                longPressActive = false
+                resolveSwipe(value: value, allowSwitch: wasLongPress)
+            }
+    }
+
+    // MARK: - Long Press Haptic Gesture
+    // Duration is read from GestureSettings so the user can calibrate it.
+
+    private var longPressHapticGesture: some Gesture {
+        LongPressGesture(minimumDuration: gestureSettings.longPressDuration)
+            .onEnded { _ in
+                longPressActive = true
+                let lpAction = gestureSettings.action(for: .longPress)
+                executeAction(lpAction)
+                // Always fire haptic to confirm long-press registered
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             }
     }
 
     // MARK: - Shared Resolution
 
-    private func resolveSwipe(value: DragGesture.Value) {
+    private func resolveSwipe(value: DragGesture.Value, allowSwitch: Bool) {
         let dx = value.translation.width
         let dy = value.translation.height
         let adx = abs(dx)
         let ady = abs(dy)
 
-        // ── Close an open panel (swipe it back) ──────────────────────────
-        if activePanel != .none {
+        // Plain swipe with a panel open: only handle the close direction.
+        // Close threshold is fixed at 50pt — not configurable to avoid lockout.
+        if !allowSwitch, activePanel != .none {
             let t: CGFloat = 50
             switch activePanel {
             case .left   where dx < -t && adx > ady: activePanel = .none
             case .right  where dx >  t && adx > ady: activePanel = .none
             case .top    where dy < -t && ady > adx: activePanel = .none
-            case .bottom where dy > t && ady > adx && value.predictedEndTranslation.height > 200:
-                activePanel = .none
+            case .bottom where dy > t && ady > adx && value.predictedEndTranslation.height > 200: activePanel = .none
             default: break
             }
             return
         }
 
-        // ── Open a panel (swipe must start near the corresponding edge) ──
-        let start = value.startLocation
-        let threshold: CGFloat = 40
+        // Use calibrated thresholds from GestureSettings
+        let threshold: CGFloat = allowSwitch
+            ? CGFloat(gestureSettings.lpSwipeThreshold)
+            : CGFloat(gestureSettings.swipeThreshold)
         guard max(adx, ady) > threshold else { return }
 
-        if adx >= ady {
-            // Horizontal swipe
-            if dx > 0 && start.x < edgeZone {
-                activePanel = .left
-            } else if dx < 0 && start.x > screen.width - edgeZone {
-                activePanel = .right
-            }
+        // Determine which direction was swiped
+        let isHorizontal = adx >= ady
+        let trigger: GestureTrigger
+        if allowSwitch {
+            trigger = isHorizontal
+                ? (dx > 0 ? .longPressSwipeRight : .longPressSwipeLeft)
+                : (dy > 0 ? .longPressSwipeDown  : .longPressSwipeUp)
         } else {
-            // Vertical swipe
-            if dy > 0 && start.y < edgeZone {
-                activePanel = .top
-            } else if dy < 0 && start.y > screen.height - edgeZone {
-                activePanel = .bottom
-            }
+            trigger = isHorizontal
+                ? (dx > 0 ? .swipeRight : .swipeLeft)
+                : (dy > 0 ? .swipeDown  : .swipeUp)
+        }
+
+        let action = gestureSettings.action(for: trigger)
+        executeAction(action)
+    }
+
+    // MARK: - Execute Action
+
+    private func executeAction(_ action: GestureAction) {
+        switch action {
+        case .none:           break
+        case .openLeft:       if activePanel == .none { activePanel = .left }
+        case .openRight:      if activePanel == .none { activePanel = .right }
+        case .openTop:        if activePanel == .none { activePanel = .top }
+        case .openBottom:     if activePanel == .none { activePanel = .bottom }
+        case .closePanel:     activePanel = .none
+        case .toggleLeft:     activePanel = activePanel == .left  ? .none : .left
+        case .toggleRight:    activePanel = activePanel == .right ? .none : .right
+        case .toggleTop:      activePanel = activePanel == .top   ? .none : .top
+        case .toggleBottom:   activePanel = activePanel == .bottom ? .none : .bottom
+        case .switchLeft:     activePanel = .left
+        case .switchRight:    activePanel = .right
+        case .switchTop:      activePanel = .top
+        case .switchBottom:   activePanel = .bottom
+        case .haptic:
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        case .dismissKeyboard:
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
+                                            to: nil, from: nil, for: nil)
+        case .nextRightPage, .prevRightPage, .openPagePicker, .scrollToTop:
+            // Right-panel page actions are handled inside RightPanelView via AppStorage.
+            // Post a notification so the panel can observe it.
+            NotificationCenter.default.post(
+                name: .gestureActionFired,
+                object: nil,
+                userInfo: ["action": action.rawValue]
+            )
         }
     }
+}
+
+extension Notification.Name {
+    static let gestureActionFired = Notification.Name("CTGestureActionFired")
 }
 
 // MARK: - Preview

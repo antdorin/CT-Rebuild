@@ -54,11 +54,13 @@ struct RightPageContent: View {
 
     var body: some View {
         switch index {
-        case 6:  // Page 7 — PDF Browser
+        case 0:  // Page 1 — PDF Browser
             PdfBrowserView(safeArea: safeArea)
+        case 6:  // Page 7 — App Settings
+            AppSettingsView(safeArea: safeArea)
         case 7:  // Page 8 — Hub Settings
             HubSettingsView(safeArea: safeArea)
-        default: // Pages 1–6 — placeholders
+        default: // Pages 2–6 — placeholders
             ZStack {
                 shades[index % shades.count].ignoresSafeArea()
                 VStack(spacing: 16) {
