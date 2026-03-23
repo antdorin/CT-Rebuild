@@ -6,6 +6,7 @@ struct AppSettingsView: View {
     let safeArea: EdgeInsets
 
     @State private var showGestureSettings = false
+    @State private var showHubSettings = false
 
     var body: some View {
         ZStack {
@@ -21,6 +22,16 @@ struct AppSettingsView: View {
                     insertion: .move(edge: .trailing),
                     removal:   .move(edge: .trailing)
                 ))
+            } else if showHubSettings {
+                HubSettingsView(safeArea: safeArea, onBack: {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        showHubSettings = false
+                    }
+                })
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing),
+                    removal:   .move(edge: .trailing)
+                ))
             } else {
                 settingsList
                     .transition(.asymmetric(
@@ -30,6 +41,7 @@ struct AppSettingsView: View {
             }
         }
         .animation(.easeInOut(duration: 0.22), value: showGestureSettings)
+        .animation(.easeInOut(duration: 0.22), value: showHubSettings)
     }
 
     // MARK: - Settings List
@@ -79,8 +91,11 @@ struct AppSettingsView: View {
                     // ── Network ───────────────────────────────────────────
                     sectionHeader("NETWORK")
 
-                    settingsRow(icon: "wifi", label: "Hub Connection", detail: "Configure in Hub Settings (page 8)") {}
-                        .opacity(0.4)
+                    settingsRow(icon: "wifi", label: "Hub Connection", detail: "Manage hub URLs & connection") {
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            showHubSettings = true
+                        }
+                    }
 
                     Divider()
                         .background(Color.white.opacity(0.08))

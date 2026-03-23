@@ -4,6 +4,7 @@ import SwiftUI
 
 struct HubSettingsView: View {
     let safeArea: EdgeInsets
+    var onBack: (() -> Void)? = nil
 
     @ObservedObject private var client = HubClient.shared
     @State private var savedUrls: [String] = HubClient.savedUrls()
@@ -19,12 +20,32 @@ struct HubSettingsView: View {
             VStack(spacing: 0) {
                 // Header
                 HStack {
+                    // Back button — only shown when navigated from another view
+                    if let onBack {
+                        Button(action: onBack) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Text("Settings")
+                                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+                            }
+                            .foregroundColor(.white.opacity(0.85))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.leading, 16)
+                    } else {
+                        Spacer()
+                    }
+
                     Spacer()
+
                     Text("HUB SETTINGS")
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundColor(.secondary.opacity(0.5))
                         .tracking(4)
+
                     Spacer()
+
                     // Live connection dot
                     Circle()
                         .fill(client.isConnected ? Color.green : Color.red.opacity(0.6))
