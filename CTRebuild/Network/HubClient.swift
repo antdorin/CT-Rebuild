@@ -31,6 +31,7 @@ final class HubClient: ObservableObject {
     // MARK: - WebSocket lifecycle
 
     /// Opens (or re-opens) a WebSocket to the active hub URL.
+    /// First runs an HTTP preflight to verify basic reachability, then opens WS.
     func connect() {
         reconnectTask?.cancel()
         wsTask?.cancel(with: .goingAway, reason: nil)
@@ -43,31 +44,48 @@ final class HubClient: ObservableObject {
               var comps = URLComponents(url: httpURL, resolvingAgainstBaseURL: false)
         else { return }
 
-        comps.scheme = comps.scheme == "https" ? "wss" : "ws"
-        comps.path   = "/ws"
-        guard let wsURL = comps.url else { return }
-
-        let task = URLSession.shared.webSocketTask(with: wsURL)
-        wsTask = task
-        DispatchQueue.main.async { self.connectionDiag = "Connecting to \(wsURL.host ?? "?")…" }
-        task.resume()
-        reconnectDelay = 2
-        // Send a ping immediately so the server registers the connection,
-        // and set isConnected as soon as the ping is acknowledged.
-        task.sendPing { [weak self] error in
-            guard let self else { return }
-            DispatchQueue.main.async {
-                if let error {
-                    self.connectionDiag = "Ping failed: \(error.localizedDescription)"
-                    self.isConnected = false
-                } else {
-                    self.connectionDiag = "Connected ✓"
-                    self.isConnected = true
+        // ── HTTP preflight: test basic reachability before WebSocket ────────
+        DispatchQueue.main.async { self.connectionDiag = "Testing HTTP to \(httpURL.host ?? "?")…" }
+        let healthURL = httpURL.appendingPathComponent("api/chasetactical")
+        var req = URLRequest(url: healthURL, timeoutInterval: 5)
+        req.httpMethod = "GET"
+        Task {
+            do {
+                let (_, response) = try await URLSession.shared.data(for: req)
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                await MainActor.run { self.connectionDiag = "HTTP OK (\(status)) — opening WS…" }
+            } catch {
+                await MainActor.run {
+                    self.connectionDiag = "HTTP failed: \(error.localizedDescription)"
                 }
+                self.scheduleReconnect()
+                return  // don't attempt WS if HTTP is unreachable
             }
-            if error != nil { self.scheduleReconnect() }
+
+            // ── WebSocket connect ──────────────────────────────────────────
+            comps.scheme = comps.scheme == "https" ? "wss" : "ws"
+            comps.path   = "/ws"
+            guard let wsURL = comps.url else { return }
+
+            let task = URLSession.shared.webSocketTask(with: wsURL)
+            await MainActor.run { self.wsTask = task }
+            task.resume()
+            self.reconnectDelay = 2
+            task.sendPing { [weak self] error in
+                guard let self else { return }
+                DispatchQueue.main.async {
+                    if let error {
+                        self.connectionDiag = "WS ping failed: \(error.localizedDescription)"
+                        self.isConnected = false
+                    } else {
+                        self.connectionDiag = "Connected ✓"
+                        self.isConnected = true
+                    }
+                }
+                if error != nil { self.scheduleReconnect() }
+            }
+            self.receive(task: task)
         }
-        receive(task: task)
     }
 
     /// Disconnects and cancels any pending reconnect.
