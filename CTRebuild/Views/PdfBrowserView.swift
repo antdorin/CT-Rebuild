@@ -122,7 +122,9 @@ private func mergePDFs(from parts: [Data]) -> PDFDocument {
     for data in parts {
         guard let doc = PDFDocument(data: data) else { continue }
         for p in 0..<doc.pageCount {
-            if let page = doc.page(at: p) { out.insert(page, at: idx); idx += 1 }
+            if let page = doc.page(at: p), let copy = page.copy() as? PDFPage {
+                out.insert(copy, at: idx); idx += 1
+            }
         }
     }
     return out
@@ -186,7 +188,11 @@ private func sortedDoc(_ doc: PDFDocument, by field: PdfSortField) -> PDFDocumen
     }
     let sorted = pages.sorted { $0.1 < $1.1 }
     let out = PDFDocument()
-    for (i, (page, _)) in sorted.enumerated() { out.insert(page, at: i) }
+    for (i, (page, _)) in sorted.enumerated() {
+        if let copy = page.copy() as? PDFPage {
+            out.insert(copy, at: i)
+        }
+    }
     return out
 }
 
