@@ -219,7 +219,7 @@ private struct LeftWheelSelector: View {
 
     var body: some View {
         ZStack {
-            ForEach((columnPage - totalColumns - 1)...(columnPage + totalColumns + 1), id: \.self) { vp in
+            ForEach((columnPage - 2)...(columnPage + 2), id: \.self) { vp in
                 let col            = colNum(vp)
                 let totalOffset    = CGFloat(vp - columnPage) * spacing + dragOffset
                 let distCenter     = totalOffset / spacing
