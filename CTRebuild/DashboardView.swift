@@ -11,6 +11,7 @@ enum Panel: Equatable {
 struct DashboardView: View {
     @State private var activePanel: Panel = .none
     @State private var longPressActive: Bool = false
+    @State private var bottomPanelZooming: Bool = false
     private let screen = UIScreen.main.bounds
 
     var body: some View {
@@ -117,7 +118,7 @@ struct DashboardView: View {
         case .top:
             TopPanelView(safeArea: safeArea)
         case .bottom:
-            BottomPanelView(safeArea: safeArea)
+            BottomPanelView(safeArea: safeArea, isZooming: $bottomPanelZooming)
         case .right:
             RightPanelView(safeArea: safeArea)
         default:
@@ -166,7 +167,7 @@ struct DashboardView: View {
             case .left   where dx < -t && adx > ady: activePanel = .none
             case .right  where dx >  t && adx > ady: activePanel = .none
             case .top    where dy < -t && ady > adx: activePanel = .none
-            case .bottom where dy >  t && ady > adx: activePanel = .none
+            case .bottom where dy >  t && ady > adx && !bottomPanelZooming: activePanel = .none
             default: break
             }
             return
