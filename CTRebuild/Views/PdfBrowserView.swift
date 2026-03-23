@@ -219,13 +219,6 @@ private struct PdfDetailView: View {
                     .truncationMode(.middle)
 
                 Spacer()
-
-                // PDF / TEXT segment toggle
-                HStack(spacing: 0) {
-                    segmentButton(label: "PDF",  active: !showTextMode) { showTextMode = false }
-                    segmentButton(label: "TEXT", active:  showTextMode) { showTextMode = true  }
-                }
-                .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
             }
             .padding(.horizontal, 16)
             .padding(.top, safeArea.top + 12)
@@ -246,8 +239,18 @@ private struct PdfDetailView: View {
                 }
             } else {
                 PdfKitView(data: pdfData)
-                    .padding(.bottom, safeArea.bottom)
             }
+
+            Divider().opacity(0.15)
+
+            // ── PDF / TEXT segment toggle ──────────────────────────────────────
+            HStack(spacing: 0) {
+                segmentButton(label: "PDF",  active: !showTextMode) { showTextMode = false }
+                segmentButton(label: "TEXT", active:  showTextMode) { showTextMode = true  }
+            }
+            .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+            .padding(.vertical, 10)
+            .padding(.bottom, safeArea.bottom)
             }
         }
     }
