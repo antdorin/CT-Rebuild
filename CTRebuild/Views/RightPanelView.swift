@@ -66,6 +66,8 @@ struct RightPageContent: View {
                         .font(.system(size: 40, weight: .bold, design: .rounded))
                         .foregroundColor(.white.opacity(0.85))
                 }
+                .padding(.top, safeArea.top)
+                .padding(.bottom, safeArea.bottom)
             }
         }
     }

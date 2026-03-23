@@ -102,6 +102,7 @@ struct BottomPanelView: View {
                                 Spacer()
                             }
                             .frame(maxWidth: .infinity)
+                            .padding(.bottom, safeArea.bottom)
                         } else {
                             ScrollView(.vertical, showsIndicators: false) {
                                 LazyVStack(spacing: 0) {
@@ -110,6 +111,7 @@ struct BottomPanelView: View {
                                     }
                                 }
                                 .padding(.vertical, 6)
+                                .padding(.bottom, safeArea.bottom)
                             }
                         }
                     }
