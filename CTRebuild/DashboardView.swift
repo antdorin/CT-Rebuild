@@ -18,8 +18,7 @@ struct DashboardView: View {
     /// .ignoresSafeArea(), so we bypass SwiftUI and read directly from the
     /// window scene instead.
     private var uiSafeInsets: EdgeInsets {
-        let insets = (UIApplication.shared.connectedScenes.first as? UIWindowScene)
-            ?.keyWindow?.safeAreaInsets ?? .zero
+        let insets = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.keyWindow?.safeAreaInsets ?? .zero
         return EdgeInsets(top: insets.top, leading: insets.left,
                           bottom: insets.bottom, trailing: insets.right)
     }
