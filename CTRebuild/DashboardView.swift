@@ -24,64 +24,66 @@ struct DashboardView: View {
     }
 
     var body: some View {
-        let safe = uiSafeInsets
+        GeometryReader { _ in
+            let safe = uiSafeInsets
 
-        ZStack {
-            // ── Adaptive Background — black in dark mode, white in light ──
-            Color(uiColor: .systemBackground)
-                .ignoresSafeArea()
-
-            // ── Placeholder Dashboard Content ─────────────────────────────
-            placeholderContent(safeArea: safe)
-
-            // ── Dim Backdrop (tap anywhere to dismiss) ────────────────────
-            if activePanel != .none {
-                Color.black.opacity(0.55)
+            ZStack {
+                // ── Adaptive Background — black in dark mode, white in light ──
+                Color(uiColor: .systemBackground)
                     .ignoresSafeArea()
-                    .onTapGesture { activePanel = .none }
-                    .transition(.opacity)
-                    .zIndex(10)
-            }
 
-            // ── Left Panel (swipe RIGHT to open) ──────────────────────────
-            if activePanel == .left {
-                panelContent(for: .left, safeArea: safe)
-                    .frame(width: screen.width * 0.97, height: screen.height)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                    .zIndex(11)
-                    .transition(.move(edge: .leading))
-            }
+                // ── Placeholder Dashboard Content ─────────────────────────────
+                placeholderContent(safeArea: safe)
 
-            // ── Right Panel (swipe LEFT to open) ──────────────────────────
-            if activePanel == .right {
-                panelContent(for: .right, safeArea: safe)
-                    .frame(width: screen.width * 0.97, height: screen.height)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                    .zIndex(11)
-                    .transition(.move(edge: .trailing))
-            }
+                // ── Dim Backdrop (tap anywhere to dismiss) ────────────────────
+                if activePanel != .none {
+                    Color.black.opacity(0.55)
+                        .ignoresSafeArea()
+                        .onTapGesture { activePanel = .none }
+                        .transition(.opacity)
+                        .zIndex(10)
+                }
 
-            // ── Top Panel (swipe DOWN to open) ────────────────────────────
-            if activePanel == .top {
-                panelContent(for: .top, safeArea: safe)
-                    .frame(width: screen.width, height: screen.height * 0.97)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .zIndex(11)
-                    .transition(.move(edge: .top))
-            }
+                // ── Left Panel (swipe RIGHT to open) ──────────────────────────
+                if activePanel == .left {
+                    panelContent(for: .left, safeArea: safe)
+                        .frame(width: screen.width * 0.97, height: screen.height)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                        .zIndex(11)
+                        .transition(.move(edge: .leading))
+                }
 
-            // ── Bottom Panel (swipe UP to open) ───────────────────────────
-            if activePanel == .bottom {
-                panelContent(for: .bottom, safeArea: safe)
-                    .frame(width: screen.width, height: screen.height * 0.97)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                    .zIndex(11)
-                    .transition(.move(edge: .bottom))
+                // ── Right Panel (swipe LEFT to open) ──────────────────────────
+                if activePanel == .right {
+                    panelContent(for: .right, safeArea: safe)
+                        .frame(width: screen.width * 0.97, height: screen.height)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                        .zIndex(11)
+                        .transition(.move(edge: .trailing))
+                }
+
+                // ── Top Panel (swipe DOWN to open) ────────────────────────────
+                if activePanel == .top {
+                    panelContent(for: .top, safeArea: safe)
+                        .frame(width: screen.width, height: screen.height * 0.97)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .zIndex(11)
+                        .transition(.move(edge: .top))
+                }
+
+                // ── Bottom Panel (swipe UP to open) ───────────────────────────
+                if activePanel == .bottom {
+                    panelContent(for: .bottom, safeArea: safe)
+                        .frame(width: screen.width, height: screen.height * 0.97)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        .zIndex(11)
+                        .transition(.move(edge: .bottom))
+                }
             }
+            .animation(.easeInOut(duration: 0.07), value: activePanel)
+            .simultaneousGesture(dragGesture)
+            .simultaneousGesture(longPressHapticGesture)
         }
-        .animation(.easeInOut(duration: 0.07), value: activePanel)
-        .simultaneousGesture(dragGesture)
-        .simultaneousGesture(longPressHapticGesture)
         .ignoresSafeArea()
         .background(Color(uiColor: .systemBackground).ignoresSafeArea())
     }
