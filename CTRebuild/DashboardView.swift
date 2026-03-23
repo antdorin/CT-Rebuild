@@ -1,4 +1,5 @@
 import SwiftUI
+import AudioToolbox
 
 // MARK: - Panel State
 
@@ -89,18 +90,20 @@ struct DashboardView: View {
     // MARK: - Placeholder Content
 
     private func placeholderContent(safeArea: EdgeInsets) -> some View {
-        VStack(spacing: 12) {
+        VStack {
             Spacer()
-            Image(systemName: "shield.fill")
-                .font(.system(size: 60))
-                .foregroundColor(.primary.opacity(0.05))
-            Text("DASHBOARD")
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundColor(.primary.opacity(0.07))
-                .tracking(6)
+            Button {
+                AudioServicesPlaySystemSound(1104)
+                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+            } label: {
+                Image("CTHelmet")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 200, height: 200)
+            }
+            .buttonStyle(.plain)
             Spacer()
         }
-        // Keep content away from notch and home indicator
         .padding(.top, safeArea.top)
         .padding(.bottom, safeArea.bottom)
         .padding(.leading, safeArea.leading)
