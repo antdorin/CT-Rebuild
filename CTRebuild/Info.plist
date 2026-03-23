@@ -31,6 +31,11 @@
 	<string>Camera is used to scan QR codes and barcodes in the warehouse.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Used to connect to the CT-Hub server on your local network.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Microphone is used to dictate notes.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
