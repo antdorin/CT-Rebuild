@@ -260,7 +260,7 @@ private struct NotesContentView: View {
                     Image(systemName: speech.isRecording ? "stop.circle.fill" : "mic.circle.fill")
                         .font(.system(size: 30))
                         .foregroundColor(speech.isRecording ? .red : .secondary)
-                        .symbolEffect(.pulse, isActive: speech.isRecording)
+                        .modifier(PulseModifier(active: speech.isRecording))
                 }
                 .buttonStyle(.plain)
                 .padding(.trailing, 16)
@@ -278,6 +278,24 @@ private struct NotesContentView: View {
         } message: {
             Text("Microphone and speech recognition access are required for dictation.")
         }
+    }
+}
+
+// MARK: - Pulse Modifier (iOS 16 compatible, no symbolEffect)
+
+private struct PulseModifier: ViewModifier {
+    let active: Bool
+    @State private var dim = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(active ? (dim ? 0.35 : 1.0) : 1.0)
+            .animation(
+                active ? .easeInOut(duration: 0.6).repeatForever(autoreverses: true) : .default,
+                value: dim
+            )
+            .onChange(of: active) { on in dim = on }
+            .onAppear { dim = active }
     }
 }
 

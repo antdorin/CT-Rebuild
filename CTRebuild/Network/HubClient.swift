@@ -135,7 +135,7 @@ final class HubClient: ObservableObject {
     }
 
     static func removeUrl(_ url: String) {
-        var list = savedUrls().filter { $0 != url }
+        let list = savedUrls().filter { $0 != url }
         UserDefaults.standard.set(list, forKey: savedUrlsKey)
         // If deleted URL was active, clear active
         if UserDefaults.standard.string(forKey: activeUrlKey) == url {
