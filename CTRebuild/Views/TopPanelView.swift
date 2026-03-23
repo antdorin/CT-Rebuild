@@ -215,16 +215,69 @@ private struct CalculatorContentView: View {
 private struct NotesContentView: View {
     let safeArea: EdgeInsets
     @AppStorage("topPanelNotes") private var notes: String = ""
+    @StateObject private var speech = SpeechManager()
+
+    // Show live transcription while recording, saved text otherwise
+    private var liveText: String {
+        guard speech.isRecording else { return notes }
+        if speech.partial.isEmpty { return speech.baseText }
+        let sep = speech.baseText.isEmpty ? "" : "\n"
+        return speech.baseText + sep + speech.partial
+    }
+
+    private var textBinding: Binding<String> {
+        Binding(
+            get: { liveText },
+            set: { if !speech.isRecording { notes = $0 } }
+        )
+    }
 
     var body: some View {
-        TextEditor(text: $notes)
-            .scrollContentBackground(.hidden)
-            .background(Color.clear)
-            .foregroundColor(.primary)
-            .font(.system(size: 15))
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
-            .padding(.bottom, safeArea.bottom + 16)
+        VStack(spacing: 0) {
+            TextEditor(text: textBinding)
+                .scrollContentBackground(.hidden)
+                .background(Color.clear)
+                .foregroundColor(speech.isRecording ? .primary.opacity(0.6) : .primary)
+                .font(.system(size: 15))
+                .disabled(speech.isRecording)
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+
+            HStack {
+                Spacer()
+                Button {
+                    if speech.isRecording {
+                        // Commit live transcription before stopping
+                        if !speech.partial.isEmpty {
+                            let sep = speech.baseText.isEmpty ? "" : "\n"
+                            notes = speech.baseText + sep + speech.partial
+                        }
+                        speech.stop()
+                    } else {
+                        speech.start(baseText: notes)
+                    }
+                } label: {
+                    Image(systemName: speech.isRecording ? "stop.circle.fill" : "mic.circle.fill")
+                        .font(.system(size: 30))
+                        .foregroundColor(speech.isRecording ? .red : .secondary)
+                        .symbolEffect(.pulse, isActive: speech.isRecording)
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 16)
+                .padding(.bottom, safeArea.bottom + 12)
+            }
+        }
+        .onDisappear { speech.stop() }
+        .alert("Permission Required", isPresented: $speech.permissionDenied) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Microphone and speech recognition access are required for dictation.")
+        }
     }
 }
 
