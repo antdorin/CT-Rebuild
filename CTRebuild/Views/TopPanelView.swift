@@ -7,7 +7,7 @@ import AVFoundation
 struct TopPanelView: View {
     let safeArea: EdgeInsets
 
-    @State private var selectedTab: Int? = nil
+    @State private var selectedTab: Int? = 1
 
     // Read directly from UIKit — reliable even when parent ignores safe area
     private var topInset: CGFloat {
