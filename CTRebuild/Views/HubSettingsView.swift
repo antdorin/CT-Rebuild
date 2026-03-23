@@ -32,7 +32,16 @@ struct HubSettingsView: View {
                         .padding(.trailing, 20)
                 }
                 .padding(.top, safeArea.top + 16)
-                .padding(.bottom, 20)
+
+                // Connection diagnostic
+                if !client.connectionDiag.isEmpty {
+                    Text(client.connectionDiag)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(client.isConnected ? .green.opacity(0.8) : .orange.opacity(0.85))
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.bottom, 6)
+                }
+                Spacer().frame(height: client.connectionDiag.isEmpty ? 20 : 8)
 
                 // Add new URL
                 VStack(alignment: .leading, spacing: 8) {

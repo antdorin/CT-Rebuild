@@ -16,6 +16,8 @@ final class HubClient: ObservableObject {
 
     // MARK: - Connection state (observable)
     @Published private(set) var isConnected: Bool = false
+    /// Human-readable status shown in Hub Settings for real-time diagnostics.
+    @Published private(set) var connectionDiag: String = ""
 
     private var wsTask: URLSessionWebSocketTask?
     private var reconnectTask: Task<Void, Never>?
@@ -47,6 +49,7 @@ final class HubClient: ObservableObject {
 
         let task = URLSession.shared.webSocketTask(with: wsURL)
         wsTask = task
+        DispatchQueue.main.async { self.connectionDiag = "Connecting to \(wsURL.host ?? "?")…" }
         task.resume()
         reconnectDelay = 2
         // Send a ping immediately so the server registers the connection,
@@ -54,7 +57,13 @@ final class HubClient: ObservableObject {
         task.sendPing { [weak self] error in
             guard let self else { return }
             DispatchQueue.main.async {
-                self.isConnected = (error == nil)
+                if let error {
+                    self.connectionDiag = "Ping failed: \(error.localizedDescription)"
+                    self.isConnected = false
+                } else {
+                    self.connectionDiag = "Connected ✓"
+                    self.isConnected = true
+                }
             }
             if error != nil { self.scheduleReconnect() }
         }
@@ -78,8 +87,14 @@ final class HubClient: ObservableObject {
                 DispatchQueue.main.async { self.isConnected = true }
                 self.handleMessage(msg)
                 self.receive(task: task)
-            case .failure:
-                DispatchQueue.main.async { self.isConnected = false }
+            case .failure(let error):
+                DispatchQueue.main.async {
+                    self.isConnected = false
+                    // Only overwrite diag if we haven't already shown a ping failure
+                    if !self.connectionDiag.hasPrefix("Ping failed") {
+                        self.connectionDiag = "Disconnected: \(error.localizedDescription)"
+                    }
+                }
                 self.scheduleReconnect()
             }
         }
