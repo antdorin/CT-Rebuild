@@ -278,7 +278,7 @@ private class SpeechManager: ObservableObject {
     }
 
     func startRecording(onCommit: @escaping (String) -> Void) {
-        guard let rec = recognizer, rec.isAvailable else { return }
+        guard !tapInstalled, let rec = recognizer, rec.isAvailable else { return }
         self.onCommit = onCommit
         do {
             let session = AVAudioSession.sharedInstance()
@@ -302,7 +302,8 @@ private class SpeechManager: ObservableObject {
             }
 
             let node = engine.inputNode
-            node.installTap(onBus: 0, bufferSize: 1024, format: node.outputFormat(forBus: 0)) { [weak self] buf, _ in
+            let fmt = node.inputFormat(forBus: 0)
+            node.installTap(onBus: 0, bufferSize: 1024, format: fmt) { [weak self] buf, _ in
                 self?.request?.append(buf)
             }
             tapInstalled = true
