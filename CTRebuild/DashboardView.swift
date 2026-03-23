@@ -10,8 +10,9 @@ enum Panel: Equatable {
 
 struct DashboardView: View {
     @State private var activePanel: Panel = .none
-    @State private var longPressActive: Bool = false
     private let screen = UIScreen.main.bounds
+    /// How close to the screen edge a swipe must start to trigger a panel (pt).
+    private let edgeZone: CGFloat = 30
 
     var body: some View {
         // GeometryReader ignores safe area so panels slide in from the true
@@ -75,12 +76,7 @@ struct DashboardView: View {
                 }
             }
             .animation(.easeInOut(duration: 0.07), value: activePanel)
-            // LongPress fires haptic immediately at 0.07 s (no sequencing delay).
-            // Drag reads longPressActive to decide threshold + switch behaviour.
-            // simultaneousGesture ensures close swipe fires even when child views
-            // (e.g. left-panel grid) have their own DragGestures active.
             .simultaneousGesture(dragGesture)
-            .simultaneousGesture(longPressHapticGesture)
         }
         .ignoresSafeArea()
         .background(Color(uiColor: .systemBackground).ignoresSafeArea())
@@ -124,61 +120,55 @@ struct DashboardView: View {
     }
 
     // MARK: - Drag Gesture
-    // minimumDistance: 10 — the 40 pt threshold for plain swipes is enforced
-    // inside resolveSwipe so long-press+drag stays responsive at low distances.
 
     private var dragGesture: some Gesture {
         DragGesture(minimumDistance: 10)
             .onEnded { value in
-                let wasLongPress = longPressActive
-                longPressActive = false
-                resolveSwipe(value: value, allowSwitch: wasLongPress)
-            }
-    }
-
-    // MARK: - Long Press Haptic Gesture
-    // Fires immediately when 0.1 s elapses — no sequencing, no extra touch needed.
-
-    private var longPressHapticGesture: some Gesture {
-        LongPressGesture(minimumDuration: 0.1)
-            .onEnded { _ in
-                longPressActive = true
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                resolveSwipe(value: value)
             }
     }
 
     // MARK: - Shared Resolution
 
-    private func resolveSwipe(value: DragGesture.Value, allowSwitch: Bool) {
+    private func resolveSwipe(value: DragGesture.Value) {
         let dx = value.translation.width
         let dy = value.translation.height
         let adx = abs(dx)
         let ady = abs(dy)
 
-        // Plain swipe with a panel open: only handle the close direction
-        if !allowSwitch, activePanel != .none {
+        // ── Close an open panel (swipe it back) ──────────────────────────
+        if activePanel != .none {
             let t: CGFloat = 50
             switch activePanel {
             case .left   where dx < -t && adx > ady: activePanel = .none
             case .right  where dx >  t && adx > ady: activePanel = .none
             case .top    where dy < -t && ady > adx: activePanel = .none
-            // Bottom panel: require fast flick (predictedEnd > 200) to avoid triggering on slow zoom drag
-            case .bottom where dy > t && ady > adx && value.predictedEndTranslation.height > 200: activePanel = .none
+            case .bottom where dy > t && ady > adx && value.predictedEndTranslation.height > 200:
+                activePanel = .none
             default: break
             }
             return
         }
 
-        let threshold: CGFloat = allowSwitch ? 10 : 40
+        // ── Open a panel (swipe must start near the corresponding edge) ──
+        let start = value.startLocation
+        let threshold: CGFloat = 40
         guard max(adx, ady) > threshold else { return }
 
-        let target: Panel = adx >= ady
-            ? (dx > 0 ? .left  : .right)
-            : (dy > 0 ? .top   : .bottom)
-
-        // Long-press can switch panels; plain swipe only opens from closed
-        if allowSwitch || activePanel == .none {
-            activePanel = target
+        if adx >= ady {
+            // Horizontal swipe
+            if dx > 0 && start.x < edgeZone {
+                activePanel = .left
+            } else if dx < 0 && start.x > screen.width - edgeZone {
+                activePanel = .right
+            }
+        } else {
+            // Vertical swipe
+            if dy > 0 && start.y < edgeZone {
+                activePanel = .top
+            } else if dy < 0 && start.y > screen.height - edgeZone {
+                activePanel = .bottom
+            }
         }
     }
 }
