@@ -63,6 +63,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         };
         timer.Start();
 
+        // Notify when a device connects
+        _hub.ClientConnected += ip => Dispatcher.InvokeAsync(() =>
+        {
+            StatusText = $"Device connected: {ip}";
+            var restore = $"http://localhost:{HubServer.Port}";
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+            timer.Tick += (_, _) => { StatusText = restore; timer.Stop(); };
+            timer.Start();
+        });
+
         // Load PDF folder and bind list
         PdfFileList.ItemsSource = _hub.PdfFolder.FileNames;
         if (!string.IsNullOrEmpty(_hub.PdfFolder.CurrentFolder))

@@ -13,13 +13,17 @@ namespace CTHub;
 /// Self-hosted HTTP + WebSocket server running inside the WPF process.
 /// Uses HttpListener (no SDK dependency) so it works in Microsoft.NET.Sdk (WPF).
 /// Port: 5050.  Requires "Run as Administrator" OR a one-time netsh reservation:
-///   netsh http add urlacl url=http://localhost:5050/ user=Everyone
+///   netsh http add urlacl url=http://+:5050/ user=Everyone
 /// </summary>
 public sealed class HubServer
 {
     public const int Port = 5050;
     private HttpListener? _listener;
     private CancellationTokenSource? _cts;
+
+    /// Fired on the thread-pool whenever a new WebSocket client connects.
+    /// Arg is the client's remote IP address string.
+    public event Action<string>? ClientConnected;
 
     public readonly WebSocketManager  WsManager = new();
     public readonly JsonStore<ChaseTacticalEntry> ChaseTactical;
@@ -59,7 +63,7 @@ public sealed class HubServer
     {
         _cts = new CancellationTokenSource();
         _listener = new HttpListener();
-        _listener.Prefixes.Add($"http://localhost:{Port}/");
+        _listener.Prefixes.Add($"http://+:{Port}/");
         _listener.Start();
         _ = AcceptLoopAsync(_cts.Token);
         return Task.CompletedTask;
@@ -98,8 +102,10 @@ public sealed class HubServer
             {
                 var wsCtx = await ctx.AcceptWebSocketAsync(null);
                 var ws    = wsCtx.WebSocket;
-                var id    = Guid.NewGuid().ToString();
+                var id         = Guid.NewGuid().ToString();
+                var clientIp   = ctx.Request.RemoteEndPoint?.Address?.ToString() ?? "unknown";
                 WsManager.Register(id, ws);
+                ClientConnected?.Invoke(clientIp);
 
                 var buf = new byte[1024];
                 while (ws.State == WebSocketState.Open && !ct.IsCancellationRequested)
