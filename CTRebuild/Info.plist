@@ -29,6 +29,10 @@
 	<dict/>
 	<key>NSCameraUsageDescription</key>
 	<string>Camera is used to scan QR codes and barcodes in the warehouse.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Used to transcribe spoken notes.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Used to record audio for speech transcription.</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

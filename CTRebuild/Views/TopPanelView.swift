@@ -1,16 +1,84 @@
 import SwiftUI
+import Speech
+import AVFoundation
 
-// MARK: - Top Panel — Calculator
+// MARK: - Top Panel
 
 struct TopPanelView: View {
+    let safeArea: EdgeInsets
+
+    @State private var selectedTab: Int? = nil
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                Spacer().frame(height: safeArea.top + 12)
+
+                TopTabBar(selected: $selectedTab)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
+
+                if let tab = selectedTab {
+                    Group {
+                        if tab == 0 {
+                            CalculatorContentView(safeArea: safeArea)
+                        } else if tab == 1 {
+                            NotesContentView(safeArea: safeArea)
+                        } else {
+                            Spacer()
+                        }
+                    }
+                    .transition(.opacity)
+                } else {
+                    Spacer()
+                }
+            }
+        }
+        .animation(.easeInOut(duration: 0.18), value: selectedTab == nil)
+    }
+}
+
+// MARK: - Tab Bar
+
+private struct TopTabBar: View {
+    @Binding var selected: Int?
+
+    private let labels = ["CALC", "NOTES", "—"]
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(labels.indices, id: \.self) { i in
+                Button { selected = i } label: {
+                    Text(labels[i])
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .tracking(2)
+                        .foregroundColor(selected == i ? .black : .secondary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 7)
+                        .background(
+                            Capsule().fill(selected == i ? Color.orange : Color(white: 0.2))
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
+// MARK: - Calculator Content
+
+private struct CalculatorContentView: View {
     let safeArea: EdgeInsets
 
     @State private var display: String = "0"
     @State private var operand: Double = 0
     @State private var pendingOp: CalcOp? = nil
-    @State private var freshEntry: Bool = true   // next digit starts a new number
+    @State private var freshEntry: Bool = true
 
-    // Button grid layout
     private let rows: [[CalcKey]] = [
         [.clear, .sign,  .percent, .op(.divide)],
         [.digit(7), .digit(8), .digit(9), .op(.multiply)],
@@ -20,67 +88,47 @@ struct TopPanelView: View {
     ]
 
     var body: some View {
-        ZStack {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .ignoresSafeArea()
+        GeometryReader { geo in
+            let hPad: CGFloat = 16
+            let spacing: CGFloat = 10
+            let cols: CGFloat = 4
+            let btnW = (geo.size.width - hPad * 2 - spacing * (cols - 1)) / cols
+            let btnH = btnW * 0.82
 
             VStack(spacing: 0) {
-                // ── Header ────────────────────────────────────────────────────
-                Text("CALCULATOR")
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundColor(.secondary.opacity(0.5))
-                    .tracking(4)
-                    .padding(.top, safeArea.top + 16)
-                    .padding(.bottom, 8)
+                Spacer(minLength: 0)
 
-                // ── Display + Button grid anchored to bottom ──────────────────
-                GeometryReader { geo in
-                    let hPad: CGFloat = 16
-                    let spacing: CGFloat = 10
-                    let cols: CGFloat = 4
-                    let btnW = (geo.size.width - hPad * 2 - spacing * (cols - 1)) / cols
-                    let btnH = btnW * 0.82
+                Text(formattedDisplay)
+                    .font(.system(size: 48, weight: .thin, design: .monospaced))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.35)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.horizontal, hPad)
+                    .padding(.bottom, 12)
 
-                    VStack(spacing: 0) {
-                        Spacer(minLength: 0)
-
-                        Text(formattedDisplay)
-                            .font(.system(size: 48, weight: .thin, design: .monospaced))
-                            .foregroundColor(.primary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.35)
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-                            .padding(.horizontal, hPad)
-                            .padding(.bottom, 12)
-
-                        VStack(spacing: spacing) {
-                            ForEach(rows.indices, id: \.self) { r in
-                                HStack(spacing: spacing) {
-                                    ForEach(rows[r].indices, id: \.self) { c in
-                                        let key = rows[r][c]
-                                        calcButton(key: key,
-                                                   width: key == .digit(0) ? btnW * 2 + spacing : btnW,
-                                                   height: btnH)
-                                    }
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, hPad)
+                VStack(spacing: spacing) {
+                    ForEach(rows.indices, id: \.self) { r in
+                        HStack(spacing: spacing) {
+                            ForEach(rows[r].indices, id: \.self) { c in
+                                let key = rows[r][c]
+                                calcButton(key: key,
+                                           width: key == .digit(0) ? btnW * 2 + spacing : btnW,
+                                           height: btnH)
                             }
                         }
-                        .padding(.bottom, safeArea.bottom + 16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, hPad)
                     }
                 }
+                .padding(.bottom, safeArea.bottom + 16)
             }
         }
     }
 
-    // MARK: - Formatted Display
-
     private var formattedDisplay: String {
         guard let d = Double(display) else { return display }
         if display.hasSuffix(".") { return display }
-        // Show integer if no fractional part, else show decimal
         if d == d.rounded() && !display.contains(".") {
             let formatted = String(format: "%.0f", d)
             return formatted.count > 9 ? String(d) : formatted
@@ -88,15 +136,10 @@ struct TopPanelView: View {
         return display.count > 10 ? String(format: "%.6g", d) : display
     }
 
-    // MARK: - Button View
-
     @ViewBuilder
     private func calcButton(key: CalcKey, width: CGFloat, height: CGFloat) -> some View {
         let (label, fg, bg) = appearance(for: key)
-
-        Button {
-            handle(key)
-        } label: {
+        Button { handle(key) } label: {
             Text(label)
                 .font(.system(size: height * 0.38, weight: .regular, design: .rounded))
                 .foregroundColor(fg)
@@ -108,66 +151,35 @@ struct TopPanelView: View {
 
     private func appearance(for key: CalcKey) -> (String, Color, Color) {
         switch key {
-        case .clear:
-            return (display == "0" && !freshEntry ? "AC" : "C",
-                    .black, Color(white: 0.75))
-        case .sign:   return ("+/−", .black, Color(white: 0.75))
-        case .percent: return ("%",  .black, Color(white: 0.75))
-        case .op(let o): return (o.symbol, .white, .orange)
+        case .clear:        return (display == "0" && !freshEntry ? "AC" : "C", .black, Color(white: 0.75))
+        case .sign:         return ("+/−", .black, Color(white: 0.75))
+        case .percent:      return ("%",   .black, Color(white: 0.75))
+        case .op(let o):    return (o.symbol, .white, .orange)
         case .digit(let d): return ("\(d)", .white, Color(white: 0.22))
-        case .decimal: return (".", .white, Color(white: 0.22))
-        case .equals: return ("=",  .white, .orange)
+        case .decimal:      return (".", .white, Color(white: 0.22))
+        case .equals:       return ("=",  .white, .orange)
         }
     }
 
-    private func operatorForKey(_ key: CalcKey) -> CalcOp? {
-        if case .op(let o) = key { return o }
-        return nil
-    }
-
-    // MARK: - Logic
-
     private func handle(_ key: CalcKey) {
         switch key {
-
         case .digit(let d):
-            if freshEntry {
-                display = d == 0 ? "0" : "\(d)"
-                freshEntry = false
-            } else {
-                if display == "0" { display = "\(d)" }
-                else if display.count < 10 { display += "\(d)" }
-            }
-
+            if freshEntry { display = d == 0 ? "0" : "\(d)"; freshEntry = false }
+            else { if display == "0" { display = "\(d)" } else if display.count < 10 { display += "\(d)" } }
         case .decimal:
             if freshEntry { display = "0."; freshEntry = false }
             else if !display.contains(".") { display += "." }
-
         case .clear:
             display = "0"
-            if !freshEntry { freshEntry = true }
-            else { operand = 0; pendingOp = nil }
-
+            if !freshEntry { freshEntry = true } else { operand = 0; pendingOp = nil }
         case .sign:
-            if let v = Double(display) {
-                display = format(-v)
-            }
-
+            if let v = Double(display) { display = format(-v) }
         case .percent:
-            if let v = Double(display) {
-                display = format(v / 100)
-            }
-
+            if let v = Double(display) { display = format(v / 100) }
         case .op(let o):
-            commit()
-            operand = Double(display) ?? 0
-            pendingOp = o
-            freshEntry = true
-
+            commit(); operand = Double(display) ?? 0; pendingOp = o; freshEntry = true
         case .equals:
-            commit()
-            pendingOp = nil
-            freshEntry = true
+            commit(); pendingOp = nil; freshEntry = true
         }
     }
 
@@ -180,8 +192,7 @@ struct TopPanelView: View {
         case .multiply: result = operand * current
         case .divide:   result = current == 0 ? 0 : operand / current
         }
-        display = format(result)
-        operand = result
+        display = format(result); operand = result
     }
 
     private func format(_ v: Double) -> String {
@@ -191,16 +202,141 @@ struct TopPanelView: View {
     }
 }
 
+// MARK: - Notes Content
+
+private struct NotesContentView: View {
+    let safeArea: EdgeInsets
+
+    @AppStorage("topPanelNotes") private var notes: String = ""
+    @StateObject private var speech = SpeechManager()
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Button {
+                    if speech.isRecording {
+                        speech.stopRecording { appended in
+                            notes += (notes.isEmpty ? "" : " ") + appended
+                        }
+                    } else {
+                        speech.startRecording { appended in
+                            notes += (notes.isEmpty ? "" : " ") + appended
+                        }
+                    }
+                } label: {
+                    Image(systemName: speech.isRecording ? "mic.fill" : "mic")
+                        .font(.system(size: 20))
+                        .foregroundColor(speech.isRecording ? .red : .secondary)
+                        .padding(10)
+                }
+                .buttonStyle(.plain)
+                .disabled(!speech.isAvailable)
+            }
+            .padding(.horizontal, 12)
+
+            TextEditor(text: $notes)
+                .scrollContentBackground(.hidden)
+                .background(Color.clear)
+                .foregroundColor(.primary)
+                .font(.system(size: 15))
+                .padding(.horizontal, 12)
+                .padding(.bottom, safeArea.bottom + 16)
+        }
+        .onAppear { speech.requestPermission() }
+    }
+}
+
+// MARK: - Speech Manager
+
+private class SpeechManager: ObservableObject {
+    @Published var isRecording = false
+    @Published var isAvailable = false
+
+    private let recognizer = SFSpeechRecognizer()
+    private let engine = AVAudioEngine()
+    private var task: SFSpeechRecognitionTask?
+    private var request: SFSpeechAudioBufferRecognitionRequest?
+    private var tapInstalled = false
+    private var livePending = ""
+    private var onCommit: ((String) -> Void)?
+
+    func requestPermission() {
+        SFSpeechRecognizer.requestAuthorization { [weak self] status in
+            DispatchQueue.main.async { self?.isAvailable = (status == .authorized) }
+        }
+    }
+
+    func startRecording(onCommit: @escaping (String) -> Void) {
+        guard let rec = recognizer, rec.isAvailable else { return }
+        self.onCommit = onCommit
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.record, mode: .measurement, options: .duckOthers)
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
+
+            request = SFSpeechAudioBufferRecognitionRequest()
+            request?.shouldReportPartialResults = true
+
+            task = rec.recognitionTask(with: request!) { [weak self] result, error in
+                guard let self else { return }
+                if let result {
+                    let text = result.bestTranscription.formattedString
+                    let isFinal = result.isFinal
+                    DispatchQueue.main.async {
+                        self.livePending = text
+                        if isFinal { self.flush(); self.stopEngine() }
+                    }
+                }
+                if error != nil { DispatchQueue.main.async { self.stopEngine() } }
+            }
+
+            let node = engine.inputNode
+            node.installTap(onBus: 0, bufferSize: 1024, format: node.outputFormat(forBus: 0)) { [weak self] buf, _ in
+                self?.request?.append(buf)
+            }
+            tapInstalled = true
+            engine.prepare()
+            try engine.start()
+            isRecording = true
+        } catch {
+            stopEngine()
+        }
+    }
+
+    func stopRecording(_ completing: ((String) -> Void)? = nil) {
+        if let c = completing { onCommit = c }
+        flush()
+        stopEngine()
+    }
+
+    private func flush() {
+        guard !livePending.isEmpty else { return }
+        onCommit?(livePending)
+        livePending = ""
+    }
+
+    private func stopEngine() {
+        engine.stop()
+        if tapInstalled { engine.inputNode.removeTap(onBus: 0); tapInstalled = false }
+        request?.endAudio(); request = nil
+        task?.cancel(); task = nil
+        onCommit = nil
+        isRecording = false
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+}
+
 // MARK: - Supporting Types
 
 enum CalcOp: Equatable {
     case add, subtract, multiply, divide
     var symbol: String {
         switch self {
-        case .add: return "+"
+        case .add:      return "+"
         case .subtract: return "−"
         case .multiply: return "×"
-        case .divide: return "÷"
+        case .divide:   return "÷"
         }
     }
 }
