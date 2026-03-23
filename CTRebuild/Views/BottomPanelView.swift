@@ -3,7 +3,6 @@ import AVFoundation
 
 struct BottomPanelView: View {
     let safeArea: EdgeInsets
-    @Binding var isZooming: Bool
 
     @StateObject private var viewModel = CameraViewModel()
     @State private var zoomAtDragStart: CGFloat? = nil   // nil = not dragging
@@ -72,7 +71,6 @@ struct BottomPanelView: View {
                                 // Capture baseline on first vertical movement
                                 if zoomAtDragStart == nil {
                                     zoomAtDragStart = viewModel.zoomFactor
-                                    isZooming = true
                                 }
                                 if let base = zoomAtDragStart {
                                     // 175 pt up/down = 2× zoom change (log scale feel)
@@ -84,8 +82,6 @@ struct BottomPanelView: View {
                             }
                             .onEnded { _ in
                                 zoomAtDragStart = nil
-                                // Delay reset so DashboardView's simultaneous onEnded sees isZooming = true
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { isZooming = false }
                                 // Auto-hide badge after 1.5 s
                                 let task = DispatchWorkItem { showZoomBadge = false }
                                 zoomBadgeTask = task

@@ -302,12 +302,13 @@ private class SpeechManager: ObservableObject {
             }
 
             let node = engine.inputNode
+            engine.prepare()
             let fmt = node.inputFormat(forBus: 0)
+            guard fmt.sampleRate > 0 else { stopEngine(); return }
             node.installTap(onBus: 0, bufferSize: 1024, format: fmt) { [weak self] buf, _ in
                 self?.request?.append(buf)
             }
             tapInstalled = true
-            engine.prepare()
             try engine.start()
             isRecording = true
         } catch {

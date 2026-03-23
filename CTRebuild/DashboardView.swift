@@ -11,7 +11,6 @@ enum Panel: Equatable {
 struct DashboardView: View {
     @State private var activePanel: Panel = .none
     @State private var longPressActive: Bool = false
-    @State private var bottomPanelZooming: Bool = false
     private let screen = UIScreen.main.bounds
 
     var body: some View {
@@ -118,7 +117,7 @@ struct DashboardView: View {
         case .top:
             TopPanelView(safeArea: safeArea)
         case .bottom:
-            BottomPanelView(safeArea: safeArea, isZooming: $bottomPanelZooming)
+            BottomPanelView(safeArea: safeArea)
         case .right:
             RightPanelView(safeArea: safeArea)
         default:
@@ -137,7 +136,7 @@ struct DashboardView: View {
             .onEnded { value in
                 let wasLongPress = longPressActive
                 longPressActive = false
-                resolveSwipe(translation: value.translation, allowSwitch: wasLongPress)
+                resolveSwipe(value: value, allowSwitch: wasLongPress)
             }
     }
 
@@ -154,9 +153,9 @@ struct DashboardView: View {
 
     // MARK: - Shared Resolution
 
-    private func resolveSwipe(translation: CGSize, allowSwitch: Bool) {
-        let dx = translation.width
-        let dy = translation.height
+    private func resolveSwipe(value: DragGesture.Value, allowSwitch: Bool) {
+        let dx = value.translation.width
+        let dy = value.translation.height
         let adx = abs(dx)
         let ady = abs(dy)
 
@@ -167,7 +166,8 @@ struct DashboardView: View {
             case .left   where dx < -t && adx > ady: activePanel = .none
             case .right  where dx >  t && adx > ady: activePanel = .none
             case .top    where dy < -t && ady > adx: activePanel = .none
-            case .bottom where dy >  t && ady > adx && !bottomPanelZooming: activePanel = .none
+            // Bottom panel: require fast flick (predictedEnd > 200) to avoid triggering on slow zoom drag
+            case .bottom where dy > t && ady > adx && value.predictedEndTranslation.height > 200: activePanel = .none
             default: break
             }
             return
