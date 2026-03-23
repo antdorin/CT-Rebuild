@@ -196,7 +196,9 @@ private struct PdfDetailView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            VStack(spacing: 0) {
             // ── Header ────────────────────────────────────────────────────────
             HStack(spacing: 12) {
                 Button(action: onBack) {
@@ -244,7 +246,8 @@ private struct PdfDetailView: View {
                 }
             } else {
                 PdfKitView(data: pdfData)
-                    .ignoresSafeArea(edges: .bottom)
+                    .padding(.bottom, safeArea.bottom)
+            }
             }
         }
     }
