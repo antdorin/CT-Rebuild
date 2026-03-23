@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using CTHub.Models;
 using CTHub.Services;
 using Microsoft.Win32;
@@ -44,6 +45,69 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         set { _lastBroadcast = value; OnPropertyChanged(); }
     }
 
+    private string _lastConnectedDevice = "No devices yet";
+    public string LastConnectedDevice
+    {
+        get => _lastConnectedDevice;
+        set { _lastConnectedDevice = value; OnPropertyChanged(); }
+    }
+
+    private bool _isBroadcastingNow;
+    public bool IsBroadcastingNow
+    {
+        get => _isBroadcastingNow;
+        set
+        {
+            _isBroadcastingNow = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(BroadcastDotColor));
+            OnPropertyChanged(nameof(BroadcastTextColor));
+        }
+    }
+
+    private static readonly Brush _dotGreen  = Freeze(new SolidColorBrush(Color.FromRgb(0x4E, 0xC9, 0xA0)));
+    private static readonly Brush _dotGray   = Freeze(new SolidColorBrush(Color.FromRgb(0x3C, 0x3C, 0x3C)));
+    private static readonly Brush _textMuted = Freeze(new SolidColorBrush(Color.FromRgb(0x85, 0x85, 0x85)));
+    private static Brush Freeze(Brush b) { b.Freeze(); return b; }
+
+    public Brush BroadcastDotColor  => IsBroadcastingNow ? _dotGreen : _dotGray;
+    public Brush BroadcastTextColor => IsBroadcastingNow ? _dotGreen : _textMuted;
+
+    private string _broadcastStatusText = "Off";
+    public string BroadcastStatusText
+    {
+        get => _broadcastStatusText;
+        set { _broadcastStatusText = value; OnPropertyChanged(); }
+    }
+
+    private string _broadcastButtonText = "\u25b6  Start Broadcasting";
+    public string BroadcastButtonText
+    {
+        get => _broadcastButtonText;
+        set { _broadcastButtonText = value; OnPropertyChanged(); }
+    }
+
+    private string _lastBeaconText = "No beacons sent yet";
+    public string LastBeaconText
+    {
+        get => _lastBeaconText;
+        set { _lastBeaconText = value; OnPropertyChanged(); }
+    }
+
+    private string _localAddresses = "Scanning...";
+    public string LocalAddresses
+    {
+        get => _localAddresses;
+        set { _localAddresses = value; OnPropertyChanged(); }
+    }
+
+    private string _hubUrl = "Scanning...";
+    public string HubUrl
+    {
+        get => _hubUrl;
+        set { _hubUrl = value; OnPropertyChanged(); }
+    }
+
     // ── Constructor ───────────────────────────────────────────────────────────
 
     public MainWindow()
@@ -51,7 +115,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         InitializeComponent();
         DataContext = this;
 
-        // Refresh client count every 2 s
+        // Refresh client count and beacon timestamp every 2 s
         var timer = new System.Windows.Threading.DispatcherTimer
         {
             Interval = TimeSpan.FromSeconds(2)
@@ -60,23 +124,37 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             var n = _hub.WsManager.ConnectedCount;
             ClientCountText = n == 1 ? "1 client connected" : $"{n} clients connected";
+            if (_hub.LastBeaconTime.HasValue)
+                LastBeaconText = $"Last beacon sent: {_hub.LastBeaconTime.Value:HH:mm:ss}";
         };
         timer.Start();
 
         // Notify when a device connects
         _hub.ClientConnected += ip => Dispatcher.InvokeAsync(() =>
         {
+            LastConnectedDevice = $"{ip}  \u00b7  {DateTime.Now:HH:mm:ss}";
             StatusText = $"Device connected: {ip}";
             var restore = $"http://localhost:{HubServer.Port}";
-            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
-            timer.Tick += (_, _) => { StatusText = restore; timer.Stop(); };
-            timer.Start();
+            var t = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+            t.Tick += (_, _) => { StatusText = restore; t.Stop(); };
+            t.Start();
+        });
+
+        // Sync broadcast state to UI
+        _hub.BroadcastStateChanged += isOn => Dispatcher.InvokeAsync(() =>
+        {
+            IsBroadcastingNow   = isOn;
+            BroadcastStatusText = isOn ? "Broadcasting" : "Off";
+            BroadcastButtonText = isOn ? "\u25a0  Stop Broadcasting" : "\u25b6  Start Broadcasting";
         });
 
         // Load PDF folder and bind list
         PdfFileList.ItemsSource = _hub.PdfFolder.FileNames;
         if (!string.IsNullOrEmpty(_hub.PdfFolder.CurrentFolder))
             PdfFolderPathText.Text = _hub.PdfFolder.CurrentFolder;
+
+        // Populate server info panel
+        RefreshServerInfo();
     }
 
     // Updates the last-broadcast timestamp shown in the status bar.
@@ -177,6 +255,36 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 Touch();
             });
         }
+    }
+
+    // ── Broadcast toggle ──────────────────────────────────────────────────────
+
+    private void Broadcast_Toggle(object sender, RoutedEventArgs e)
+    {
+        if (_hub.IsBroadcasting)
+            _hub.StopBroadcast();
+        else
+            _hub.StartBroadcast();
+    }
+
+    // ── Server info ───────────────────────────────────────────────────────────
+
+    private void RefreshServerInfo()
+    {
+        var ips = System.Net.NetworkInformation.NetworkInterface
+            .GetAllNetworkInterfaces()
+            .Where(ni =>
+                ni.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up &&
+                ni.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
+            .SelectMany(ni => ni.GetIPProperties().UnicastAddresses)
+            .Where(ua => ua.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+            .Select(ua => ua.Address.ToString())
+            .ToList();
+
+        LocalAddresses = ips.Count > 0 ? string.Join(",  ", ips) : "Not found";
+        HubUrl = ips.Count > 0
+            ? $"ws://{ips[0]}:{HubServer.Port}/ws"
+            : $"ws://localhost:{HubServer.Port}/ws";
     }
 
     // ── INotifyPropertyChanged ────────────────────────────────────────────────

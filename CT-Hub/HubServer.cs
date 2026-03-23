@@ -59,8 +59,7 @@ public sealed class HubServer
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-    public const int DiscoveryPort = 5052;      // UDP port desktop listens on
-    public const int DiscoveryReplyPort = 5051; // UDP port phone listens on
+    public const int DiscoveryReplyPort = 5051; // UDP port phone listens on (desktop broadcasts here)
 
     public Task StartAsync()
     {
@@ -69,43 +68,63 @@ public sealed class HubServer
         _listener.Prefixes.Add($"http://+:{Port}/");
         _listener.Start();
         _ = AcceptLoopAsync(_cts.Token);
-        _ = DiscoveryLoopAsync(_cts.Token);
         return Task.CompletedTask;
     }
 
     public void Stop()
     {
+        StopBroadcast();
         _cts?.Cancel();
         _listener?.Stop();
         _listener?.Close();
     }
 
-    // ── UDP discovery responder ───────────────────────────────────────────────
-    // Listens for "CT-DISCOVER" on UDP 5052, replies "CT-HUB:{Port}" back to
-    // the sender on port 5051. Zero overhead when idle — only answers when asked.
+    // ── UDP discovery broadcaster ─────────────────────────────────────────────
+    // Broadcasts "CT-HUB:{Port}" to 255.255.255.255:{DiscoveryReplyPort} every 3 s.
+    // Opt-in: call StartBroadcast() to begin, StopBroadcast() to stop.
+    // Phone only needs to listen on UDP 5051 — no inbound firewall rule required.
 
-    private async Task DiscoveryLoopAsync(CancellationToken ct)
+    public bool IsBroadcasting => _broadcastCts != null;
+    public DateTime? LastBeaconTime { get; private set; }
+    public event Action<bool>? BroadcastStateChanged;
+    private CancellationTokenSource? _broadcastCts;
+
+    public void StartBroadcast()
+    {
+        if (_broadcastCts != null) return;
+        _broadcastCts = new CancellationTokenSource();
+        BroadcastStateChanged?.Invoke(true);
+        _ = BroadcastLoopAsync(_broadcastCts.Token);
+    }
+
+    public void StopBroadcast()
+    {
+        var cts = _broadcastCts;
+        _broadcastCts = null;
+        cts?.Cancel();
+        cts?.Dispose();
+        if (cts != null) BroadcastStateChanged?.Invoke(false);
+    }
+
+    private async Task BroadcastLoopAsync(CancellationToken ct)
     {
         using var udp = new System.Net.Sockets.UdpClient();
-        udp.Client.SetSocketOption(
-            System.Net.Sockets.SocketOptionLevel.Socket,
-            System.Net.Sockets.SocketOptionName.ReuseAddress, true);
-        udp.Client.Bind(new IPEndPoint(IPAddress.Any, DiscoveryPort));
-
-        while (!ct.IsCancellationRequested)
+        udp.EnableBroadcast = true;
+        var endpoint = new IPEndPoint(IPAddress.Broadcast, DiscoveryReplyPort);
+        var payload  = Encoding.UTF8.GetBytes($"CT-HUB:{Port}");
+        try
         {
-            try
+            while (!ct.IsCancellationRequested)
             {
-                var result = await udp.ReceiveAsync(ct);
-                var msg = System.Text.Encoding.UTF8.GetString(result.Buffer).Trim();
-                if (msg != "CT-DISCOVER") continue;
-
-                var reply = System.Text.Encoding.UTF8.GetBytes($"CT-HUB:{Port}");
-                var replyEp = new IPEndPoint(result.RemoteEndPoint.Address, DiscoveryReplyPort);
-                await udp.SendAsync(reply, reply.Length, replyEp);
+                await udp.SendAsync(payload, payload.Length, endpoint);
+                LastBeaconTime = DateTime.Now;
+                await Task.Delay(3_000, ct);
             }
-            catch (OperationCanceledException) { break; }
-            catch { /* ignore malformed packets */ }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[HubServer] Broadcast error: {ex.Message}");
         }
     }
 

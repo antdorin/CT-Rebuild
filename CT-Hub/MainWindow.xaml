@@ -231,6 +231,156 @@
                 </DockPanel>
             </TabItem>
 
+            <!-- ── Server ────────────────────────────────────────────────── -->
+            <TabItem Header="Server">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="#1E1E1E">
+                    <StackPanel Margin="24,20,24,24" MaxWidth="680">
+
+                        <!-- HTTP SERVER ─────────────────────────────────── -->
+                        <TextBlock Text="HTTP SERVER"
+                                   FontFamily="Consolas" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="#569CD6" Margin="0,0,0,8"/>
+                        <Border Background="#252526" BorderBrush="#3C3C3C" BorderThickness="1"
+                                CornerRadius="4" Padding="14,10" Margin="0,0,0,20">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="170"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="28"/>
+                                    <RowDefinition Height="28"/>
+                                    <RowDefinition Height="Auto" MinHeight="28"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Status"
+                                           VerticalAlignment="Center" FontFamily="Consolas" FontSize="12" Foreground="#858585"/>
+                                <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Ellipse Width="7" Height="7" Fill="#4EC9A0" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Running" FontFamily="Consolas" FontSize="12" Foreground="#4EC9A0"/>
+                                </StackPanel>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="HTTP / WebSocket Port"
+                                           VerticalAlignment="Center" FontFamily="Consolas" FontSize="12" Foreground="#858585"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="5050"
+                                           VerticalAlignment="Center" FontFamily="Consolas" FontSize="12" Foreground="#D4D4D4"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="WebSocket URL"
+                                           VerticalAlignment="Top" Margin="0,6,0,0"
+                                           FontFamily="Consolas" FontSize="12" Foreground="#858585"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding HubUrl}"
+                                           VerticalAlignment="Top" Margin="0,6,0,6"
+                                           FontFamily="Consolas" FontSize="12" Foreground="#9CDCFE"
+                                           TextWrapping="Wrap"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- LOCAL NETWORK ───────────────────────────────── -->
+                        <TextBlock Text="LOCAL NETWORK"
+                                   FontFamily="Consolas" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="#569CD6" Margin="0,0,0,8"/>
+                        <Border Background="#252526" BorderBrush="#3C3C3C" BorderThickness="1"
+                                CornerRadius="4" Padding="14,10" Margin="0,0,0,20">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="170"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" MinHeight="28"/>
+                                    <RowDefinition Height="28"/>
+                                    <RowDefinition Height="28"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Local IP(s)"
+                                           VerticalAlignment="Top" Margin="0,6,0,0"
+                                           FontFamily="Consolas" FontSize="12" Foreground="#858585"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding LocalAddresses}"
+                                           VerticalAlignment="Top" Margin="0,6,0,6"
+                                           FontFamily="Consolas" FontSize="12" Foreground="#D4D4D4"
+                                           TextWrapping="Wrap"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Connected Clients"
+                                           VerticalAlignment="Center" FontFamily="Consolas" FontSize="12" Foreground="#858585"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ClientCountText}"
+                                           VerticalAlignment="Center" FontFamily="Consolas" FontSize="12" Foreground="#D4D4D4"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Last Device"
+                                           VerticalAlignment="Center" FontFamily="Consolas" FontSize="12" Foreground="#858585"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding LastConnectedDevice}"
+                                           VerticalAlignment="Center" FontFamily="Consolas" FontSize="12" Foreground="#D4D4D4"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- UDP DISCOVERY BROADCAST ─────────────────────── -->
+                        <TextBlock Text="UDP DISCOVERY BROADCAST"
+                                   FontFamily="Consolas" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="#569CD6" Margin="0,0,0,8"/>
+                        <Border Background="#252526" BorderBrush="#3C3C3C" BorderThickness="1"
+                                CornerRadius="4" Padding="14,12" Margin="0,0,0,14">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="170"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="28"/>
+                                        <RowDefinition Height="28"/>
+                                        <RowDefinition Height="28"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Status"
+                                               VerticalAlignment="Center" FontFamily="Consolas" FontSize="12" Foreground="#858585"/>
+                                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Ellipse Width="7" Height="7" Fill="{Binding BroadcastDotColor}"
+                                                 Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding BroadcastStatusText}"
+                                                   Foreground="{Binding BroadcastTextColor}"
+                                                   FontFamily="Consolas" FontSize="12"/>
+                                    </StackPanel>
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Beacon Destination"
+                                               VerticalAlignment="Center" FontFamily="Consolas" FontSize="12" Foreground="#858585"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="255.255.255.255 : UDP 5051"
+                                               VerticalAlignment="Center" FontFamily="Consolas" FontSize="12" Foreground="#D4D4D4"/>
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Beacon Interval"
+                                               VerticalAlignment="Center" FontFamily="Consolas" FontSize="12" Foreground="#858585"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="3 seconds"
+                                               VerticalAlignment="Center" FontFamily="Consolas" FontSize="12" Foreground="#D4D4D4"/>
+                                </Grid>
+
+                                <Button Content="{Binding BroadcastButtonText}"
+                                        Click="Broadcast_Toggle"
+                                        Style="{StaticResource ToolbarButton}"
+                                        HorizontalAlignment="Left"
+                                        MinWidth="210"
+                                        Margin="0,0,0,10"/>
+
+                                <TextBlock Text="{Binding LastBeaconText}"
+                                           FontFamily="Consolas" FontSize="11"
+                                           Foreground="#555"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Firewall note ────────────────────────────────── -->
+                        <Border Background="#1C1C1C" BorderBrush="#3C3C3C" BorderThickness="1"
+                                CornerRadius="4" Padding="12,10">
+                            <StackPanel>
+                                <TextBlock Text="ⓘ  Firewall Note"
+                                           FontFamily="Consolas" FontSize="11"
+                                           Foreground="#858585" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                <TextBlock Text="Broadcasting uses UDP outbound only — no inbound firewall rule needed for discovery.  If TCP 5050 is blocked by Windows Firewall, run once as Administrator or add an inbound rule for port 5050."
+                                           FontFamily="Consolas" FontSize="11"
+                                           Foreground="#555" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
         </TabControl>
     </DockPanel>
 </Window>
