@@ -47,6 +47,11 @@ struct RightPageContent: View {
     let index: Int
     let safeArea: EdgeInsets
 
+    private let shades: [Color] = [
+        Color(white: 0.18), Color(white: 0.26), Color(white: 0.34),
+        Color(white: 0.42), Color(white: 0.50), Color(white: 0.58),
+    ]
+
     var body: some View {
         switch index {
         case 6:  // Page 7 — PDF Browser
@@ -55,7 +60,7 @@ struct RightPageContent: View {
             HubSettingsView(safeArea: safeArea)
         default: // Pages 1–6 — placeholders
             ZStack {
-                Color(white: 0.18).ignoresSafeArea()
+                shades[index % shades.count].ignoresSafeArea()
                 VStack(spacing: 16) {
                     Text("Page \(index + 1)")
                         .font(.system(size: 40, weight: .bold, design: .rounded))

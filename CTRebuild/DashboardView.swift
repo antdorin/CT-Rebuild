@@ -13,19 +13,13 @@ struct DashboardView: View {
     @State private var longPressActive: Bool = false
     private let screen = UIScreen.main.bounds
 
-    /// Reads the real device safe-area insets from UIKit.
-    /// geo.safeAreaInsets returns zero when the GeometryReader lives inside
-    /// .ignoresSafeArea(), so we bypass SwiftUI and read directly from the
-    /// window scene instead.
-    private var uiSafeInsets: EdgeInsets {
-        let insets = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.keyWindow?.safeAreaInsets ?? .zero
-        return EdgeInsets(top: insets.top, leading: insets.left,
-                          bottom: insets.bottom, trailing: insets.right)
-    }
-
     var body: some View {
-        GeometryReader { _ in
-            let safe = uiSafeInsets
+        // GeometryReader ignores safe area so panels slide in from the true
+        // physical edges (behind notch / home indicator). Safe area insets are
+        // read from `geo` and passed explicitly to each content view so that
+        // text and interactive elements are never obscured.
+        GeometryReader { geo in
+            let safe = geo.safeAreaInsets
 
             ZStack {
                 // ── Adaptive Background — black in dark mode, white in light ──
@@ -81,6 +75,10 @@ struct DashboardView: View {
                 }
             }
             .animation(.easeInOut(duration: 0.07), value: activePanel)
+            // LongPress fires haptic immediately at 0.07 s (no sequencing delay).
+            // Drag reads longPressActive to decide threshold + switch behaviour.
+            // simultaneousGesture ensures close swipe fires even when child views
+            // (e.g. left-panel grid) have their own DragGestures active.
             .simultaneousGesture(dragGesture)
             .simultaneousGesture(longPressHapticGesture)
         }
