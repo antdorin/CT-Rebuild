@@ -156,15 +156,9 @@ enum GestureTrigger: String, CaseIterable, Identifiable {
     }
 
     /// Whether this gesture is actively wired up in DashboardView.
+    /// forceTap (3D Touch) is not available on modern iPhones — kept for future.
     var isImplemented: Bool {
-        switch self {
-        case .swipeRight, .swipeLeft, .swipeUp, .swipeDown,
-             .longPressSwipeRight, .longPressSwipeLeft, .longPressSwipeUp, .longPressSwipeDown,
-             .longPress:
-            return true
-        default:
-            return false
-        }
+        self != .forceTap
     }
 }
 

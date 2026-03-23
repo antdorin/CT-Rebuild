@@ -23,6 +23,12 @@ struct DashboardView: View {
             let safe = geo.safeAreaInsets
 
             ZStack {
+                // ── UIKit multi-touch & shake overlay ────────────────────────
+                // Attaches window-level recognizers; hitTest passes through.
+                GestureRecognizerOverlay(onTrigger: handleTrigger)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .ignoresSafeArea()
+
                 // ── Adaptive Background — black in dark mode, white in light ──
                 Color(uiColor: .systemBackground)
                     .ignoresSafeArea()
@@ -82,6 +88,19 @@ struct DashboardView: View {
             // (e.g. left-panel grid) have their own DragGestures active.
             .simultaneousGesture(dragGesture)
             .simultaneousGesture(longPressHapticGesture)
+            // ── Double / triple tap ───────────────────────────────────────
+            .simultaneousGesture(TapGesture(count: 3).onEnded { handleTrigger(.tripleTap) })
+            .simultaneousGesture(TapGesture(count: 2).onEnded { handleTrigger(.doubleTap) })
+            // ── Pinch ─────────────────────────────────────────────────────
+            .simultaneousGesture(
+                MagnificationGesture()
+                    .onEnded { val in handleTrigger(val < 1.0 ? .pinchIn : .pinchOut) }
+            )
+            // ── Rotation ──────────────────────────────────────────────────
+            .simultaneousGesture(
+                RotationGesture()
+                    .onEnded { angle in handleTrigger(angle.degrees >= 0 ? .rotationCW : .rotationCCW) }
+            )
         }
         .ignoresSafeArea()
         .background(Color(uiColor: .systemBackground).ignoresSafeArea())
@@ -179,21 +198,28 @@ struct DashboardView: View {
             : CGFloat(gestureSettings.swipeThreshold)
         guard max(adx, ady) > threshold else { return }
 
-        // Determine which direction was swiped
+        // Determine which direction was swiped (+ edge-zone detection)
         let isHorizontal = adx >= ady
         let trigger: GestureTrigger
         if allowSwitch {
+            // Long-press swipes aren't classified as edge swipes
             trigger = isHorizontal
                 ? (dx > 0 ? .longPressSwipeRight : .longPressSwipeLeft)
                 : (dy > 0 ? .longPressSwipeDown  : .longPressSwipeUp)
         } else {
-            trigger = isHorizontal
-                ? (dx > 0 ? .swipeRight : .swipeLeft)
-                : (dy > 0 ? .swipeDown  : .swipeUp)
+            let startX = value.startLocation.x
+            let startY = value.startLocation.y
+            let edge   = CGFloat(gestureSettings.edgeZoneWidth)
+            if      isHorizontal && dx > 0 && startX < edge                       { trigger = .edgeSwipeRight  }
+            else if isHorizontal && dx < 0 && startX > screen.width  - edge       { trigger = .edgeSwipeLeft   }
+            else if !isHorizontal && dy > 0 && startY < edge                      { trigger = .edgeSwipeDown   }
+            else if !isHorizontal && dy < 0 && startY > screen.height - edge      { trigger = .edgeSwipeUp     }
+            else { trigger = isHorizontal
+                    ? (dx > 0 ? .swipeRight : .swipeLeft)
+                    : (dy > 0 ? .swipeDown  : .swipeUp) }
         }
 
-        let action = gestureSettings.action(for: trigger)
-        executeAction(action)
+        executeAction(gestureSettings.action(for: trigger))
     }
 
     // MARK: - Execute Action
@@ -228,6 +254,13 @@ struct DashboardView: View {
                 userInfo: ["action": action.rawValue]
             )
         }
+    }
+
+    // MARK: - Trigger Bridge
+    // Called by GestureRecognizerOverlay and SwiftUI gesture closures.
+
+    private func handleTrigger(_ trigger: GestureTrigger) {
+        executeAction(gestureSettings.action(for: trigger))
     }
 }
 
