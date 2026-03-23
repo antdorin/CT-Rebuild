@@ -81,8 +81,12 @@ private struct RightWheelSelector: View {
 
     private let itemCount = 8
     private let cardW: CGFloat = 320
-    private let cardH: CGFloat = 560
     private let spacing: CGFloat = 580
+
+    private var cardH: CGFloat {
+        guard panelSize.width > 0 else { return 560 }
+        return cardW * (panelSize.height / panelSize.width)
+    }
 
     @State private var virtualPage: Int = 0
     @State private var dragOffset: CGFloat = 0
