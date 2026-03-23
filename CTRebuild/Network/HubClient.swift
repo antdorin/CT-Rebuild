@@ -1,10 +1,12 @@
 import Foundation
+import Combine
 
 // MARK: - Hub Client
 
-/// URLSession-based singleton for communicating with CT-Hub.
-/// Active base URL is read from UserDefaults key "hubActiveUrl".
-final class HubClient {
+/// HTTP + WebSocket client for CT-Hub.
+/// Call `connect()` after setting the active URL — or it is called automatically
+/// when `setActiveUrl` is used. Reconnects with exponential backoff on drop.
+final class HubClient: ObservableObject {
     static let shared = HubClient()
     private init() {}
 
@@ -12,8 +14,81 @@ final class HubClient {
     static let activeUrlKey = "hubActiveUrl"
     static let savedUrlsKey = "hubSavedUrls"
 
+    // MARK: - Connection state (observable)
+    @Published private(set) var isConnected: Bool = false
+
+    private var wsTask: URLSessionWebSocketTask?
+    private var reconnectTask: Task<Void, Never>?
+    private var reconnectDelay: TimeInterval = 2
+    private let maxDelay: TimeInterval = 30
+
     var activeBaseURL: String {
         UserDefaults.standard.string(forKey: HubClient.activeUrlKey) ?? ""
+    }
+
+    // MARK: - WebSocket lifecycle
+
+    /// Opens (or re-opens) a WebSocket to the active hub URL.
+    func connect() {
+        reconnectTask?.cancel()
+        wsTask?.cancel(with: .goingAway, reason: nil)
+        wsTask = nil
+        isConnected = false
+
+        let base = activeBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !base.isEmpty,
+              let httpURL = URL(string: base),
+              var comps = URLComponents(url: httpURL, resolvingAgainstBaseURL: false)
+        else { return }
+
+        comps.scheme = comps.scheme == "https" ? "wss" : "ws"
+        comps.path   = "/ws"
+        guard let wsURL = comps.url else { return }
+
+        let task = URLSession.shared.webSocketTask(with: wsURL)
+        wsTask = task
+        task.resume()
+        isConnected = true
+        reconnectDelay = 2
+        receive(task: task)
+    }
+
+    /// Disconnects and cancels any pending reconnect.
+    func disconnect() {
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        wsTask?.cancel(with: .goingAway, reason: nil)
+        wsTask = nil
+        DispatchQueue.main.async { self.isConnected = false }
+    }
+
+    private func receive(task: URLSessionWebSocketTask) {
+        task.receive { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success(let msg):
+                self.handleMessage(msg)
+                self.receive(task: task)
+            case .failure:
+                DispatchQueue.main.async { self.isConnected = false }
+                self.scheduleReconnect()
+            }
+        }
+    }
+
+    private func handleMessage(_ msg: URLSessionWebSocketTask.Message) {
+        // Future: parse pushed data updates here
+        _ = msg
+    }
+
+    private func scheduleReconnect() {
+        let delay = reconnectDelay
+        reconnectDelay = min(reconnectDelay * 2, maxDelay)
+        reconnectTask = Task {
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            await MainActor.run { self.connect() }
+        }
     }
 
     // MARK: - PDF API
@@ -70,6 +145,8 @@ final class HubClient {
 
     static func setActiveUrl(_ url: String) {
         UserDefaults.standard.set(url, forKey: activeUrlKey)
+        // Auto-connect whenever the active URL changes
+        Task { await MainActor.run { HubClient.shared.connect() } }
     }
 }
 

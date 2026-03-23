@@ -10,6 +10,10 @@ struct CTRebuildApp: App {
         if let windowScene = scenes.first as? UIWindowScene {
             windowScene.windows.forEach { $0.backgroundColor = .systemBackground }
         }
+        // Auto-connect WebSocket if an active URL is already saved
+        if !HubClient.shared.activeBaseURL.isEmpty {
+            HubClient.shared.connect()
+        }
     }
 
     var body: some Scene {

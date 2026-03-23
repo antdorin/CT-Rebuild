@@ -5,6 +5,7 @@ import SwiftUI
 struct HubSettingsView: View {
     let safeArea: EdgeInsets
 
+    @ObservedObject private var client = HubClient.shared
     @State private var savedUrls: [String] = HubClient.savedUrls()
     @State private var activeUrl: String = UserDefaults.standard.string(forKey: HubClient.activeUrlKey) ?? ""
     @State private var newUrlText: String = ""
@@ -17,12 +18,21 @@ struct HubSettingsView: View {
 
             VStack(spacing: 0) {
                 // Header
-                Text("HUB SETTINGS")
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundColor(.secondary.opacity(0.5))
-                    .tracking(4)
-                    .padding(.top, safeArea.top + 16)
-                    .padding(.bottom, 20)
+                HStack {
+                    Spacer()
+                    Text("HUB SETTINGS")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(.secondary.opacity(0.5))
+                        .tracking(4)
+                    Spacer()
+                    // Live connection dot
+                    Circle()
+                        .fill(client.isConnected ? Color.green : Color.red.opacity(0.6))
+                        .frame(width: 8, height: 8)
+                        .padding(.trailing, 20)
+                }
+                .padding(.top, safeArea.top + 16)
+                .padding(.bottom, 20)
 
                 // Add new URL
                 VStack(alignment: .leading, spacing: 8) {
