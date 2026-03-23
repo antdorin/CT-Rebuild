@@ -283,6 +283,10 @@ public sealed class HubServer
                 case ("GET", "/api/pdfs"):
                     await WriteJsonAsync(res, PdfFolder.FileNames.ToList()); break;
 
+                // ── PDF metadata (name + last-modified) ───────────────────
+                case ("GET", "/api/pdfs/meta"):
+                    await WriteJsonAsync(res, PdfFolder.GetFileMeta()); break;
+
                 // ── PDF file download ─────────────────────────────────────
                 case ("GET", _) when path.StartsWith("/api/pdfs/"):
                 {

@@ -24,7 +24,7 @@ private func soDisplayTitle(from doc: PDFDocument) -> String {
     return "\(ordered.first!) – \(ordered.last!)"
 }
 
-// MARK: - Date Extraction from filename
+// MARK: - Date Extraction from filename (fallback when server provides no modified date)
 
 private func extractDate(from filename: String) -> Date? {
     let name = (filename as NSString).deletingPathExtension
@@ -63,31 +63,55 @@ private func extractDate(from filename: String) -> Date? {
 
 struct PdfDateGroup: Identifiable, Equatable {
     let id: String
-    let dateLabel: String
+    let dateLabel: String   // e.g. "January 15, 2024"
+    let soLabel: String     // e.g. "SO-01-0001 – SO-01-0024" (from filenames)
     let sortDate: Date
     let filenames: [String]
     static func == (l: Self, r: Self) -> Bool { l.id == r.id }
 }
 
-private func groupFiles(_ files: [String]) -> [PdfDateGroup] {
-    var byKey: [String: (Date, [String])] = [:]
+private func groupFiles(_ metas: [PdfMeta]) -> [PdfDateGroup] {
+    var byKey: [String: (Date, [PdfMeta])] = [:]
     let df = DateFormatter(); df.dateStyle = .long; df.timeStyle = .none
-    for file in files {
-        if let date = extractDate(from: file) {
+    let iso1 = ISO8601DateFormatter()
+    iso1.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    let iso2 = ISO8601DateFormatter()
+    iso2.formatOptions = [.withInternetDateTime]
+
+    for meta in metas {
+        var date: Date?
+        if !meta.modified.isEmpty {
+            date = iso1.date(from: meta.modified) ?? iso2.date(from: meta.modified)
+        }
+        if date == nil { date = extractDate(from: meta.name) }
+
+        if let date {
             let comps = Calendar.current.dateComponents([.year, .month, .day], from: date)
             let key = String(format: "%04d-%02d-%02d", comps.year!, comps.month!, comps.day!)
             if byKey[key] == nil { byKey[key] = (date, []) }
-            byKey[key]!.1.append(file)
+            byKey[key]!.1.append(meta)
         } else {
-            byKey["z_\(file)"] = (Date.distantPast, [file])
+            byKey["z_\(meta.name)"] = (Date.distantPast, [meta])
         }
     }
+
     return byKey
-        .map { key, v in
-            PdfDateGroup(id: key,
-                         dateLabel: v.0 == .distantPast ? "No Date" : df.string(from: v.0),
-                         sortDate:  v.0,
-                         filenames: v.1.sorted())
+        .map { key, v -> PdfDateGroup in
+            let filenames = v.1.map { $0.name }.sorted()
+            let allSOs = filenames.flatMap { extractSOs(from: $0) }
+            var seen = Set<String>(); var orderedSOs: [String] = []
+            for so in allSOs { if seen.insert(so).inserted { orderedSOs.append(so) } }
+            let soLabel: String
+            switch orderedSOs.count {
+            case 0:  soLabel = ""
+            case 1:  soLabel = orderedSOs[0]
+            default: soLabel = "\(orderedSOs.first!) \u{2013} \(orderedSOs.last!)"
+            }
+            return PdfDateGroup(id: key,
+                                dateLabel: v.0 == .distantPast ? "No Date" : df.string(from: v.0),
+                                soLabel: soLabel,
+                                sortDate: v.0,
+                                filenames: filenames)
         }
         .sorted { $0.sortDate > $1.sortDate }
 }
@@ -191,7 +215,7 @@ struct PdfBrowserView: View {
             if let group = openedGroup, let doc = mergedDoc {
                 PdfDetailView(
                     document: doc,
-                    title: group.dateLabel,
+                    title: group.soLabel.isEmpty ? group.dateLabel : group.soLabel,
                     safeArea: safeArea,
                     currentPage: Binding(
                         get: { lastPages[group.id] ?? 0 },
@@ -294,12 +318,14 @@ struct PdfBrowserView: View {
                     .frame(width: 28)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(group.dateLabel)
+                    // Primary: SO range from filename(s); fallback to file count
+                    Text(group.soLabel.isEmpty
+                         ? (group.filenames.count == 1 ? group.filenames[0] : "\(group.filenames.count) PDFs")
+                         : group.soLabel)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white.opacity(0.9))
-                    Text(group.filenames.count == 1
-                         ? group.filenames[0]
-                         : "\(group.filenames.count) PDFs \u{2013} merged on open")
+                    // Secondary: date grouping label
+                    Text(group.dateLabel)
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundColor(.white.opacity(0.38))
                         .lineLimit(1).truncationMode(.middle)
@@ -331,8 +357,16 @@ struct PdfBrowserView: View {
     private func loadFiles() async {
         isLoading = true; errorMessage = nil
         do {
-            let files = try await HubClient.shared.fetchPdfList()
-            groups = groupFiles(files)
+            // Try metadata endpoint first (provides real modification dates).
+            // Fall back to filename-only list for older server versions.
+            let metas: [PdfMeta]
+            do {
+                metas = try await HubClient.shared.fetchPdfMeta()
+            } catch {
+                let names = try await HubClient.shared.fetchPdfList()
+                metas = names.map { PdfMeta(name: $0, modified: "") }
+            }
+            groups = groupFiles(metas)
         } catch {
             errorMessage = error.localizedDescription
         }

@@ -1,6 +1,14 @@
 import Foundation
 import Combine
 
+// MARK: - Models
+
+/// PDF file metadata returned by /api/pdfs/meta
+struct PdfMeta: Decodable {
+    let name: String
+    let modified: String   // UTC ISO 8601, e.g. "2024-01-15T10:30:00.0000000Z"
+}
+
 // MARK: - Hub Client
 
 /// HTTP + WebSocket client for CT-Hub.
@@ -134,6 +142,13 @@ final class HubClient: ObservableObject {
     }
 
     // MARK: - PDF API
+
+    /// Fetch name + last-modified for each PDF (server must support /api/pdfs/meta).
+    func fetchPdfMeta() async throws -> [PdfMeta] {
+        let url = try endpoint("/api/pdfs/meta")
+        let (data, _) = try await URLSession.shared.data(from: url)
+        return try JSONDecoder().decode([PdfMeta].self, from: data)
+    }
 
     /// Fetches the list of PDF filenames available on the hub.
     func fetchPdfList() async throws -> [String] {

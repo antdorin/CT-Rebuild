@@ -90,4 +90,23 @@ public sealed class PdfFolderService : IDisposable
     }
 
     public void Dispose() => _watcher?.Dispose();
+
+    // ── Metadata ──────────────────────────────────────────────────────────────
+
+    /// Returns filename + last-modified (UTC ISO 8601) for each PDF in the folder.
+    public IReadOnlyList<PdfFileMeta> GetFileMeta()
+    {
+        if (string.IsNullOrEmpty(_folder) || !Directory.Exists(_folder))
+            return Array.Empty<PdfFileMeta>();
+
+        return Directory.GetFiles(_folder, "*.pdf", SearchOption.TopDirectoryOnly)
+            .Select(f => new FileInfo(f))
+            .Where(fi => fi.Exists)
+            .OrderBy(fi => fi.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(fi => new PdfFileMeta(fi.Name, fi.LastWriteTimeUtc.ToString("o")))
+            .ToList();
+    }
 }
+
+/// <summary>Filename + UTC last-modified timestamp for a single PDF.</summary>
+public sealed record PdfFileMeta(string Name, string Modified);
