@@ -11,6 +11,8 @@ struct LeftPanelView: View {
     // true = Panel Page Picker is open; false = full-page content shown
     @State private var isPPOpen = false
 
+    @ObservedObject private var binStore = BinDataStore.shared
+
     private let levelLabels = ["A", "B", "C", "D", "E", "F"]
     private let totalColumns = 3  // 1, 2, 3 — wraps infinitely
 
@@ -163,18 +165,31 @@ struct LeftPanelView: View {
     @ViewBuilder
     private func binCell(code: String, size: CGFloat) -> some View {
         let taken = occupiedBins.contains(code)
+        let qty = binStore.binQuantities[code] ?? 0
+        let hasQty = qty > 0
         let fontSize = max(size * 0.17, 8)
 
-        ZStack(alignment: .top) {
+        ZStack {
             RoundedRectangle(cornerRadius: 6)
-                .fill(taken ? Color.white.opacity(0.04) : Color.white.opacity(0.06))
+                .fill(hasQty ? Color.green.opacity(0.15) : (taken ? Color.white.opacity(0.04) : Color.white.opacity(0.06)))
             RoundedRectangle(cornerRadius: 6)
-                .stroke(Color.white.opacity(taken ? 0.06 : 0.12), lineWidth: 0.5)
-            Text(code)
-                .font(.system(size: fontSize, weight: .regular, design: .monospaced))
-                .foregroundColor(taken ? .white.opacity(0.25) : .white)
-                .padding(.top, 5)
-                .padding(.horizontal, 2)
+                .stroke(hasQty ? Color.green.opacity(0.5) : Color.white.opacity(taken ? 0.06 : 0.12), lineWidth: hasQty ? 1 : 0.5)
+
+            VStack(spacing: 1) {
+                Text(code)
+                    .font(.system(size: fontSize, weight: .regular, design: .monospaced))
+                    .foregroundColor(hasQty ? .green : (taken ? .white.opacity(0.25) : .white))
+                    .padding(.top, 3)
+
+                if hasQty {
+                    Text("\(qty)")
+                        .font(.system(size: max(size * 0.28, 11), weight: .bold, design: .monospaced))
+                        .foregroundColor(.green)
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 2)
         }
         .frame(width: size, height: size)
         .onTapGesture {

@@ -214,6 +214,11 @@ struct PdfBrowserView: View {
     // per-group last-page memory (group.id → page index)
     @State private var lastPages: [String: Int] = [:]
 
+    // per-group cached merged PDFDocuments (for bin extraction without re-download)
+    @State private var cachedDocs: [String: PDFDocument] = [:]
+
+    @ObservedObject private var binStore = BinDataStore.shared
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -316,46 +321,63 @@ struct PdfBrowserView: View {
     }
 
     private func groupRow(_ group: PdfDateGroup) -> some View {
-        Button { Task { await openGroup(group) } } label: {
-            HStack(spacing: 14) {
-                Image(systemName: group.filenames.count > 1 ? "doc.on.doc" : "doc")
-                    .font(.system(size: 18))
-                    .foregroundColor(.white.opacity(0.4))
-                    .frame(width: 28)
+        let isActive = binStore.isActive(groupId: group.id)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    // Primary: SO range from filename(s); fallback to file count
-                    Text(group.soLabel.isEmpty
-                         ? (group.filenames.count == 1 ? group.filenames[0] : "\(group.filenames.count) PDFs")
-                         : group.soLabel)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.9))
-                    // Secondary: date grouping label
-                    Text(group.dateLabel)
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.38))
-                        .lineLimit(1).truncationMode(.middle)
-                }
-
-                Spacer()
-
-                // Bookmark badge if we have a saved position
-                if let page = lastPages[group.id], page > 0 {
-                    Text("p.\(page + 1)")
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                        .foregroundColor(.blue.opacity(0.8))
-                        .padding(.horizontal, 6).padding(.vertical, 3)
-                        .background(Color.blue.opacity(0.15), in: RoundedRectangle(cornerRadius: 5))
-                }
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.2))
+        return HStack(spacing: 0) {
+            // ── Toggle button (left edge) ─────────────────────────────────
+            Button {
+                Task { await toggleGroupActive(group) }
+            } label: {
+                Circle()
+                    .fill(isActive ? Color.green : Color.orange)
+                    .frame(width: 10, height: 10)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 14)
             }
-            .padding(.horizontal, 16).padding(.vertical, 14)
-            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+            .buttonStyle(.plain)
+
+            // ── Main row (opens PDF viewer) ───────────────────────────────
+            Button { Task { await openGroup(group) } } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: group.filenames.count > 1 ? "doc.on.doc" : "doc")
+                        .font(.system(size: 18))
+                        .foregroundColor(.white.opacity(0.4))
+                        .frame(width: 28)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        // Primary: SO range from filename(s); fallback to file count
+                        Text(group.soLabel.isEmpty
+                             ? (group.filenames.count == 1 ? group.filenames[0] : "\(group.filenames.count) PDFs")
+                             : group.soLabel)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.9))
+                        // Secondary: date grouping label
+                        Text(group.dateLabel)
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.38))
+                            .lineLimit(1).truncationMode(.middle)
+                    }
+
+                    Spacer()
+
+                    // Bookmark badge if we have a saved position
+                    if let page = lastPages[group.id], page > 0 {
+                        Text("p.\(page + 1)")
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .foregroundColor(.blue.opacity(0.8))
+                            .padding(.horizontal, 6).padding(.vertical, 3)
+                            .background(Color.blue.opacity(0.15), in: RoundedRectangle(cornerRadius: 5))
+                    }
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.2))
+                }
+                .padding(.trailing, 16).padding(.vertical, 14)
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: - Actions
@@ -382,11 +404,7 @@ struct PdfBrowserView: View {
     private func openGroup(_ group: PdfDateGroup) async {
         isLoadingGroup = true; groupError = nil
         do {
-            var parts: [Data] = []
-            for filename in group.filenames {
-                parts.append(try await HubClient.shared.fetchPdf(filename: filename))
-            }
-            let doc = mergePDFs(from: parts)
+            let doc = try await downloadAndMerge(group)
             withAnimation(.easeInOut(duration: 0.22)) {
                 mergedDoc = doc
                 openedGroup = group
@@ -395,6 +413,33 @@ struct PdfBrowserView: View {
             groupError = error.localizedDescription
         }
         isLoadingGroup = false
+    }
+
+    private func toggleGroupActive(_ group: PdfDateGroup) async {
+        if binStore.isActive(groupId: group.id) {
+            binStore.deactivate(groupId: group.id)
+            cachedDocs.removeValue(forKey: group.id)
+        } else {
+            // Download + merge if not already cached
+            do {
+                let doc = try await downloadAndMerge(group)
+                binStore.activate(groupId: group.id, document: doc)
+            } catch {
+                // Silently skip on network error (user can retry)
+            }
+        }
+    }
+
+    /// Downloads all PDFs for a group and returns the merged document (caches result).
+    private func downloadAndMerge(_ group: PdfDateGroup) async throws -> PDFDocument {
+        if let cached = cachedDocs[group.id] { return cached }
+        var parts: [Data] = []
+        for filename in group.filenames {
+            parts.append(try await HubClient.shared.fetchPdf(filename: filename))
+        }
+        let doc = mergePDFs(from: parts)
+        cachedDocs[group.id] = doc
+        return doc
     }
 }
 
