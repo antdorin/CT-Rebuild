@@ -177,7 +177,7 @@ struct LeftPanelView: View {
 
             VStack(spacing: 1) {
                 Text(code)
-                    .font(.system(size: fontSize, weight: .regular, design: .monospaced))
+                    .font(.system(size: fontSize, weight: .bold, design: .monospaced))
                     .foregroundColor(hasQty ? .green : (taken ? .white.opacity(0.25) : .white))
                     .padding(.top, 3)
 

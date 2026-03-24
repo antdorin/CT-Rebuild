@@ -519,7 +519,7 @@ private struct PdfDetailView: View {
                             LazyVStack(spacing: 12) {
                                 ForEach(0..<displayDoc.pageCount, id: \.self) { i in
                                     if let page = displayDoc.page(at: i),
-                                       let img = renderPageImage(page, scale: 3.0) {
+                                       let img = renderPageImage(page, scale: scaleFactor * 3.0) {
                                         Image(uiImage: img)
                                             .resizable()
                                             .scaledToFit()
@@ -534,7 +534,7 @@ private struct PdfDetailView: View {
                     }
                 } else {
                     PdfKitView(document: displayDoc, currentPageIdx: $currentPage,
-                               singlePage: singlePageMode, scaleFactor: scaleFactor)
+                               singlePage: singlePageMode)
                 }
 
                 Divider().opacity(0.12)
@@ -574,8 +574,8 @@ private struct PdfDetailView: View {
                     }
                     .buttonStyle(.plain)
 
-                    // Text size controls (PDF mode only)
-                    if !showTextMode {
+                    // Text size controls (TEXT mode only)
+                    if showTextMode {
                         Divider().frame(height: 20).opacity(0.2)
 
                         Button { scaleFactor = max(0.5, scaleFactor - 0.25) } label: {
@@ -624,7 +624,7 @@ private struct PdfDetailView: View {
         }
         .onAppear { soTitle = soDisplayTitle(from: displayDoc) }
         .sheet(isPresented: $showSortSheet) {
-            PdfSortSheet { field in
+            PdfSortSheet(document: displayDoc) { field in
                 let s = sortedDoc(displayDoc, by: field)
                 displayDoc = s
                 currentPage = 0
@@ -737,7 +737,6 @@ private struct PdfKitView: UIViewRepresentable {
     let document: PDFDocument
     @Binding var currentPageIdx: Int
     var singlePage: Bool = false
-    var scaleFactor: CGFloat = 1.0
 
     func makeCoordinator() -> Coordinator { Coordinator(binding: $currentPageIdx) }
 
@@ -747,6 +746,7 @@ private struct PdfKitView: UIViewRepresentable {
         view.displayMode = singlePage ? .singlePage : .singlePageContinuous
         view.displayDirection = .vertical
         view.backgroundColor = .black
+        view.usePageViewController(singlePage)
         view.document = document
         // Restore saved position
         if currentPageIdx > 0, let page = document.page(at: currentPageIdx) {
@@ -769,16 +769,11 @@ private struct PdfKitView: UIViewRepresentable {
                 uiView.go(to: first)
             }
         }
-        // Display mode
+        // Display mode + swipe navigation
         let mode: PDFDisplayMode = singlePage ? .singlePage : .singlePageContinuous
-        if uiView.displayMode != mode { uiView.displayMode = mode }
-        // Scale
-        if scaleFactor == 1.0 {
-            if !uiView.autoScales { uiView.autoScales = true }
-        } else {
-            uiView.autoScales = false
-            let base = uiView.scaleFactorForSizeToFit
-            if base > 0 { uiView.scaleFactor = base * scaleFactor }
+        if uiView.displayMode != mode {
+            uiView.displayMode = mode
+            uiView.usePageViewController(singlePage)
         }
     }
 
