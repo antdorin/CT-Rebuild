@@ -345,17 +345,18 @@ struct PdfBrowserView: View {
                         .frame(width: 28)
 
                     VStack(alignment: .leading, spacing: 3) {
-                        // Primary: SO range from filename(s); fallback to file count
-                        Text(group.soLabel.isEmpty
-                             ? (group.filenames.count == 1 ? group.filenames[0] : "\(group.filenames.count) PDFs")
-                             : group.soLabel)
+                        // Date label
+                        Text(group.dateLabel)
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(.white.opacity(0.9))
-                        // Secondary: date grouping label
-                        Text(group.dateLabel)
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.38))
-                            .lineLimit(1).truncationMode(.middle)
+                        // Per-file SO labels
+                        ForEach(group.filenames, id: \.self) { filename in
+                            let so = extractSOs(from: filename).first ?? filename
+                            Text(so)
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.5))
+                                .lineLimit(1).truncationMode(.middle)
+                        }
                     }
 
                     Spacer()
@@ -456,6 +457,8 @@ private struct PdfDetailView: View {
     @State private var showSortSheet = false
     @State private var displayDoc: PDFDocument
     @State private var soTitle: String = ""
+    @State private var singlePageMode = false
+    @State private var scaleFactor: CGFloat = 1.0
 
     init(document: PDFDocument, title: String, safeArea: EdgeInsets,
          currentPage: Binding<Int>, onBack: @escaping () -> Void) {
@@ -530,12 +533,13 @@ private struct PdfDetailView: View {
                         }
                     }
                 } else {
-                    PdfKitView(document: displayDoc, currentPageIdx: $currentPage)
+                    PdfKitView(document: displayDoc, currentPageIdx: $currentPage,
+                               singlePage: singlePageMode, scaleFactor: scaleFactor)
                 }
 
                 Divider().opacity(0.12)
 
-                // ── Bottom bar: [ ← Back ][ PDF ][ TEXT ][ ⊞ ] ───────────
+                // ── Bottom bar ──────────────────────────────────────────────────────
                 HStack(spacing: 0) {
 
                     // Back button (left)
@@ -558,6 +562,48 @@ private struct PdfDetailView: View {
 
                     // TEXT segment
                     barSegment(label: "TEXT", active: showTextMode) { showTextMode = true }
+
+                    Divider().frame(height: 20).opacity(0.2)
+
+                    // Single page toggle
+                    Button { singlePageMode.toggle() } label: {
+                        Image(systemName: singlePageMode ? "doc" : "doc.on.doc")
+                            .font(.system(size: 13))
+                            .foregroundColor(singlePageMode ? .orange : .white.opacity(0.45))
+                            .padding(.horizontal, 8).padding(.vertical, 10)
+                    }
+                    .buttonStyle(.plain)
+
+                    // Text size controls (PDF mode only)
+                    if !showTextMode {
+                        Divider().frame(height: 20).opacity(0.2)
+
+                        Button { scaleFactor = max(0.5, scaleFactor - 0.25) } label: {
+                            Image(systemName: "minus.circle")
+                                .font(.system(size: 13))
+                                .foregroundColor(scaleFactor <= 0.5 ? .white.opacity(0.2) : .white.opacity(0.55))
+                                .padding(.horizontal, 6).padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+
+                        Button { scaleFactor = min(4.0, scaleFactor + 0.25) } label: {
+                            Image(systemName: "plus.circle")
+                                .font(.system(size: 13))
+                                .foregroundColor(scaleFactor >= 4.0 ? .white.opacity(0.2) : .white.opacity(0.55))
+                                .padding(.horizontal, 6).padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+
+                        if scaleFactor != 1.0 {
+                            Button { scaleFactor = 1.0 } label: {
+                                Text("\(Int(scaleFactor * 100))%")
+                                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                    .foregroundColor(.orange.opacity(0.7))
+                                    .padding(.horizontal, 4).padding(.vertical, 10)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
 
                     Spacer()
 
@@ -608,6 +654,14 @@ private struct PdfDetailView: View {
 private struct PdfSortSheet: View {
     let onSort: (PdfSortField) -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var searchText: String = ""
+
+    private var filteredFields: [PdfSortField] {
+        guard !searchText.isEmpty else { return PdfSortField.allCases }
+        return PdfSortField.allCases.filter {
+            $0.rawValue.localizedCaseInsensitiveContains(searchText)
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -617,10 +671,34 @@ private struct PdfSortSheet: View {
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundColor(.white.opacity(0.35))
                     .tracking(3)
-                    .padding(.top, 22).padding(.bottom, 16)
+                    .padding(.top, 22).padding(.bottom, 12)
+
+                // Search bar
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.4))
+                    TextField("Search…", text: $searchText)
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.9))
+                        .tint(.orange)
+                    if !searchText.isEmpty {
+                        Button { searchText = "" } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 13))
+                                .foregroundColor(.white.opacity(0.35))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
 
                 VStack(spacing: 0) {
-                    ForEach(Array(PdfSortField.allCases.enumerated()), id: \.element.id) { idx, field in
+                    ForEach(Array(filteredFields.enumerated()), id: \.element.id) { idx, field in
                         if idx > 0 { Divider().opacity(0.1).padding(.leading, 54) }
                         Button {
                             onSort(field)
@@ -658,13 +736,15 @@ private struct PdfSortSheet: View {
 private struct PdfKitView: UIViewRepresentable {
     let document: PDFDocument
     @Binding var currentPageIdx: Int
+    var singlePage: Bool = false
+    var scaleFactor: CGFloat = 1.0
 
     func makeCoordinator() -> Coordinator { Coordinator(binding: $currentPageIdx) }
 
     func makeUIView(context: Context) -> PDFView {
         let view = PDFView()
         view.autoScales = true
-        view.displayMode = .singlePageContinuous
+        view.displayMode = singlePage ? .singlePage : .singlePageContinuous
         view.displayDirection = .vertical
         view.backgroundColor = .black
         view.document = document
@@ -688,6 +768,17 @@ private struct PdfKitView: UIViewRepresentable {
             if let first = document.page(at: 0) {
                 uiView.go(to: first)
             }
+        }
+        // Display mode
+        let mode: PDFDisplayMode = singlePage ? .singlePage : .singlePageContinuous
+        if uiView.displayMode != mode { uiView.displayMode = mode }
+        // Scale
+        if scaleFactor == 1.0 {
+            if !uiView.autoScales { uiView.autoScales = true }
+        } else {
+            uiView.autoScales = false
+            let base = uiView.scaleFactorForSizeToFit
+            if base > 0 { uiView.scaleFactor = base * scaleFactor }
         }
     }
 

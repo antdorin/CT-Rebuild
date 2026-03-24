@@ -120,23 +120,10 @@ private struct RightWheelSelector: View {
 
     @State private var virtualPage: Int = 0
     @State private var dragOffset: CGFloat = 0
-    @State private var searchText: String = ""
-    @FocusState private var searchFocused: Bool
-
     private var previewScale: CGFloat {
         guard panelSize.width > 0 else { return 1 }
         return cardW / panelSize.width
     }
-
-    /// Indices matching the current search query
-    private var filteredIndices: [Int] {
-        guard !searchText.isEmpty else { return [] }
-        return (0..<itemCount).filter {
-            rightPageTitles[$0].localizedCaseInsensitiveContains(searchText)
-        }
-    }
-
-    private var isSearching: Bool { !searchText.isEmpty }
 
     // Maps any virtual page to a real 0–(itemCount-1) index, wrapping circularly
     private func realIndex(_ page: Int) -> Int {
@@ -145,114 +132,11 @@ private struct RightWheelSelector: View {
     }
 
     var body: some View {
-        ZStack {
-            // ── Carousel (hidden while searching) ─────────────────────────
-            if !isSearching {
-                carousel
+        carousel
+            .frame(width: panelSize.width, height: panelSize.height)
+            .onAppear {
+                virtualPage = selectedIndex
             }
-
-            // ── Search bar + results overlay ──────────────────────────────
-            VStack(spacing: 0) {
-                searchBar
-                    .padding(.top, safeArea.top + 8)
-                    .padding(.horizontal, 24)
-
-                if isSearching {
-                    searchResults
-                }
-
-                Spacer()
-            }
-        }
-        .frame(width: panelSize.width, height: panelSize.height)
-        .onAppear {
-            virtualPage = selectedIndex
-        }
-    }
-
-    // MARK: - Search Bar
-
-    private var searchBar: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white.opacity(0.4))
-
-            TextField("Search pages…", text: $searchText)
-                .font(.system(size: 14, weight: .medium, design: .monospaced))
-                .foregroundColor(.white.opacity(0.9))
-                .tint(.orange)
-                .focused($searchFocused)
-                .submitLabel(.done)
-                .onSubmit {
-                    if let first = filteredIndices.first {
-                        selectPage(first)
-                    }
-                }
-
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                    searchFocused = false
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.35))
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-    }
-
-    // MARK: - Search Results
-
-    private var searchResults: some View {
-        ScrollView {
-            VStack(spacing: 4) {
-                if filteredIndices.isEmpty {
-                    Text("No matching pages")
-                        .font(.system(size: 13, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.3))
-                        .padding(.top, 24)
-                } else {
-                    ForEach(filteredIndices, id: \.self) { idx in
-                        Button { selectPage(idx) } label: {
-                            HStack(spacing: 12) {
-                                Text("\(idx + 1)")
-                                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                                    .foregroundColor(.orange.opacity(0.85))
-                                    .frame(width: 24)
-
-                                Text(rightPageTitles[idx])
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.9))
-
-                                Spacer()
-
-                                if idx == selectedIndex {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(.orange)
-                                }
-
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundColor(.white.opacity(0.2))
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
-                            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 12)
-        }
     }
 
     // MARK: - Carousel
@@ -327,15 +211,4 @@ private struct RightWheelSelector: View {
         )
     }
 
-    // MARK: - Helpers
-
-    private func selectPage(_ index: Int) {
-        searchText = ""
-        searchFocused = false
-        withAnimation(.slideFwd) {
-            virtualPage = index
-            selectedIndex = index
-            isPPOpen = false
-        }
-    }
 }
