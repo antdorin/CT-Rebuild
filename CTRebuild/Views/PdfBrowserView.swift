@@ -478,6 +478,20 @@ private struct PdfDetailView: View {
         return parts.isEmpty ? "No selectable text found in this PDF." : parts.joined(separator: "\n\n")
     }
 
+    /// Render a single PDF page to a UIImage at the given scale multiplier.
+    private func renderPageImage(_ page: PDFPage, scale: CGFloat) -> UIImage? {
+        let bounds = page.bounds(for: .mediaBox)
+        let size = CGSize(width: bounds.width * scale, height: bounds.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { ctx in
+            UIColor.white.setFill()
+            ctx.fill(CGRect(origin: .zero, size: size))
+            ctx.cgContext.translateBy(x: 0, y: size.height)
+            ctx.cgContext.scaleBy(x: scale, y: -scale)
+            page.draw(with: .mediaBox, to: ctx.cgContext)
+        }
+    }
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -497,13 +511,23 @@ private struct PdfDetailView: View {
 
                 // ── Content ───────────────────────────────────────────────
                 if showTextMode {
-                    ScrollView {
-                        Text(extractedText)
-                            .font(.system(size: 13))
-                            .foregroundColor(.white.opacity(0.85))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16).padding(.vertical, 14)
-                            .textSelection(.enabled)
+                    GeometryReader { geo in
+                        ScrollView {
+                            LazyVStack(spacing: 12) {
+                                ForEach(0..<displayDoc.pageCount, id: \.self) { i in
+                                    if let page = displayDoc.page(at: i),
+                                       let img = renderPageImage(page, scale: 3.0) {
+                                        Image(uiImage: img)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: geo.size.width - 16)
+                                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 12)
+                        }
                     }
                 } else {
                     PdfKitView(document: displayDoc, currentPageIdx: $currentPage)
