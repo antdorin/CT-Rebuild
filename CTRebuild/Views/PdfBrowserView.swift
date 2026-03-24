@@ -849,79 +849,277 @@ private func autoCropped(_ source: PDFDocument) -> PDFDocument {
 }
 
 private func htmlEscaped(_ text: String) -> String {
-        text
-                .replacingOccurrences(of: "&", with: "&amp;")
-                .replacingOccurrences(of: "<", with: "&lt;")
-                .replacingOccurrences(of: ">", with: "&gt;")
-                .replacingOccurrences(of: "\"", with: "&quot;")
-                .replacingOccurrences(of: "'", with: "&#39;")
+    text
+        .replacingOccurrences(of: "&", with: "&amp;")
+        .replacingOccurrences(of: "<", with: "&lt;")
+        .replacingOccurrences(of: ">", with: "&gt;")
+        .replacingOccurrences(of: "\"", with: "&quot;")
+        .replacingOccurrences(of: "'", with: "&#39;")
+}
+
+private struct TicketFields {
+    var soNumber: String = ""
+    var date: String = ""
+    var shipToHtml: String = ""
+    var notes: String = ""
+
+    var companyName: String = ""
+    var terms: String = ""
+    var shippingMethod: String = ""
+    var thirdPartyAccount: String = ""
+
+    var binLocation: String = ""
+    var itemCode: String = ""
+    var itemDescription: String = ""
+    var quantity: String = ""
+    var units: String = ""
+    var committed: String = ""
+}
+
+private func firstMatch(_ text: String, _ pattern: String, options: NSRegularExpression.Options = []) -> String {
+    guard let re = try? NSRegularExpression(pattern: pattern, options: options),
+          let match = re.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+          let range = Range(match.range, in: text)
+    else { return "" }
+    return String(text[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+private func firstCapture(_ text: String, _ pattern: String, options: NSRegularExpression.Options = []) -> String {
+    guard let re = try? NSRegularExpression(pattern: pattern, options: options),
+          let match = re.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+          match.numberOfRanges > 1,
+          let range = Range(match.range(at: 1), in: text)
+    else { return "" }
+    return String(text[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+private func splitColumns(_ line: String) -> [String] {
+    let normalized = line.replacingOccurrences(
+        of: #"\s{2,}"#,
+        with: "\t",
+        options: .regularExpression
+    )
+    return normalized
+        .split(separator: "\t")
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+}
+
+private func extractLineAfterHeader(_ text: String, headerPattern: String) -> [String] {
+    guard let re = try? NSRegularExpression(pattern: headerPattern, options: [.anchorsMatchLines, .caseInsensitive]),
+          let match = re.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+          let full = Range(match.range, in: text)
+    else { return [] }
+
+    let tail = String(text[full.upperBound...])
+    let lines = tail
+        .components(separatedBy: .newlines)
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+    return lines
+}
+
+private func parseTicketFields(from text: String) -> TicketFields {
+    var fields = TicketFields()
+
+    fields.soNumber = firstMatch(text, #"SO-[A-Za-z0-9]+-[A-Za-z0-9]+"#)
+    fields.date = firstMatch(text, #"\b(?:0?[1-9]|1[0-2])/(?:0?[1-9]|[12][0-9]|3[01])/\d{4}\b"#)
+
+    let shipToBlock = firstCapture(text, #"(?is)Ship\s*To\s*:?[\s\n]*(.*?)[\s\n]*Notes\s*:?"#)
+    if !shipToBlock.isEmpty {
+        fields.shipToHtml = shipToBlock
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .map(htmlEscaped)
+            .joined(separator: "<br />")
+    }
+    fields.notes = firstCapture(text, #"(?is)Notes\s*:?[\s\n]*(.*?)(?:\n\s*Company\s+Name|\n\s*Bin\s+Location|$)"#)
+
+    let companyLines = extractLineAfterHeader(
+        text,
+        headerPattern: #"^\s*Company\s+Name\s+Terms\s+Shipping\s+Method\s+3rd\s+Party\s+Account\s*#?\s*$"#
+    )
+    if let row = companyLines.first {
+        let cols = splitColumns(row)
+        if cols.count > 0 { fields.companyName = cols[0].trimmingCharacters(in: .whitespaces) }
+        if cols.count > 1 { fields.terms = cols[1].trimmingCharacters(in: .whitespaces) }
+        if cols.count > 2 { fields.shippingMethod = cols[2].trimmingCharacters(in: .whitespaces) }
+        if cols.count > 3 { fields.thirdPartyAccount = cols[3].trimmingCharacters(in: .whitespaces) }
+    }
+
+    let itemLines = extractLineAfterHeader(
+        text,
+        headerPattern: #"^\s*Bin\s+Location\s+Item\s+Quantity\s+Units\s+Committed\s*$"#
+    )
+    if let row = itemLines.first {
+        let cols = splitColumns(row)
+        if cols.count > 0 { fields.binLocation = cols[0].trimmingCharacters(in: .whitespaces) }
+        if cols.count > 1 { fields.itemCode = cols[1].trimmingCharacters(in: .whitespaces) }
+        if cols.count > 2 { fields.quantity = cols[2].trimmingCharacters(in: .whitespaces) }
+        if cols.count > 3 { fields.units = cols[3].trimmingCharacters(in: .whitespaces) }
+        if cols.count > 4 { fields.committed = cols[4].trimmingCharacters(in: .whitespaces) }
+    }
+    if itemLines.count > 1 {
+        fields.itemDescription = itemLines[1]
+    }
+
+    return fields
+}
+
+private func ticketSectionHTML(fields: TicketFields, page: Int) -> String {
+    let notes = fields.notes.isEmpty ? "" : htmlEscaped(fields.notes)
+    let shipTo = fields.shipToHtml
+
+    return """
+    <section class=\"ticket\">
+      <div class=\"ticket-inner\">
+        <div class=\"title\">Picking Ticket</div>
+        <div class=\"so\">#\(htmlEscaped(fields.soNumber))</div>
+        <div class=\"date\">\(htmlEscaped(fields.date))</div>
+
+        <table class=\"check-grid\" cellspacing=\"0\" cellpadding=\"0\">
+          <tr><th></th><th>Employee</th><th>Date</th></tr>
+          <tr><th>Picked</th><td></td><td></td></tr>
+          <tr><th>Checked</th><td></td><td></td></tr>
+        </table>
+
+        <div class=\"ship-title\">Ship To</div>
+        <div class=\"ship-block\">\(shipTo)</div>
+        <div class=\"notes-title\">Notes:</div>
+        <div class=\"notes\">\(notes)</div>
+
+        <div class=\"band top\"></div>
+        <div class=\"band bottom\"></div>
+
+        <div class=\"hdr hdr-company\">Company Name</div>
+        <div class=\"hdr hdr-terms\">Terms</div>
+        <div class=\"hdr hdr-ship\">Shipping Method</div>
+        <div class=\"hdr hdr-third\">3rd Party Account #</div>
+
+        <div class=\"val val-company\">\(htmlEscaped(fields.companyName))</div>
+        <div class=\"val val-terms\">\(htmlEscaped(fields.terms))</div>
+        <div class=\"val val-ship\">\(htmlEscaped(fields.shippingMethod))</div>
+        <div class=\"val val-third\">\(htmlEscaped(fields.thirdPartyAccount))</div>
+
+        <div class=\"hdr2 hdr2-bin\">Bin Location</div>
+        <div class=\"hdr2 hdr2-item\">Item</div>
+        <div class=\"hdr2 hdr2-qty\">Quantity</div>
+        <div class=\"hdr2 hdr2-units\">Units</div>
+        <div class=\"hdr2 hdr2-comm\">Committed</div>
+
+        <div class=\"val2 val2-bin\">\(htmlEscaped(fields.binLocation))</div>
+        <div class=\"val2 val2-item\"><strong>\(htmlEscaped(fields.itemCode))</strong></div>
+        <div class=\"val2 val2-qty\">\(htmlEscaped(fields.quantity))</div>
+        <div class=\"val2 val2-units\">\(htmlEscaped(fields.units))</div>
+        <div class=\"val2 val2-comm\">\(htmlEscaped(fields.committed))</div>
+        <div class=\"desc\">\(htmlEscaped(fields.itemDescription))</div>
+
+        <div class=\"page-label\">Page \(page)</div>
+      </div>
+    </section>
+    """
 }
 
 private func buildReflowHTML(from doc: PDFDocument, fontPercent: Int) -> String {
-        var blocks: [String] = []
-        for i in 0..<doc.pageCount {
-                let raw = (doc.page(at: i)?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !raw.isEmpty else { continue }
-                let block = """
-                <section class=\"page\">
-                    <div class=\"page-title\">Page \(i + 1)</div>
-                    <pre class=\"page-text\">\(htmlEscaped(raw))</pre>
-                </section>
-                """
-                blocks.append(block)
+    var pages: [String] = []
+    for i in 0..<doc.pageCount {
+        let raw = (doc.page(at: i)?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else { continue }
+        let fields = parseTicketFields(from: raw)
+        pages.append(ticketSectionHTML(fields: fields, page: i + 1))
+    }
+
+    let content = pages.isEmpty
+        ? "<section class=\"empty\">No selectable text found in this PDF.</section>"
+        : pages.joined(separator: "\n")
+
+    return """
+    <!doctype html>
+    <html>
+    <head>
+      <meta charset=\"utf-8\" />
+      <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0\" />
+      <style>
+        :root { --fontScale: \(fontPercent)%; }
+        * { box-sizing: border-box; }
+        body {
+          margin: 0;
+          padding: 10px;
+          background: #0f0f0f;
+          color: #111;
+          font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;
         }
+        .ticket {
+          background: #dcdcdc;
+          border-radius: 10px;
+          margin: 0 0 10px 0;
+          overflow: hidden;
+        }
+        .ticket-inner {
+          position: relative;
+          width: 100%;
+          aspect-ratio: 612 / 792;
+          padding: 6% 5%;
+        }
+        .title { position: absolute; left: 6%; top: 5%; font-size: calc(42px * var(--fontScale) / 100); font-weight: 500; }
+        .so { position: absolute; left: 6%; top: 12%; font-size: calc(28px * var(--fontScale) / 100); font-weight: 600; }
+        .date { position: absolute; left: 6%; top: 16.5%; font-size: calc(22px * var(--fontScale) / 100); color: #333; }
 
-        let content = blocks.isEmpty
-                ? "<section class=\"page\"><div class=\"page-title\">No selectable text found</div></section>"
-                : blocks.joined(separator: "\n")
+        .check-grid { position: absolute; right: 5%; top: 5%; width: 38%; border-collapse: collapse; }
+        .check-grid th, .check-grid td { border: 2px solid #232323; padding: 6px 8px; font-size: calc(12px * var(--fontScale) / 100); text-align: left; }
 
-        return """
-        <!doctype html>
-        <html>
-        <head>
-            <meta charset=\"utf-8\" />
-            <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0\" />
-            <style>
-                :root { --fontScale: \(fontPercent)%; }
-                * { box-sizing: border-box; }
-                body {
-                    margin: 0;
-                    padding: 12px;
-                    background: #0f0f0f;
-                    color: #f2f2f2;
-                    font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;
-                }
-                .page {
-                    background: #1b1b1b;
-                    border: 1px solid #2b2b2b;
-                    border-radius: 12px;
-                    padding: 12px;
-                    margin-bottom: 10px;
-                }
-                .page-title {
-                    font-size: 11px;
-                    letter-spacing: 0.08em;
-                    text-transform: uppercase;
-                    color: #a9a9a9;
-                    margin-bottom: 8px;
-                }
-                .page-text {
-                    margin: 0;
-                    white-space: pre-wrap;
-                    word-wrap: break-word;
-                    overflow-wrap: anywhere;
-                    line-height: 1.45;
-                    font-size: calc(14px * var(--fontScale) / 100);
-                    font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;
-                    color: #f4f4f4;
-                }
-            </style>
-        </head>
-        <body>
-            \(content)
-        </body>
-        </html>
-        """
+        .ship-title { position: absolute; left: 6%; top: 27%; font-size: calc(13px * var(--fontScale) / 100); font-weight: 700; }
+        .ship-block { position: absolute; left: 6%; top: 29%; width: 34%; font-size: calc(13px * var(--fontScale) / 100); line-height: 1.2; }
+        .notes-title { position: absolute; left: 52%; top: 27%; font-size: calc(13px * var(--fontScale) / 100); font-weight: 700; }
+        .notes { position: absolute; left: 52%; top: 29%; width: 38%; font-size: calc(13px * var(--fontScale) / 100); line-height: 1.2; white-space: pre-wrap; }
+
+        .band { position: absolute; left: 6%; right: 5%; background: #cfcfcf; }
+        .band.top { top: 39%; height: 3.2%; }
+        .band.bottom { top: 47.3%; height: 4.4%; }
+
+        .hdr, .val, .hdr2, .val2, .desc {
+          position: absolute;
+          font-size: calc(12px * var(--fontScale) / 100);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .hdr, .hdr2 { font-weight: 700; color: #2c2c2c; }
+
+        .hdr-company { left: 6.5%; top: 39.6%; width: 23%; }
+        .hdr-terms   { left: 29%;   top: 39.6%; width: 15%; }
+        .hdr-ship    { left: 50%;   top: 39.6%; width: 24%; }
+        .hdr-third   { left: 73.5%; top: 39.6%; width: 20%; }
+
+        .val-company { left: 6.5%; top: 43.3%; width: 23%; }
+        .val-terms   { left: 29%;   top: 43.3%; width: 15%; }
+        .val-ship    { left: 50%;   top: 43.3%; width: 24%; }
+        .val-third   { left: 73.5%; top: 43.3%; width: 20%; }
+
+        .hdr2-bin  { left: 6.5%;  top: 48.3%; width: 11%; }
+        .hdr2-item { left: 17.5%; top: 48.3%; width: 43%; }
+        .hdr2-qty  { left: 62%;   top: 48.3%; width: 10%; }
+        .hdr2-units{ left: 73%;   top: 48.3%; width: 10%; }
+        .hdr2-comm { left: 84%;   top: 48.3%; width: 10%; }
+
+        .val2-bin  { left: 6.5%;  top: 52.6%; width: 11%; }
+        .val2-item { left: 17.5%; top: 52.6%; width: 43%; }
+        .val2-qty  { left: 62%;   top: 52.6%; width: 10%; }
+        .val2-units{ left: 73%;   top: 52.6%; width: 10%; }
+        .val2-comm { left: 84%;   top: 52.6%; width: 10%; }
+
+        .desc { left: 17.5%; top: 55.2%; width: 60%; white-space: normal; line-height: 1.2; }
+        .page-label { position: absolute; right: 6%; bottom: 4%; font-size: calc(10px * var(--fontScale) / 100); color: #666; }
+
+        .empty { color: #ddd; padding: 20px; }
+      </style>
+    </head>
+    <body>
+      \(content)
+    </body>
+    </html>
+    """
 }
 
 // MARK: - Reflow Web View
