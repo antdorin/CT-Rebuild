@@ -1286,38 +1286,75 @@ private struct ReaderWebView: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
+        
+        // Allow navigation to any URL and disable restrictions
+        let prefs = WKWebpagePreferences()
+        prefs.allowsContentJavaScript = true
+        config.defaultWebpagePreferences = prefs
+        
         let view = WKWebView(frame: .zero, configuration: config)
         view.isOpaque = false
         view.backgroundColor = .black
         view.scrollView.backgroundColor = .black
         view.scrollView.contentInsetAdjustmentBehavior = .never
+        view.navigationDelegate = context.coordinator
 
         context.coordinator.loadedFilenames = filenames
-        loadReader(into: view)
+        loadReader(into: view, context: context)
         return view
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {
         guard context.coordinator.loadedFilenames != filenames else { return }
         context.coordinator.loadedFilenames = filenames
-        loadReader(into: uiView)
+        loadReader(into: uiView, context: context)
     }
 
-    private func loadReader(into webView: WKWebView) {
+    private func loadReader(into webView: WKWebView, context: Context) {
         let base = HubClient.shared.activeBaseURL
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard !base.isEmpty, let first = filenames.first else { return }
+        
+        print("🔍 READER DEBUG: base URL = '\(base)'")
+        print("🔍 READER DEBUG: filenames = \(filenames)")
+        
+        guard !base.isEmpty else {
+            print("❌ READER ERROR: base URL is empty")
+            return
+        }
+        
+        guard let first = filenames.first else {
+            print("❌ READER ERROR: no filenames provided")
+            return
+        }
 
         let encoded = first.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? first
         let urlString = "\(base)/reader.html?file=\(encoded)"
+        
+        print("🔍 READER DEBUG: loading URL = '\(urlString)'")
+        
         if let url = URL(string: urlString) {
-            webView.load(URLRequest(url: url))
+            let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
+            webView.load(request)
+        } else {
+            print("❌ READER ERROR: failed to create URL from string '\(urlString)'")
         }
     }
 
-    final class Coordinator {
+    final class Coordinator: NSObject, WKNavigationDelegate {
         var loadedFilenames: [String] = []
+        
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            print("✅ READER: page loaded successfully")
+        }
+        
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            print("❌ READER ERROR: navigation failed - \(error.localizedDescription)")
+        }
+        
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            print("❌ READER ERROR: provisional navigation failed - \(error.localizedDescription)")
+        }
     }
 }
 
