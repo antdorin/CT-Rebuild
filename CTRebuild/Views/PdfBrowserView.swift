@@ -974,28 +974,17 @@ private func ticketSectionHTML(fields: TicketFields, page: Int) -> String {
     return """
     <section class=\"ticket\">
       <div class=\"ticket-inner\">
-                <div class=\"top-row\">
-                    <div class=\"doc-meta\">
-                        <div class=\"title\">Picking Ticket</div>
-                        <div class=\"so\">#\(htmlEscaped(fields.soNumber))</div>
-                        <div class=\"date\">\(htmlEscaped(fields.date))</div>
-                    </div>
-                    <table class=\"check-grid\" cellspacing=\"0\" cellpadding=\"0\">
-                        <tr><th></th><th>Employee</th><th>Date</th></tr>
-                        <tr><th>Picked</th><td></td><td></td></tr>
-                        <tr><th>Checked</th><td></td><td></td></tr>
-                    </table>
-                </div>
+                <div class=\"title\">Picking Ticket</div>
+                <div class=\"so\">#\(htmlEscaped(fields.soNumber))</div>
+                <div class=\"date\">\(htmlEscaped(fields.date))</div>
 
+                <div class=\"address-head\">
+                    <span>Ship To</span>
+                    <span>Notes:</span>
+                </div>
                 <div class=\"address-row\">
-                    <div class=\"panel\">
-                        <div class=\"panel-title\">Ship To</div>
-                        <div class=\"panel-body\">\(shipTo)</div>
-                    </div>
-                    <div class=\"panel\">
-                        <div class=\"panel-title\">Notes:</div>
-                        <div class=\"panel-body\">\(notes)</div>
-                    </div>
+                    <div class=\"ship-block\">\(shipTo)</div>
+                    <div class=\"notes\">\(notes)</div>
                 </div>
 
                 <table class=\"meta-table\" cellspacing=\"0\" cellpadding=\"0\">
@@ -1074,77 +1063,60 @@ private func buildReflowHTML(from doc: PDFDocument, fontPercent: Int) -> String 
         }
         .ticket-inner {
                     width: 100%;
-                    min-height: 100vw;
+                    min-height: 94vw;
                     max-width: 980px;
                     margin: 0 auto;
-                    padding: 22px 18px 16px;
+                    padding: 16px 14px 12px;
                     display: grid;
-                    gap: 10px;
+                    gap: 6px;
                 }
 
-                .top-row {
-                    display: grid;
-                    grid-template-columns: 1.1fr 0.9fr;
-                    gap: 12px;
-                    align-items: start;
-                }
-                .title { font-size: calc(30px * var(--fontScale) / 100); font-weight: 700; line-height: 1.1; }
-                .so { margin-top: 8px; font-size: calc(24px * var(--fontScale) / 100); font-weight: 700; line-height: 1.15; }
-                .date { margin-top: 2px; font-size: calc(18px * var(--fontScale) / 100); color: #2b2b2b; }
-
-                .check-grid { width: 100%; border-collapse: collapse; background: #e2e2e2; }
-                .check-grid th, .check-grid td {
-                    border: 2px solid #232323;
-                    padding: 6px;
-                    font-size: calc(12px * var(--fontScale) / 100);
-                    text-align: left;
-                    min-height: 24px;
-                }
+                .title { font-size: calc(22px * var(--fontScale) / 100); font-weight: 500; line-height: 1.1; }
+                .so { margin-top: 2px; font-size: calc(16px * var(--fontScale) / 100); font-weight: 600; line-height: 1.12; }
+                .date { margin-top: -2px; font-size: calc(12px * var(--fontScale) / 100); color: #2b2b2b; }
 
                 .address-row {
                     display: grid;
                     grid-template-columns: 1fr 1fr;
-                    gap: 12px;
+                    gap: 8px;
                 }
-                .panel {
-                    background: #dbdbdb;
-                    border: 1px solid #cfcfcf;
-                    border-radius: 6px;
-                    padding: 8px;
-                    min-height: 126px;
-                }
-                .panel-title {
-                    font-size: calc(16px * var(--fontScale) / 100);
+                .address-head {
+                    margin-top: 6px;
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    font-size: calc(11px * var(--fontScale) / 100);
                     font-weight: 700;
-                    margin-bottom: 6px;
                 }
-                .panel-body {
-                    font-size: calc(13px * var(--fontScale) / 100);
-                    line-height: 1.24;
+                .ship-block,
+                .notes {
+                    font-size: calc(11px * var(--fontScale) / 100);
+                    line-height: 1.15;
                     white-space: pre-wrap;
                     word-break: break-word;
+                    min-height: 72px;
                 }
 
                 .meta-table,
                 .item-table {
                     width: 100%;
-                    border-collapse: collapse;
+                    border-collapse: separate;
+                    border-spacing: 0;
                     table-layout: fixed;
-                    background: #e0e0e0;
+                    background: transparent;
                 }
                 .meta-table th,
                 .meta-table td,
                 .item-table th,
                 .item-table td {
-                    border: 2px solid #2a2a2a;
-                    padding: 6px;
-                    font-size: calc(12px * var(--fontScale) / 100);
+                    border: 0;
+                    padding: 2px 3px;
+                    font-size: calc(10px * var(--fontScale) / 100);
                     text-align: left;
                     vertical-align: top;
                     word-break: break-word;
                 }
                 .meta-table th,
-                .item-table th { background: #d2d2d2; font-weight: 700; }
+                .item-table th { background: #cfcfcf; font-weight: 700; }
 
                 .meta-table th:nth-child(1), .meta-table td:nth-child(1) { width: 28%; }
                 .meta-table th:nth-child(2), .meta-table td:nth-child(2) { width: 14%; }
@@ -1158,30 +1130,26 @@ private func buildReflowHTML(from doc: PDFDocument, fontPercent: Int) -> String 
                 .item-table th:nth-child(5), .item-table td:nth-child(5) { width: 16%; }
 
                 .item-desc {
-                    margin-top: -2px;
-                    border: 2px solid #2a2a2a;
-                    border-top: 0;
-                    background: #e0e0e0;
-                    padding: 6px;
-                    min-height: 26px;
-                    font-size: calc(12px * var(--fontScale) / 100);
+                    margin-top: -5px;
+                    padding: 0 3px;
+                    min-height: 18px;
+                    font-size: calc(10px * var(--fontScale) / 100);
                     line-height: 1.2;
                     word-break: break-word;
                 }
 
                 .page-label {
                     justify-self: end;
-                    font-size: calc(10px * var(--fontScale) / 100);
+                    font-size: calc(9px * var(--fontScale) / 100);
                     color: #595959;
-                    margin-top: 4px;
+                    margin-top: 2px;
                 }
 
                 @media (max-width: 760px) {
-                    .title { font-size: calc(22px * var(--fontScale) / 100); }
-                    .so { font-size: calc(20px * var(--fontScale) / 100); }
-                    .date { font-size: calc(16px * var(--fontScale) / 100); }
-                    .top-row { grid-template-columns: 1fr; }
-                    .address-row { grid-template-columns: 1fr; }
+                    .ticket-inner { min-height: 112vw; }
+                    .title { font-size: calc(18px * var(--fontScale) / 100); }
+                    .so { font-size: calc(14px * var(--fontScale) / 100); }
+                    .date { font-size: calc(11px * var(--fontScale) / 100); }
                 }
 
         .empty { color: #ddd; padding: 20px; }
