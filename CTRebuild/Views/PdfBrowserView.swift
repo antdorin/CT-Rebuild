@@ -974,48 +974,64 @@ private func ticketSectionHTML(fields: TicketFields, page: Int) -> String {
     return """
     <section class=\"ticket\">
       <div class=\"ticket-inner\">
-        <div class=\"title\">Picking Ticket</div>
-        <div class=\"so\">#\(htmlEscaped(fields.soNumber))</div>
-        <div class=\"date\">\(htmlEscaped(fields.date))</div>
+                <div class=\"top-row\">
+                    <div class=\"doc-meta\">
+                        <div class=\"title\">Picking Ticket</div>
+                        <div class=\"so\">#\(htmlEscaped(fields.soNumber))</div>
+                        <div class=\"date\">\(htmlEscaped(fields.date))</div>
+                    </div>
+                    <table class=\"check-grid\" cellspacing=\"0\" cellpadding=\"0\">
+                        <tr><th></th><th>Employee</th><th>Date</th></tr>
+                        <tr><th>Picked</th><td></td><td></td></tr>
+                        <tr><th>Checked</th><td></td><td></td></tr>
+                    </table>
+                </div>
 
-        <table class=\"check-grid\" cellspacing=\"0\" cellpadding=\"0\">
-          <tr><th></th><th>Employee</th><th>Date</th></tr>
-          <tr><th>Picked</th><td></td><td></td></tr>
-          <tr><th>Checked</th><td></td><td></td></tr>
-        </table>
+                <div class=\"address-row\">
+                    <div class=\"panel\">
+                        <div class=\"panel-title\">Ship To</div>
+                        <div class=\"panel-body\">\(shipTo)</div>
+                    </div>
+                    <div class=\"panel\">
+                        <div class=\"panel-title\">Notes:</div>
+                        <div class=\"panel-body\">\(notes)</div>
+                    </div>
+                </div>
 
-        <div class=\"ship-title\">Ship To</div>
-        <div class=\"ship-block\">\(shipTo)</div>
-        <div class=\"notes-title\">Notes:</div>
-        <div class=\"notes\">\(notes)</div>
+                <table class=\"meta-table\" cellspacing=\"0\" cellpadding=\"0\">
+                    <tr>
+                        <th>Company Name</th>
+                        <th>Terms</th>
+                        <th>Shipping Method</th>
+                        <th>3rd Party Account #</th>
+                    </tr>
+                    <tr>
+                        <td>\(htmlEscaped(fields.companyName))</td>
+                        <td>\(htmlEscaped(fields.terms))</td>
+                        <td>\(htmlEscaped(fields.shippingMethod))</td>
+                        <td>\(htmlEscaped(fields.thirdPartyAccount))</td>
+                    </tr>
+                </table>
 
-        <div class=\"band top\"></div>
-        <div class=\"band bottom\"></div>
+                <table class=\"item-table\" cellspacing=\"0\" cellpadding=\"0\">
+                    <tr>
+                        <th>Bin Location</th>
+                        <th>Item</th>
+                        <th>Quantity</th>
+                        <th>Units</th>
+                        <th>Committed</th>
+                    </tr>
+                    <tr>
+                        <td>\(htmlEscaped(fields.binLocation))</td>
+                        <td><strong>\(htmlEscaped(fields.itemCode))</strong></td>
+                        <td>\(htmlEscaped(fields.quantity))</td>
+                        <td>\(htmlEscaped(fields.units))</td>
+                        <td>\(htmlEscaped(fields.committed))</td>
+                    </tr>
+                </table>
 
-        <div class=\"hdr hdr-company\">Company Name</div>
-        <div class=\"hdr hdr-terms\">Terms</div>
-        <div class=\"hdr hdr-ship\">Shipping Method</div>
-        <div class=\"hdr hdr-third\">3rd Party Account #</div>
-
-        <div class=\"val val-company\">\(htmlEscaped(fields.companyName))</div>
-        <div class=\"val val-terms\">\(htmlEscaped(fields.terms))</div>
-        <div class=\"val val-ship\">\(htmlEscaped(fields.shippingMethod))</div>
-        <div class=\"val val-third\">\(htmlEscaped(fields.thirdPartyAccount))</div>
-
-        <div class=\"hdr2 hdr2-bin\">Bin Location</div>
-        <div class=\"hdr2 hdr2-item\">Item</div>
-        <div class=\"hdr2 hdr2-qty\">Quantity</div>
-        <div class=\"hdr2 hdr2-units\">Units</div>
-        <div class=\"hdr2 hdr2-comm\">Committed</div>
-
-        <div class=\"val2 val2-bin\">\(htmlEscaped(fields.binLocation))</div>
-        <div class=\"val2 val2-item\"><strong>\(htmlEscaped(fields.itemCode))</strong></div>
-        <div class=\"val2 val2-qty\">\(htmlEscaped(fields.quantity))</div>
-        <div class=\"val2 val2-units\">\(htmlEscaped(fields.units))</div>
-        <div class=\"val2 val2-comm\">\(htmlEscaped(fields.committed))</div>
-        <div class=\"desc\">\(htmlEscaped(fields.itemDescription))</div>
-
-        <div class=\"page-label\">Page \(page)</div>
+                <div class=\"item-desc\">\(htmlEscaped(fields.itemDescription))</div>
+                <div class=\"page-label\">Page \(page)</div>
       </div>
     </section>
     """
@@ -1057,60 +1073,116 @@ private func buildReflowHTML(from doc: PDFDocument, fontPercent: Int) -> String 
           overflow: hidden;
         }
         .ticket-inner {
-          position: relative;
-          width: 100%;
-          aspect-ratio: 612 / 792;
-          padding: 6% 5%;
-        }
-        .title { position: absolute; left: 6%; top: 5%; font-size: calc(42px * var(--fontScale) / 100); font-weight: 500; }
-        .so { position: absolute; left: 6%; top: 12%; font-size: calc(28px * var(--fontScale) / 100); font-weight: 600; }
-        .date { position: absolute; left: 6%; top: 16.5%; font-size: calc(22px * var(--fontScale) / 100); color: #333; }
+                    width: 100%;
+                    min-height: 100vw;
+                    max-width: 980px;
+                    margin: 0 auto;
+                    padding: 22px 18px 16px;
+                    display: grid;
+                    gap: 10px;
+                }
 
-        .check-grid { position: absolute; right: 5%; top: 5%; width: 38%; border-collapse: collapse; }
-        .check-grid th, .check-grid td { border: 2px solid #232323; padding: 6px 8px; font-size: calc(12px * var(--fontScale) / 100); text-align: left; }
+                .top-row {
+                    display: grid;
+                    grid-template-columns: 1.1fr 0.9fr;
+                    gap: 12px;
+                    align-items: start;
+                }
+                .title { font-size: calc(30px * var(--fontScale) / 100); font-weight: 700; line-height: 1.1; }
+                .so { margin-top: 8px; font-size: calc(24px * var(--fontScale) / 100); font-weight: 700; line-height: 1.15; }
+                .date { margin-top: 2px; font-size: calc(18px * var(--fontScale) / 100); color: #2b2b2b; }
 
-        .ship-title { position: absolute; left: 6%; top: 27%; font-size: calc(13px * var(--fontScale) / 100); font-weight: 700; }
-        .ship-block { position: absolute; left: 6%; top: 29%; width: 34%; font-size: calc(13px * var(--fontScale) / 100); line-height: 1.2; }
-        .notes-title { position: absolute; left: 52%; top: 27%; font-size: calc(13px * var(--fontScale) / 100); font-weight: 700; }
-        .notes { position: absolute; left: 52%; top: 29%; width: 38%; font-size: calc(13px * var(--fontScale) / 100); line-height: 1.2; white-space: pre-wrap; }
+                .check-grid { width: 100%; border-collapse: collapse; background: #e2e2e2; }
+                .check-grid th, .check-grid td {
+                    border: 2px solid #232323;
+                    padding: 6px;
+                    font-size: calc(12px * var(--fontScale) / 100);
+                    text-align: left;
+                    min-height: 24px;
+                }
 
-        .band { position: absolute; left: 6%; right: 5%; background: #cfcfcf; }
-        .band.top { top: 39%; height: 3.2%; }
-        .band.bottom { top: 47.3%; height: 4.4%; }
+                .address-row {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 12px;
+                }
+                .panel {
+                    background: #dbdbdb;
+                    border: 1px solid #cfcfcf;
+                    border-radius: 6px;
+                    padding: 8px;
+                    min-height: 126px;
+                }
+                .panel-title {
+                    font-size: calc(16px * var(--fontScale) / 100);
+                    font-weight: 700;
+                    margin-bottom: 6px;
+                }
+                .panel-body {
+                    font-size: calc(13px * var(--fontScale) / 100);
+                    line-height: 1.24;
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                }
 
-        .hdr, .val, .hdr2, .val2, .desc {
-          position: absolute;
-          font-size: calc(12px * var(--fontScale) / 100);
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .hdr, .hdr2 { font-weight: 700; color: #2c2c2c; }
+                .meta-table,
+                .item-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    table-layout: fixed;
+                    background: #e0e0e0;
+                }
+                .meta-table th,
+                .meta-table td,
+                .item-table th,
+                .item-table td {
+                    border: 2px solid #2a2a2a;
+                    padding: 6px;
+                    font-size: calc(12px * var(--fontScale) / 100);
+                    text-align: left;
+                    vertical-align: top;
+                    word-break: break-word;
+                }
+                .meta-table th,
+                .item-table th { background: #d2d2d2; font-weight: 700; }
 
-        .hdr-company { left: 6.5%; top: 39.6%; width: 23%; }
-        .hdr-terms   { left: 29%;   top: 39.6%; width: 15%; }
-        .hdr-ship    { left: 50%;   top: 39.6%; width: 24%; }
-        .hdr-third   { left: 73.5%; top: 39.6%; width: 20%; }
+                .meta-table th:nth-child(1), .meta-table td:nth-child(1) { width: 28%; }
+                .meta-table th:nth-child(2), .meta-table td:nth-child(2) { width: 14%; }
+                .meta-table th:nth-child(3), .meta-table td:nth-child(3) { width: 26%; }
+                .meta-table th:nth-child(4), .meta-table td:nth-child(4) { width: 32%; }
 
-        .val-company { left: 6.5%; top: 43.3%; width: 23%; }
-        .val-terms   { left: 29%;   top: 43.3%; width: 15%; }
-        .val-ship    { left: 50%;   top: 43.3%; width: 24%; }
-        .val-third   { left: 73.5%; top: 43.3%; width: 20%; }
+                .item-table th:nth-child(1), .item-table td:nth-child(1) { width: 14%; }
+                .item-table th:nth-child(2), .item-table td:nth-child(2) { width: 46%; }
+                .item-table th:nth-child(3), .item-table td:nth-child(3) { width: 12%; }
+                .item-table th:nth-child(4), .item-table td:nth-child(4) { width: 12%; }
+                .item-table th:nth-child(5), .item-table td:nth-child(5) { width: 16%; }
 
-        .hdr2-bin  { left: 6.5%;  top: 48.3%; width: 11%; }
-        .hdr2-item { left: 17.5%; top: 48.3%; width: 43%; }
-        .hdr2-qty  { left: 62%;   top: 48.3%; width: 10%; }
-        .hdr2-units{ left: 73%;   top: 48.3%; width: 10%; }
-        .hdr2-comm { left: 84%;   top: 48.3%; width: 10%; }
+                .item-desc {
+                    margin-top: -2px;
+                    border: 2px solid #2a2a2a;
+                    border-top: 0;
+                    background: #e0e0e0;
+                    padding: 6px;
+                    min-height: 26px;
+                    font-size: calc(12px * var(--fontScale) / 100);
+                    line-height: 1.2;
+                    word-break: break-word;
+                }
 
-        .val2-bin  { left: 6.5%;  top: 52.6%; width: 11%; }
-        .val2-item { left: 17.5%; top: 52.6%; width: 43%; }
-        .val2-qty  { left: 62%;   top: 52.6%; width: 10%; }
-        .val2-units{ left: 73%;   top: 52.6%; width: 10%; }
-        .val2-comm { left: 84%;   top: 52.6%; width: 10%; }
+                .page-label {
+                    justify-self: end;
+                    font-size: calc(10px * var(--fontScale) / 100);
+                    color: #595959;
+                    margin-top: 4px;
+                }
 
-        .desc { left: 17.5%; top: 55.2%; width: 60%; white-space: normal; line-height: 1.2; }
-        .page-label { position: absolute; right: 6%; bottom: 4%; font-size: calc(10px * var(--fontScale) / 100); color: #666; }
+                @media (max-width: 760px) {
+                    .title { font-size: calc(22px * var(--fontScale) / 100); }
+                    .so { font-size: calc(20px * var(--fontScale) / 100); }
+                    .date { font-size: calc(16px * var(--fontScale) / 100); }
+                    .top-row { grid-template-columns: 1fr; }
+                    .address-row { grid-template-columns: 1fr; }
+                }
 
         .empty { color: #ddd; padding: 20px; }
       </style>
