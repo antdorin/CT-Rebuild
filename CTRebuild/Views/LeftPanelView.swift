@@ -44,15 +44,15 @@ struct LeftPanelView: View {
                 } else {
                     leftPageContent(geo: geo)
                         .transition(.pageTransition)
-                        .onTapGesture(count: 2) {
-                            withAnimation(.slideBck) {
-                                isPPOpen = true
-                            }
-                        }
                 }
             }
         }
         .ignoresSafeArea()
+        .onReceive(NotificationCenter.default.publisher(for: .gestureActionFired)) { note in
+            guard let raw = note.userInfo?["action"] as? String,
+                  raw == GestureAction.openPagePicker.rawValue else { return }
+            withAnimation(.slideBck) { isPPOpen.toggle() }
+        }
     }
 
     // MARK: - Full page content (used both in-panel and as thumbnail source)

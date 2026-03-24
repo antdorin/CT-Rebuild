@@ -28,15 +28,30 @@ struct RightPanelView: View {
                     RightPageContent(index: selectedIndex, safeArea: safeArea)
                         .frame(width: geo.size.width, height: geo.size.height)
                         .transition(.pageTransition)
-                        .onTapGesture(count: 2) {
-                            withAnimation(.slideBck) {
-                                isPPOpen = true
-                            }
-                        }
                 }
             }
         }
         .ignoresSafeArea()
+        .onReceive(NotificationCenter.default.publisher(for: .gestureActionFired)) { note in
+            guard let raw = note.userInfo?["action"] as? String else { return }
+            switch raw {
+            case GestureAction.openPagePicker.rawValue:
+                withAnimation(.slideBck) { isPPOpen.toggle() }
+            case GestureAction.nextRightPage.rawValue:
+                let total = 8
+                withAnimation(.slideFwd) {
+                    selectedIndex = (selectedIndex + 1) % total
+                    isPPOpen = false
+                }
+            case GestureAction.prevRightPage.rawValue:
+                let total = 8
+                withAnimation(.slideBck) {
+                    selectedIndex = (selectedIndex - 1 + total) % total
+                    isPPOpen = false
+                }
+            default: break
+            }
+        }
     }
 }
 
