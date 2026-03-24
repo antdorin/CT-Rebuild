@@ -88,6 +88,19 @@ struct RightPageContent: View {
     }
 }
 
+// MARK: - Page Titles
+
+/// Human-readable names for right-panel pages (index 0–6).
+private let rightPageTitles: [String] = [
+    "PDF Browser",
+    "Page 2",
+    "Page 3",
+    "Page 4",
+    "Page 5",
+    "Page 6",
+    "App Settings",
+]
+
 // MARK: - Right Panel Page Picker
 
 private struct RightWheelSelector: View {
@@ -107,11 +120,23 @@ private struct RightWheelSelector: View {
 
     @State private var virtualPage: Int = 0
     @State private var dragOffset: CGFloat = 0
+    @State private var searchText: String = ""
+    @FocusState private var searchFocused: Bool
 
     private var previewScale: CGFloat {
         guard panelSize.width > 0 else { return 1 }
         return cardW / panelSize.width
     }
+
+    /// Indices matching the current search query
+    private var filteredIndices: [Int] {
+        guard !searchText.isEmpty else { return [] }
+        return (0..<itemCount).filter {
+            rightPageTitles[$0].localizedCaseInsensitiveContains(searchText)
+        }
+    }
+
+    private var isSearching: Bool { !searchText.isEmpty }
 
     // Maps any virtual page to a real 0–(itemCount-1) index, wrapping circularly
     private func realIndex(_ page: Int) -> Int {
@@ -121,45 +146,168 @@ private struct RightWheelSelector: View {
 
     var body: some View {
         ZStack {
+            // ── Carousel (hidden while searching) ─────────────────────────
+            if !isSearching {
+                carousel
+            }
+
+            // ── Search bar + results overlay ──────────────────────────────
+            VStack(spacing: 0) {
+                searchBar
+                    .padding(.top, safeArea.top + 8)
+                    .padding(.horizontal, 24)
+
+                if isSearching {
+                    searchResults
+                }
+
+                Spacer()
+            }
+        }
+        .frame(width: panelSize.width, height: panelSize.height)
+        .onAppear {
+            virtualPage = selectedIndex
+        }
+    }
+
+    // MARK: - Search Bar
+
+    private var searchBar: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white.opacity(0.4))
+
+            TextField("Search pages…", text: $searchText)
+                .font(.system(size: 14, weight: .medium, design: .monospaced))
+                .foregroundColor(.white.opacity(0.9))
+                .tint(.orange)
+                .focused($searchFocused)
+                .submitLabel(.done)
+                .onSubmit {
+                    if let first = filteredIndices.first {
+                        selectPage(first)
+                    }
+                }
+
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                    searchFocused = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.35))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - Search Results
+
+    private var searchResults: some View {
+        ScrollView {
+            VStack(spacing: 4) {
+                if filteredIndices.isEmpty {
+                    Text("No matching pages")
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.3))
+                        .padding(.top, 24)
+                } else {
+                    ForEach(filteredIndices, id: \.self) { idx in
+                        Button { selectPage(idx) } label: {
+                            HStack(spacing: 12) {
+                                Text("\(idx + 1)")
+                                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                    .foregroundColor(.orange.opacity(0.85))
+                                    .frame(width: 24)
+
+                                Text(rightPageTitles[idx])
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.9))
+
+                                Spacer()
+
+                                if idx == selectedIndex {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundColor(.orange)
+                                }
+
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.2))
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 12)
+        }
+    }
+
+    // MARK: - Carousel
+
+    private var carousel: some View {
+        ZStack {
             ForEach((virtualPage - 2)...(virtualPage + 2), id: \.self) { vp in
                 let real           = realIndex(vp)
                 let totalOffset    = CGFloat(vp - virtualPage) * spacing + dragOffset
                 let distCenter     = totalOffset / spacing
 
-                RightPageContent(index: real, safeArea: safeArea)
-                    .frame(width: panelSize.width, height: panelSize.height)
-                    .scaleEffect(previewScale, anchor: .center)
-                    .frame(width: cardW, height: cardH)
-                    .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
-                    .overlay(RoundedRectangle(cornerRadius: 18)
-                        .stroke(Color.white.opacity(0.14), lineWidth: 0.5))
-                    .overlay(
-                        Color.clear
-                            .contentShape(RoundedRectangle(cornerRadius: 18))
-                            .onTapGesture {
-                                withAnimation(realIndex(virtualPage) == real ? .slideFwd : .spring(response: 0.3, dampingFraction: 0.85)) {
-                                    if realIndex(virtualPage) == real {
-                                        isPPOpen = false
-                                    } else {
-                                        virtualPage = vp
-                                        selectedIndex = real
-                                    }
+                ZStack(alignment: .bottom) {
+                    RightPageContent(index: real, safeArea: safeArea)
+                        .frame(width: panelSize.width, height: panelSize.height)
+                        .scaleEffect(previewScale, anchor: .center)
+                        .frame(width: cardW, height: cardH)
+                        .clipped()
+
+                    // Page label overlay
+                    Text(rightPageTitles[real])
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.85))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .padding(.bottom, 10)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+                .overlay(RoundedRectangle(cornerRadius: 18)
+                    .stroke(Color.white.opacity(0.14), lineWidth: 0.5))
+                .overlay(
+                    Color.clear
+                        .contentShape(RoundedRectangle(cornerRadius: 18))
+                        .onTapGesture {
+                            withAnimation(realIndex(virtualPage) == real ? .slideFwd : .spring(response: 0.3, dampingFraction: 0.85)) {
+                                if realIndex(virtualPage) == real {
+                                    isPPOpen = false
+                                } else {
+                                    virtualPage = vp
+                                    selectedIndex = real
                                 }
                             }
-                    )
-                    .offset(y: totalOffset)
-                    .rotation3DEffect(
-                        .degrees(Double(distCenter) * -35),
-                        axis: (x: 1, y: 0, z: 0),
-                        perspective: 0.5
-                    )
-                    .scaleEffect(1.0 - abs(distCenter) * 0.15)
-                    .opacity(1.0 - abs(distCenter) * 0.4)
-                    .zIndex(1.0 - abs(distCenter) * 0.5)
+                        }
+                )
+                .offset(y: totalOffset)
+                .rotation3DEffect(
+                    .degrees(Double(distCenter) * -35),
+                    axis: (x: 1, y: 0, z: 0),
+                    perspective: 0.5
+                )
+                .scaleEffect(1.0 - abs(distCenter) * 0.15)
+                .opacity(1.0 - abs(distCenter) * 0.4)
+                .zIndex(1.0 - abs(distCenter) * 0.5)
             }
         }
-        .frame(width: panelSize.width, height: panelSize.height)
         .contentShape(Rectangle())
         .gesture(
             DragGesture()
@@ -177,8 +325,17 @@ private struct RightWheelSelector: View {
                     }
                 }
         )
-        .onAppear {
-            virtualPage = selectedIndex
+    }
+
+    // MARK: - Helpers
+
+    private func selectPage(_ index: Int) {
+        searchText = ""
+        searchFocused = false
+        withAnimation(.slideFwd) {
+            virtualPage = index
+            selectedIndex = index
+            isPPOpen = false
         }
     }
 }
