@@ -957,7 +957,7 @@
       async function loadPdf() {
         try {
           const pdfjsLib = await importPdfJs();
-          const src = '/api/docs/open/' + encodeURIComponent(file);
+          const src = '/api/pdfs/' + encodeURIComponent(file);
           const loadingTask = pdfjsLib.getDocument({ url: src, withCredentials: false });
           pdfDoc = await loadingTask.promise;
           currentPage = 1;

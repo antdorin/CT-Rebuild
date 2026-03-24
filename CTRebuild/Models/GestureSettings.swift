@@ -171,6 +171,14 @@ final class GestureSettings: ObservableObject {
     // ── Per-trigger action storage ─────────────────────────────────────────
     @Published private var actions: [String: String] = [:]
 
+    // ── Panel picker swipe overrides ───────────────────────────────────────
+    @Published var pickerSwipeLeft: GestureAction {
+        didSet { UserDefaults.standard.set(pickerSwipeLeft.rawValue, forKey: "gs_picker_swipe_left") }
+    }
+    @Published var pickerSwipeRight: GestureAction {
+        didSet { UserDefaults.standard.set(pickerSwipeRight.rawValue, forKey: "gs_picker_swipe_right") }
+    }
+
     // ── Threshold calibration ──────────────────────────────────────────────
     @Published var swipeThreshold: Double {
         didSet { UserDefaults.standard.set(swipeThreshold, forKey: "gs_thresh_swipe") }
@@ -191,6 +199,8 @@ final class GestureSettings: ObservableObject {
         lpSwipeThreshold = ud.object(forKey: "gs_thresh_lp")         .flatMap { $0 as? Double } ?? 10
         longPressDuration = ud.object(forKey: "gs_thresh_lpDuration").flatMap { $0 as? Double } ?? 0.1
         edgeZoneWidth    = ud.object(forKey: "gs_thresh_edge")       .flatMap { $0 as? Double } ?? 44
+        pickerSwipeLeft  = GestureAction(rawValue: ud.string(forKey: "gs_picker_swipe_left")  ?? "") ?? .none
+        pickerSwipeRight = GestureAction(rawValue: ud.string(forKey: "gs_picker_swipe_right") ?? "") ?? .none
 
         if let saved = ud.dictionary(forKey: "gs_actions") as? [String: String] {
             actions = saved
@@ -219,9 +229,13 @@ final class GestureSettings: ObservableObject {
         lpSwipeThreshold  = 10
         longPressDuration = 0.1
         edgeZoneWidth     = 44
+        pickerSwipeLeft   = .none
+        pickerSwipeRight  = .none
         UserDefaults.standard.removeObject(forKey: "gs_thresh_swipe")
         UserDefaults.standard.removeObject(forKey: "gs_thresh_lp")
         UserDefaults.standard.removeObject(forKey: "gs_thresh_lpDuration")
         UserDefaults.standard.removeObject(forKey: "gs_thresh_edge")
+        UserDefaults.standard.removeObject(forKey: "gs_picker_swipe_left")
+        UserDefaults.standard.removeObject(forKey: "gs_picker_swipe_right")
     }
 }

@@ -10,4 +10,8 @@
     <RootNamespace>CTHub</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Content Include="wwwroot\**" CopyToOutputDirectory="Always" />
+  </ItemGroup>
+
 </Project>

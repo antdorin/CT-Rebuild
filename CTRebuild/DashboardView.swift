@@ -178,10 +178,18 @@ struct DashboardView: View {
         let adx = abs(dx)
         let ady = abs(dy)
 
-        // Plain swipe with a panel open: only handle the close direction.
+        // Plain swipe with a panel open: check panel picker overrides, then close direction.
         // Close threshold is fixed at 50pt — not configurable to avoid lockout.
         if !allowSwitch, activePanel != .none {
             let t: CGFloat = 50
+            // Panel picker swipe overrides (configurable in Gesture Settings)
+            if adx > ady && adx > t {
+                let pickerAction = dx > 0 ? gestureSettings.pickerSwipeRight : gestureSettings.pickerSwipeLeft
+                if pickerAction != .none {
+                    executeAction(pickerAction)
+                    return
+                }
+            }
             switch activePanel {
             case .left   where dx < -t && adx > ady: activePanel = .none
             case .right  where dx >  t && adx > ady: activePanel = .none

@@ -222,7 +222,7 @@ struct PdfBrowserView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
 
             if let group = openedGroup, let doc = mergedDoc {
                 PdfDetailView(
@@ -482,7 +482,7 @@ private struct PdfDetailView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
             VStack(spacing: 0) {
 
                 // ── Title bar ─────────────────────────────────────────────

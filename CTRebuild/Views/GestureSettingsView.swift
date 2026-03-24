@@ -9,6 +9,7 @@ struct GestureSettingsView: View {
     @ObservedObject private var settings = GestureSettings.shared
     @State private var editingTrigger: GestureTrigger? = nil
     @State private var showResetConfirm = false
+    @State private var editingPickerSwipe: PickerSwipeDir? = nil
 
     // Groups in the order we want to show them
     private let groupOrder = [
@@ -42,7 +43,7 @@ struct GestureSettingsView: View {
                     VStack(spacing: 2) {
                         calibrationSection
                             .padding(.top, 8)
-
+                        panelPickerSection
                         // ── Gesture list ──────────────────────────────────
                         ForEach(triggersByGroup, id: \.0) { (group, triggers) in
                             gestureGroup(title: group, triggers: triggers)
@@ -58,6 +59,18 @@ struct GestureSettingsView: View {
             ActionPickerView(trigger: trigger, settings: settings)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $editingPickerSwipe) { dir in
+            PickerSwipeActionView(
+                title: dir.rawValue,
+                systemImage: dir.systemImage,
+                action: Binding(
+                    get: { dir == .left ? settings.pickerSwipeLeft : settings.pickerSwipeRight },
+                    set: { if dir == .left { settings.pickerSwipeLeft = $0 } else { settings.pickerSwipeRight = $0 } }
+                )
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .confirmationDialog("Reset all gesture assignments to defaults?",
                             isPresented: $showResetConfirm,
@@ -146,6 +159,61 @@ struct GestureSettingsView: View {
             .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
             .padding(.bottom, 14)
         }
+    }
+
+    // MARK: - Panel Picker Section
+
+    private var panelPickerSection: some View {
+        VStack(spacing: 2) {
+            sectionHeader("PANEL PICKER MODE")
+
+            VStack(spacing: 0) {
+                pickerSwipeRow(
+                    label: "Swipe Right",
+                    systemImage: "arrow.right",
+                    action: settings.pickerSwipeRight,
+                    onTap: { editingPickerSwipe = .right }
+                )
+                Divider().opacity(0.1).padding(.leading, 46)
+                pickerSwipeRow(
+                    label: "Swipe Left",
+                    systemImage: "arrow.left",
+                    action: settings.pickerSwipeLeft,
+                    onTap: { editingPickerSwipe = .left }
+                )
+            }
+            .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
+            .padding(.bottom, 14)
+        }
+    }
+
+    private func pickerSwipeRow(label: String, systemImage: String, action: GestureAction, onTap: @escaping () -> Void) -> some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.7))
+                    .frame(width: 28)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.88))
+                    Text(action.rawValue)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(action == .none ? .white.opacity(0.2) : .blue.opacity(0.9))
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.18))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Gesture Group
@@ -247,6 +315,111 @@ struct GestureSettingsView: View {
                 .foregroundColor(.white.opacity(0.35))
             Slider(value: value, in: range)
                 .tint(.blue.opacity(0.7))
+        }
+    }
+}
+
+// MARK: - Panel Picker Swipe Direction
+
+private enum PickerSwipeDir: String, Identifiable {
+    case left  = "Swipe Left (Panel Picker)"
+    case right = "Swipe Right (Panel Picker)"
+    var id: String { rawValue }
+    var systemImage: String { self == .left ? "arrow.left" : "arrow.right" }
+}
+
+// MARK: - Picker Swipe Action View
+
+private struct PickerSwipeActionView: View {
+    let title: String
+    let systemImage: String
+    @Binding var action: GestureAction
+    @Environment(\.dismiss) private var dismiss
+
+    private let groupOrder = [
+        "Disabled", "Open Panel", "Toggle Panel",
+        "Switch Panel", "Close", "Right Panel Pages", "Utility"
+    ]
+
+    private var actionsByGroup: [(String, [GestureAction])] {
+        groupOrder.compactMap { group in
+            let actions = GestureAction.allCases.filter { $0.group == group }
+            return actions.isEmpty ? nil : (group, actions)
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            Color(white: 0.10).ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                HStack(spacing: 10) {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 16))
+                        .foregroundColor(.white.opacity(0.7))
+                    Text(title)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.9))
+                    Spacer()
+                    Button("Done") { dismiss() }
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.blue.opacity(0.9))
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .padding(.bottom, 10)
+
+                Divider().opacity(0.15)
+
+                ScrollView {
+                    VStack(spacing: 12) {
+                        ForEach(actionsByGroup, id: \.0) { (group, actions) in
+                            VStack(spacing: 0) {
+                                HStack {
+                                    Text(group.uppercased())
+                                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                        .foregroundColor(.white.opacity(0.3))
+                                        .tracking(2)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.top, 14)
+                                .padding(.bottom, 6)
+
+                                VStack(spacing: 0) {
+                                    ForEach(Array(actions.enumerated()), id: \.element.id) { idx, a in
+                                        if idx > 0 { Divider().opacity(0.1).padding(.leading, 20) }
+                                        Button {
+                                            action = a
+                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                            dismiss()
+                                        } label: {
+                                            HStack {
+                                                Text(a.rawValue)
+                                                    .font(.system(size: 13, weight: action == a ? .semibold : .regular))
+                                                    .foregroundColor(action == a ? .blue : .white.opacity(0.75))
+                                                Spacer()
+                                                if action == a {
+                                                    Image(systemName: "checkmark")
+                                                        .font(.system(size: 12, weight: .semibold))
+                                                        .foregroundColor(.blue)
+                                                }
+                                            }
+                                            .padding(.horizontal, 20)
+                                            .padding(.vertical, 12)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                                .background(Color.white.opacity(0.05),
+                                            in: RoundedRectangle(cornerRadius: 12))
+                                .padding(.horizontal, 16)
+                            }
+                        }
+                    }
+                    .padding(.bottom, 32)
+                }
+            }
         }
     }
 }

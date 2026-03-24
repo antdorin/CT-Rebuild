@@ -320,6 +320,42 @@ public sealed class HubServer
                     break;
                 }
 
+                // ── Static files (wwwroot) ────────────────────────────────────
+                case ("GET", _) when !path.StartsWith("/api/"):
+                {
+                    var wwwroot  = Path.Combine(AppContext.BaseDirectory, "wwwroot");
+                    var relative = path == "" || path == "/" ? "index.html" : path.TrimStart('/');
+                    var fullPath = Path.GetFullPath(Path.Combine(wwwroot, relative));
+
+                    // Block path traversal
+                    if (!fullPath.StartsWith(Path.GetFullPath(wwwroot) + Path.DirectorySeparatorChar)
+                        && !fullPath.Equals(Path.GetFullPath(wwwroot), StringComparison.OrdinalIgnoreCase))
+                    {
+                        res.StatusCode = 403; break;
+                    }
+
+                    if (!File.Exists(fullPath)) { res.StatusCode = 404; break; }
+
+                    var ext = Path.GetExtension(fullPath).ToLowerInvariant();
+                    res.ContentType = ext switch
+                    {
+                        ".html" => "text/html; charset=utf-8",
+                        ".js"   => "application/javascript; charset=utf-8",
+                        ".mjs"  => "application/javascript; charset=utf-8",
+                        ".css"  => "text/css; charset=utf-8",
+                        ".json" => "application/json; charset=utf-8",
+                        ".png"  => "image/png",
+                        ".jpg"  => "image/jpeg",
+                        ".svg"  => "image/svg+xml",
+                        _       => "application/octet-stream"
+                    };
+
+                    var bytes = await File.ReadAllBytesAsync(fullPath);
+                    res.ContentLength64 = bytes.Length;
+                    await res.OutputStream.WriteAsync(bytes);
+                    break;
+                }
+
                 default:
                     res.StatusCode = 404; break;
             }
