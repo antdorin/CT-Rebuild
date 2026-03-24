@@ -1,5 +1,6 @@
 import SwiftUI
 import PDFKit
+import Vision
 
 // MARK: - SO Number Helpers
 
@@ -459,6 +460,7 @@ private struct PdfDetailView: View {
     @State private var soTitle: String = ""
     @State private var singlePageMode = false
     @State private var scaleFactor: CGFloat = 1.0
+    @State private var showOcrMode = false
 
     init(document: PDFDocument, title: String, safeArea: EdgeInsets,
          currentPage: Binding<Int>, onBack: @escaping () -> Void) {
@@ -513,7 +515,23 @@ private struct PdfDetailView: View {
                 Divider().opacity(0.12)
 
                 // ── Content ───────────────────────────────────────────────
-                if showTextMode {
+                if showOcrMode {
+                    GeometryReader { geo in
+                        ScrollView {
+                            LazyVStack(spacing: 12) {
+                                ForEach(0..<displayDoc.pageCount, id: \.self) { i in
+                                    if let page = displayDoc.page(at: i) {
+                                        OcrPageView(page: page,
+                                                    availableWidth: geo.size.width - 16,
+                                                    scaleFactor: scaleFactor)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 12)
+                        }
+                    }
+                } else if showTextMode {
                     GeometryReader { geo in
                         ScrollView {
                             LazyVStack(spacing: 12) {
@@ -558,10 +576,19 @@ private struct PdfDetailView: View {
                     Divider().frame(height: 20).opacity(0.2)
 
                     // PDF segment
-                    barSegment(label: "PDF", active: !showTextMode) { showTextMode = false }
+                    barSegment(label: "PDF", active: !showTextMode && !showOcrMode) {
+                        showTextMode = false; showOcrMode = false
+                    }
 
                     // TEXT segment
-                    barSegment(label: "TEXT", active: showTextMode) { showTextMode = true }
+                    barSegment(label: "TEXT", active: showTextMode) {
+                        showTextMode = true; showOcrMode = false
+                    }
+
+                    // SCAN segment
+                    barSegment(label: "SCAN", active: showOcrMode) {
+                        showOcrMode = true; showTextMode = false
+                    }
 
                     Divider().frame(height: 20).opacity(0.2)
 
@@ -574,8 +601,8 @@ private struct PdfDetailView: View {
                     }
                     .buttonStyle(.plain)
 
-                    // Text size controls (TEXT mode only)
-                    if showTextMode {
+                    // Text size controls (TEXT / SCAN mode)
+                    if showTextMode || showOcrMode {
                         Divider().frame(height: 20).opacity(0.2)
 
                         Button { scaleFactor = max(0.5, scaleFactor - 0.25) } label: {
@@ -805,6 +832,107 @@ private struct PdfSortSheet: View {
             }
         }
         matchingPages = pages
+    }
+}
+
+// MARK: - OCR Page View
+
+private struct OcrPageView: View {
+    let page: PDFPage
+    let availableWidth: CGFloat
+    let scaleFactor: CGFloat
+
+    @State private var pageImage: UIImage?
+    @State private var textBlocks: [TextBlock] = []
+    @State private var isProcessing = true
+
+    private struct TextBlock: Identifiable, Sendable {
+        let id = UUID()
+        let text: String
+        let box: CGRect
+    }
+
+    var body: some View {
+        ZStack {
+            if let img = pageImage {
+                let aspect = img.size.height / img.size.width
+                let h = availableWidth * aspect
+
+                ZStack {
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: availableWidth)
+                        .opacity(0.35)
+
+                    ForEach(textBlocks) { block in
+                        let bx = block.box.origin.x * availableWidth
+                        let by = (1 - block.box.origin.y - block.box.height) * h
+                        let bw = block.box.width * availableWidth
+                        let bh = block.box.height * h
+
+                        Text(block.text)
+                            .font(.system(size: max(4, bh * 0.72 * scaleFactor),
+                                          design: .monospaced))
+                            .foregroundColor(.white.opacity(0.92))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.3)
+                            .frame(width: bw, height: bh, alignment: .leading)
+                            .background(Color.black.opacity(0.45))
+                            .position(x: bx + bw / 2, y: by + bh / 2)
+                    }
+                    .frame(width: availableWidth, height: h)
+
+                    if isProcessing {
+                        ProgressView().tint(.orange)
+                    }
+                }
+                .frame(width: availableWidth, height: h)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+            } else {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.white.opacity(0.04))
+                    .frame(height: availableWidth * 1.414)
+                    .overlay { ProgressView().tint(.orange) }
+            }
+        }
+        .task { await processPage() }
+    }
+
+    private func processPage() async {
+        let bounds = page.bounds(for: .mediaBox)
+        let renderScale: CGFloat = 2.0
+        let size = CGSize(width: bounds.width * renderScale,
+                          height: bounds.height * renderScale)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let img = renderer.image { ctx in
+            UIColor.white.setFill()
+            ctx.fill(CGRect(origin: .zero, size: size))
+            ctx.cgContext.translateBy(x: 0, y: size.height)
+            ctx.cgContext.scaleBy(x: renderScale, y: -renderScale)
+            page.draw(with: .mediaBox, to: ctx.cgContext)
+        }
+        pageImage = img
+
+        guard let cgImage = img.cgImage else { isProcessing = false; return }
+
+        let blocks = await withCheckedContinuation { (cont: CheckedContinuation<[TextBlock], Never>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let request = VNRecognizeTextRequest()
+                request.recognitionLevel = .accurate
+                request.usesLanguageCorrection = true
+                let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+                try? handler.perform([request])
+                let results: [TextBlock] = (request.results ?? []).compactMap { obs in
+                    guard let text = obs.topCandidates(1).first?.string else { return nil }
+                    return TextBlock(text: text, box: obs.boundingBox)
+                }
+                cont.resume(returning: results)
+            }
+        }
+
+        textBlocks = blocks
+        isProcessing = false
     }
 }
 
