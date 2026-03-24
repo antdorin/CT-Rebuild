@@ -102,7 +102,7 @@ enum GestureTrigger: String, CaseIterable, Identifiable {
         case .swipeLeft,  .edgeSwipeLeft,  .longPressSwipeLeft:   return .openRight
         case .swipeUp,    .edgeSwipeUp,    .longPressSwipeUp:     return .openBottom
         case .swipeDown,  .edgeSwipeDown,  .longPressSwipeDown:   return .openTop
-        case .longPress:                                           return .haptic
+        case .longPress:                                           return .openPagePicker
         default:                                                   return .none
         }
     }
