@@ -921,47 +921,128 @@ private func extractLineAfterHeader(_ text: String, headerPattern: String) -> [S
 
 private func parseTicketFields(from text: String) -> TicketFields {
     var fields = TicketFields()
+    let lines = text.components(separatedBy: .newlines)
+        .map { $0.trimmingCharacters(in: .whitespaces) }
 
+    // ── SO Number & Date ──
     fields.soNumber = firstMatch(text, #"SO-[A-Za-z0-9]+-[A-Za-z0-9]+"#)
     fields.date = firstMatch(text, #"\b(?:0?[1-9]|1[0-2])/(?:0?[1-9]|[12][0-9]|3[01])/\d{4}\b"#)
 
-    let shipToBlock = firstCapture(text, #"(?is)Ship\s*To\s*:?[\s\n]*(.*?)[\s\n]*Notes\s*:?"#)
-    if !shipToBlock.isEmpty {
-        fields.shipToHtml = shipToBlock
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .map(htmlEscaped)
-            .joined(separator: "<br />")
-    }
-    fields.notes = firstCapture(text, #"(?is)Notes\s*:?[\s\n]*(.*?)(?:\n\s*Company\s+Name|\n\s*Bin\s+Location|$)"#)
-
-    let companyLines = extractLineAfterHeader(
-        text,
-        headerPattern: #"^\s*Company\s+Name\s+Terms\s+Shipping\s+Method\s+3rd\s+Party\s+Account\s*#?\s*$"#
-    )
-    if let row = companyLines.first {
-        let cols = splitColumns(row)
-        if cols.count > 0 { fields.companyName = cols[0].trimmingCharacters(in: .whitespaces) }
-        if cols.count > 1 { fields.terms = cols[1].trimmingCharacters(in: .whitespaces) }
-        if cols.count > 2 { fields.shippingMethod = cols[2].trimmingCharacters(in: .whitespaces) }
-        if cols.count > 3 { fields.thirdPartyAccount = cols[3].trimmingCharacters(in: .whitespaces) }
+    // ── Locate section headers by line index ──
+    var shipToIdx: Int?
+    var companyIdx: Int?
+    var binIdx: Int?
+    for (i, line) in lines.enumerated() {
+        let lo = line.lowercased()
+        if shipToIdx == nil && lo.contains("ship to") { shipToIdx = i }
+        if companyIdx == nil && lo.contains("company name") && lo.contains("terms") { companyIdx = i }
+        if binIdx == nil && lo.contains("bin location") && lo.contains("item") { binIdx = i }
     }
 
-    let itemLines = extractLineAfterHeader(
-        text,
-        headerPattern: #"^\s*Bin\s+Location\s+Item\s+Quantity\s+Units\s+Committed\s*$"#
-    )
-    if let row = itemLines.first {
-        let cols = splitColumns(row)
-        if cols.count > 0 { fields.binLocation = cols[0].trimmingCharacters(in: .whitespaces) }
-        if cols.count > 1 { fields.itemCode = cols[1].trimmingCharacters(in: .whitespaces) }
-        if cols.count > 2 { fields.quantity = cols[2].trimmingCharacters(in: .whitespaces) }
-        if cols.count > 3 { fields.units = cols[3].trimmingCharacters(in: .whitespaces) }
-        if cols.count > 4 { fields.committed = cols[4].trimmingCharacters(in: .whitespaces) }
+    // ── Ship To / Notes ──
+    // Collect content between the Ship-To/Notes header row and the Company-Name header.
+    // PDFKit often outputs "Ship To" then "Notes" on the next line, followed by the
+    // actual address lines — so we skip past any bare "Notes" label rather than
+    // treating it as a section divider.
+    if let sti = shipToIdx {
+        let endIdx = companyIdx ?? binIdx ?? lines.count
+        var addressLines: [String] = []
+        var noteLines: [String] = []
+        var pastAddress = false
+        var j = sti + 1
+        // Skip standalone "Notes" header that PDFKit puts right after "Ship To"
+        while j < endIdx {
+            let lo = lines[j].lowercased()
+            if lo == "notes" || lo == "notes:" { j += 1; continue }
+            break
+        }
+        while j < endIdx {
+            let l = lines[j]; j += 1
+            if l.isEmpty { continue }
+            if !pastAddress {
+                addressLines.append(l)
+                // Last address line typically contains state abbreviation + zip
+                if l.range(of: #"\b[A-Z]{2}\s+\d{5}"#, options: .regularExpression) != nil {
+                    pastAddress = true
+                }
+            } else {
+                noteLines.append(l)
+            }
+        }
+        fields.shipToHtml = addressLines.map(htmlEscaped).joined(separator: "<br />")
+        fields.notes = noteLines.joined(separator: " ")
     }
-    if itemLines.count > 1 {
-        fields.itemDescription = itemLines[1]
+
+    // ── Company row – semantic splitting ──
+    // PDFKit collapses columns into one line like "Daniel McBride PayPal USPS Ground Advantage".
+    // We identify known terms & carrier keywords to split semantically.
+    if let chi = companyIdx, chi + 1 < lines.count {
+        let row = lines[chi + 1]
+
+        // Find Terms keyword (PayPal, Credit Card, OCC, Net 30, etc.)
+        let termsRe = #"\b(PayPal|Credit\s*Card|OCC|Net\s*\d+|COD|Prepaid|Check|Wire|C\.?O\.?D\.?)\b"#
+        var termsStart: String.Index?
+        var termsEnd: String.Index?
+        if let re = try? NSRegularExpression(pattern: termsRe, options: .caseInsensitive),
+           let m = re.firstMatch(in: row, range: NSRange(row.startIndex..., in: row)),
+           let r = Range(m.range, in: row) {
+            fields.terms = String(row[r]).trimmingCharacters(in: .whitespaces)
+            termsStart = r.lowerBound
+            termsEnd = r.upperBound
+        }
+
+        // Find Carrier keyword (USPS, UPS, FedEx, DHL, etc.)
+        let carrierRe = #"\b(USPS|UPS|FedEx|DHL|Freight|LTL)\b"#
+        var carrierStart: String.Index?
+        if let re = try? NSRegularExpression(pattern: carrierRe, options: .caseInsensitive),
+           let m = re.firstMatch(in: row, range: NSRange(row.startIndex..., in: row)),
+           let r = Range(m.range, in: row) {
+            carrierStart = r.lowerBound
+        }
+
+        // Company name: everything before the first pattern match
+        let firstPatternStart = [termsStart, carrierStart].compactMap { $0 }.min() ?? row.endIndex
+        fields.companyName = String(row[row.startIndex..<firstPatternStart]).trimmingCharacters(in: .whitespaces)
+
+        // Shipping method: from carrier keyword to end (minus possible trailing account #)
+        if let cs = carrierStart {
+            let tail = String(row[cs...]).trimmingCharacters(in: .whitespaces)
+            let acctRe = #"\s+([A-Z0-9]{6,})\s*$"#
+            if let re = try? NSRegularExpression(pattern: acctRe),
+               let m = re.firstMatch(in: tail, range: NSRange(tail.startIndex..., in: tail)),
+               let aRange = Range(m.range(at: 1), in: tail),
+               let fRange = Range(m.range, in: tail) {
+                fields.thirdPartyAccount = String(tail[aRange])
+                fields.shippingMethod = String(tail[tail.startIndex..<fRange.lowerBound]).trimmingCharacters(in: .whitespaces)
+            } else {
+                fields.shippingMethod = tail
+            }
+        } else if let te = termsEnd {
+            // No carrier found — everything after terms is shipping method
+            let remainder = String(row[te...]).trimmingCharacters(in: .whitespaces)
+            if !remainder.isEmpty { fields.shippingMethod = remainder }
+        }
+    }
+
+    // ── Item row – semantic splitting ──
+    // Line like "1-A-1 CT-FORK-LFT 2 PR 2"
+    if let bhi = binIdx, bhi + 1 < lines.count {
+        let row = lines[bhi + 1]
+
+        // Bin location: digit-letter-digit pattern
+        fields.binLocation = firstCapture(row, #"\b(\d+-[A-Za-z]-\d+[A-Za-z]?)\b"#)
+
+        // Item code: CT-XXX-XXX (may have extra segments)
+        fields.itemCode = firstCapture(row, #"\b(CT-[A-Za-z0-9]+-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)\b"#)
+
+        // Trailing: quantity  units  committed
+        let qtyRe = #"\b(\d+)\s+(PR|EA|BX|CS|PK|FT|LB|PC|DZ|CT|RL|ST|SET|GAL|QT|OZ)\s+(\d+)\s*$"#
+        if let re = try? NSRegularExpression(pattern: qtyRe, options: .caseInsensitive),
+           let m = re.firstMatch(in: row, range: NSRange(row.startIndex..., in: row)) {
+            if let r1 = Range(m.range(at: 1), in: row) { fields.quantity = String(row[r1]) }
+            if let r2 = Range(m.range(at: 2), in: row) { fields.units = String(row[r2]) }
+            if let r3 = Range(m.range(at: 3), in: row) { fields.committed = String(row[r3]) }
+        }
     }
 
     return fields
@@ -1002,7 +1083,6 @@ private func ticketSectionHTML(fields: TicketFields, page: Int) -> String {
           <td>\(htmlEscaped(fields.units))</td>
           <td>\(htmlEscaped(fields.committed))</td>
         </tr>
-        <tr class=\"desc-row\"><td></td><td colspan=\"4\">\(htmlEscaped(fields.itemDescription))</td></tr>
       </table>
 
       <div class=\"page-label\">Page \(page)</div>
@@ -1045,27 +1125,27 @@ private func buildReflowHTML(from doc: PDFDocument, fontPercent: Int) -> String 
           padding: 20px 18px 18px;
         }
         .title {
-          font-size: calc(28px * var(--fontScale) / 100);
+          font-size: calc(20px * var(--fontScale) / 100);
           font-weight: 400;
           line-height: 1.15;
           color: #111;
         }
         .so {
-          font-size: calc(22px * var(--fontScale) / 100);
+          font-size: calc(16px * var(--fontScale) / 100);
           font-weight: 700;
           margin-top: 3px;
           color: #111;
         }
         .date {
-          font-size: calc(14px * var(--fontScale) / 100);
+          font-size: calc(12px * var(--fontScale) / 100);
           color: #444;
           margin-top: 2px;
-          margin-bottom: 22px;
+          margin-bottom: 18px;
         }
         .address-head {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          font-size: calc(14px * var(--fontScale) / 100);
+          font-size: calc(12px * var(--fontScale) / 100);
           font-weight: 700;
           margin-bottom: 5px;
         }
@@ -1073,11 +1153,11 @@ private func buildReflowHTML(from doc: PDFDocument, fontPercent: Int) -> String 
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 12px;
-          margin-bottom: 20px;
-          min-height: 72px;
+          margin-bottom: 16px;
+          min-height: 52px;
         }
         .ship-block, .notes {
-          font-size: calc(14px * var(--fontScale) / 100);
+          font-size: calc(12px * var(--fontScale) / 100);
           line-height: 1.45;
           color: #222;
           white-space: pre-wrap;
@@ -1087,20 +1167,19 @@ private func buildReflowHTML(from doc: PDFDocument, fontPercent: Int) -> String 
           width: 100%;
           border-collapse: collapse;
           margin-bottom: 14px;
-          table-layout: fixed;
         }
         .band-table th {
           background: #d0d0d0;
-          font-size: calc(12px * var(--fontScale) / 100);
+          font-size: calc(10px * var(--fontScale) / 100);
           font-weight: 700;
-          padding: 7px 8px;
+          padding: 6px 6px;
           text-align: left;
           vertical-align: bottom;
           line-height: 1.25;
         }
         .band-table td {
-          font-size: calc(14px * var(--fontScale) / 100);
-          padding: 8px 8px;
+          font-size: calc(12px * var(--fontScale) / 100);
+          padding: 6px 6px;
           vertical-align: top;
           line-height: 1.4;
           word-break: break-word;
@@ -1118,15 +1197,9 @@ private func buildReflowHTML(from doc: PDFDocument, fontPercent: Int) -> String 
         .item-band td:nth-child(4),
         .item-band td:nth-child(5) { text-align: right; }
         .item-code { font-weight: 700; color: #111; }
-        .desc-row td {
-          font-size: calc(13px * var(--fontScale) / 100);
-          color: #444;
-          padding: 3px 8px 8px;
-          line-height: 1.35;
-        }
         .page-label {
           text-align: right;
-          font-size: calc(12px * var(--fontScale) / 100);
+          font-size: calc(10px * var(--fontScale) / 100);
           color: #888;
           margin-top: 6px;
         }
@@ -1168,9 +1241,15 @@ private struct ReflowWebView: UIViewRepresentable {
                 let fontChanged = c.fontPercent != fontPercent
                 guard docChanged || fontChanged else { return }
 
-                c.sourceDoc = document
                 c.fontPercent = fontPercent
-                uiView.loadHTMLString(buildReflowHTML(from: document, fontPercent: fontPercent), baseURL: nil)
+
+                if docChanged {
+                        c.sourceDoc = document
+                        uiView.loadHTMLString(buildReflowHTML(from: document, fontPercent: fontPercent), baseURL: nil)
+                } else {
+                        // Update CSS variable via JS — no full reload, keeps scroll position
+                        uiView.evaluateJavaScript("document.documentElement.style.setProperty('--fontScale','\(fontPercent)')")
+                }
         }
 
         final class Coordinator {
