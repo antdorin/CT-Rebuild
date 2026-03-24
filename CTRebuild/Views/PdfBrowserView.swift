@@ -229,6 +229,7 @@ struct PdfBrowserView: View {
                     document: doc,
                     title: group.soLabel.isEmpty ? group.dateLabel : group.soLabel,
                     safeArea: safeArea,
+                    filenames: group.filenames,
                     currentPage: Binding(
                         get: { lastPages[group.id] ?? 0 },
                         set: { lastPages[group.id] = $0 }
@@ -445,12 +446,17 @@ struct PdfBrowserView: View {
     }
 }
 
+// MARK: - View Mode Enum
+
+private enum ViewMode { case pdf, reflow, reader }
+
 // MARK: - PDF Detail View
 
 private struct PdfDetailView: View {
     let document: PDFDocument
     let title: String
     let safeArea: EdgeInsets
+    let filenames: [String]
     @Binding var currentPage: Int
     let onBack: () -> Void
 
@@ -459,14 +465,16 @@ private struct PdfDetailView: View {
     @State private var soTitle: String = ""
     @State private var singlePageMode = false
     @State private var autoCropEnabled = true
-    @State private var showReflowMode = false
+    @State private var viewMode: ViewMode = .pdf
     @State private var reflowFontPercent = 100
 
     init(document: PDFDocument, title: String, safeArea: EdgeInsets,
+         filenames: [String] = [],
          currentPage: Binding<Int>, onBack: @escaping () -> Void) {
         self.document    = document
         self.title       = title
         self.safeArea    = safeArea
+        self.filenames   = filenames
         self._currentPage = currentPage
         self.onBack      = onBack
         self._displayDoc = State(initialValue: document)
@@ -490,9 +498,12 @@ private struct PdfDetailView: View {
                 Divider().opacity(0.12)
 
                 // ── Content ───────────────────────────────────────────────
-                if showReflowMode {
+                switch viewMode {
+                case .reflow:
                     ReflowWebView(document: displayDoc, fontPercent: reflowFontPercent)
-                } else {
+                case .reader:
+                    ReaderWebView(filenames: filenames)
+                case .pdf:
                     PdfKitView(document: displayDoc, currentPageIdx: $currentPage,
                                singlePage: singlePageMode, autoCrop: autoCropEnabled)
                 }
@@ -517,17 +528,22 @@ private struct PdfDetailView: View {
 
                     Divider().frame(height: 20).opacity(0.2)
 
-                    modeSegment(label: "PDF", active: !showReflowMode) {
-                        showReflowMode = false
+                    modeSegment(label: "PDF", active: viewMode == .pdf) {
+                        viewMode = .pdf
                     }
 
-                    modeSegment(label: "REFLOW", active: showReflowMode) {
-                        showReflowMode = true
+                    modeSegment(label: "REFLOW", active: viewMode == .reflow) {
+                        viewMode = .reflow
+                    }
+
+                    modeSegment(label: "READER", active: viewMode == .reader) {
+                        viewMode = .reader
                     }
 
                     Divider().frame(height: 20).opacity(0.2)
 
-                    if showReflowMode {
+                    switch viewMode {
+                    case .reflow:
                         Button { reflowFontPercent = max(70, reflowFontPercent - 10) } label: {
                             Image(systemName: "minus.circle")
                                 .font(.system(size: 13))
@@ -551,7 +567,7 @@ private struct PdfDetailView: View {
                                 .padding(.horizontal, 4).padding(.vertical, 10)
                         }
                         .buttonStyle(.plain)
-                    } else {
+                    case .pdf:
                         // Auto-crop toggle
                         Button { autoCropEnabled.toggle() } label: {
                             Image(systemName: autoCropEnabled ? "crop" : "arrow.up.left.and.arrow.down.right")
@@ -569,6 +585,8 @@ private struct PdfDetailView: View {
                                 .padding(.horizontal, 8).padding(.vertical, 10)
                         }
                         .buttonStyle(.plain)
+                    case .reader:
+                        EmptyView()
                     }
 
                     Spacer()
@@ -1256,6 +1274,51 @@ private struct ReflowWebView: UIViewRepresentable {
                 weak var sourceDoc: PDFDocument?
                 var fontPercent: Int = 100
         }
+}
+
+// MARK: - Reader Web View (loads reader.html from CT-Hub server)
+
+private struct ReaderWebView: UIViewRepresentable {
+    let filenames: [String]
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        config.allowsInlineMediaPlayback = true
+        let view = WKWebView(frame: .zero, configuration: config)
+        view.isOpaque = false
+        view.backgroundColor = .black
+        view.scrollView.backgroundColor = .black
+        view.scrollView.contentInsetAdjustmentBehavior = .never
+
+        context.coordinator.loadedFilenames = filenames
+        loadReader(into: view)
+        return view
+    }
+
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        guard context.coordinator.loadedFilenames != filenames else { return }
+        context.coordinator.loadedFilenames = filenames
+        loadReader(into: uiView)
+    }
+
+    private func loadReader(into webView: WKWebView) {
+        let base = HubClient.shared.activeBaseURL
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard !base.isEmpty, let first = filenames.first else { return }
+
+        let encoded = first.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? first
+        let urlString = "\(base)/reader.html?file=\(encoded)"
+        if let url = URL(string: urlString) {
+            webView.load(URLRequest(url: url))
+        }
+    }
+
+    final class Coordinator {
+        var loadedFilenames: [String] = []
+    }
 }
 
 // MARK: - PDFKit View
