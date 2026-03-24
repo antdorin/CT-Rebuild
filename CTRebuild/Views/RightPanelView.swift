@@ -38,13 +38,13 @@ struct RightPanelView: View {
             case GestureAction.openPagePicker.rawValue:
                 withAnimation(.slideBck) { isPPOpen.toggle() }
             case GestureAction.nextRightPage.rawValue:
-                let total = 8
+                let total = 7
                 withAnimation(.slideFwd) {
                     selectedIndex = (selectedIndex + 1) % total
                     isPPOpen = false
                 }
             case GestureAction.prevRightPage.rawValue:
-                let total = 8
+                let total = 7
                 withAnimation(.slideBck) {
                     selectedIndex = (selectedIndex - 1 + total) % total
                     isPPOpen = false
@@ -73,8 +73,6 @@ struct RightPageContent: View {
             PdfBrowserView(safeArea: safeArea)
         case 6:  // Page 7 — App Settings
             AppSettingsView(safeArea: safeArea)
-        case 7:  // Page 8 — Hub Settings
-            HubSettingsView(safeArea: safeArea)
         default: // Pages 2–6 — placeholders
             ZStack {
                 shades[index % shades.count].ignoresSafeArea()
@@ -98,7 +96,7 @@ private struct RightWheelSelector: View {
     let panelSize: CGSize
     let safeArea: EdgeInsets
 
-    private let itemCount = 8
+    private let itemCount = 7
     private let cardW: CGFloat = 320
     private let spacing: CGFloat = 580
 

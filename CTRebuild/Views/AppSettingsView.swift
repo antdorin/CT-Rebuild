@@ -7,6 +7,7 @@ struct AppSettingsView: View {
 
     @State private var showGestureSettings = false
     @State private var showHubSettings = false
+    @State private var showCameraSettings = false
 
     var body: some View {
         ZStack {
@@ -32,6 +33,16 @@ struct AppSettingsView: View {
                     insertion: .move(edge: .trailing),
                     removal:   .move(edge: .trailing)
                 ))
+            } else if showCameraSettings {
+                CameraSettingsView(safeArea: safeArea, onBack: {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        showCameraSettings = false
+                    }
+                })
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing),
+                    removal:   .move(edge: .trailing)
+                ))
             } else {
                 settingsList
                     .transition(.asymmetric(
@@ -42,6 +53,7 @@ struct AppSettingsView: View {
         }
         .animation(.easeInOut(duration: 0.22), value: showGestureSettings)
         .animation(.easeInOut(duration: 0.22), value: showHubSettings)
+        .animation(.easeInOut(duration: 0.22), value: showCameraSettings)
     }
 
     // MARK: - Settings List
@@ -72,6 +84,23 @@ struct AppSettingsView: View {
                     }
 
                     // ── Divider ───────────────────────────────────────────
+                    Divider()
+                        .background(Color.white.opacity(0.08))
+                        .padding(.vertical, 10)
+
+                    // ── Camera ────────────────────────────────────────────
+                    sectionHeader("CAMERA")
+
+                    settingsRow(
+                        icon: "camera",
+                        label: "Camera Settings",
+                        detail: "Focus, zoom, torch & detection"
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            showCameraSettings = true
+                        }
+                    }
+
                     Divider()
                         .background(Color.white.opacity(0.08))
                         .padding(.vertical, 10)
