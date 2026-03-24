@@ -1052,11 +1052,11 @@ private func buildReflowHTML(from doc: PDFDocument, fontPercent: Int) -> String 
           margin: 0;
           padding: 10px;
           background: #0f0f0f;
-          color: #111;
+          color: #000;
           font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;
         }
         .ticket {
-          background: #dcdcdc;
+          background: #f8f8f8;
           border-radius: 10px;
           margin: 0 0 10px 0;
           overflow: hidden;
@@ -1066,34 +1066,36 @@ private func buildReflowHTML(from doc: PDFDocument, fontPercent: Int) -> String 
                     min-height: 94vw;
                     max-width: 980px;
                     margin: 0 auto;
-                    padding: 16px 14px 12px;
+                    padding: 14px 12px 10px;
                     display: grid;
-                    gap: 6px;
+                    gap: 4px;
                 }
 
-                .title { font-size: calc(22px * var(--fontScale) / 100); font-weight: 500; line-height: 1.1; }
-                .so { margin-top: 2px; font-size: calc(16px * var(--fontScale) / 100); font-weight: 600; line-height: 1.12; }
-                .date { margin-top: -2px; font-size: calc(12px * var(--fontScale) / 100); color: #2b2b2b; }
+                .title { font-size: calc(20px * var(--fontScale) / 100); font-weight: 500; line-height: 1.15; }
+                .so { margin-top: 1px; font-size: calc(15px * var(--fontScale) / 100); font-weight: 700; line-height: 1.1; }
+                .date { margin-top: -1px; font-size: calc(11px * var(--fontScale) / 100); color: #111; }
 
                 .address-row {
                     display: grid;
                     grid-template-columns: 1fr 1fr;
-                    gap: 8px;
+                    gap: 6px;
                 }
                 .address-head {
-                    margin-top: 6px;
+                    margin-top: 8px;
                     display: grid;
                     grid-template-columns: 1fr 1fr;
-                    font-size: calc(11px * var(--fontScale) / 100);
+                    font-size: calc(10px * var(--fontScale) / 100);
                     font-weight: 700;
+                    color: #000;
                 }
                 .ship-block,
                 .notes {
-                    font-size: calc(11px * var(--fontScale) / 100);
-                    line-height: 1.15;
+                    font-size: calc(10px * var(--fontScale) / 100);
+                    line-height: 1.18;
                     white-space: pre-wrap;
                     word-break: break-word;
-                    min-height: 72px;
+                    min-height: 64px;
+                    color: #000;
                 }
 
                 .meta-table,
@@ -1103,20 +1105,25 @@ private func buildReflowHTML(from doc: PDFDocument, fontPercent: Int) -> String 
                     border-spacing: 0;
                     table-layout: fixed;
                     background: transparent;
+                    margin-top: 2px;
                 }
                 .meta-table th,
                 .meta-table td,
                 .item-table th,
                 .item-table td {
                     border: 0;
-                    padding: 2px 3px;
-                    font-size: calc(10px * var(--fontScale) / 100);
+                    padding: 3px 4px;
+                    font-size: calc(9px * var(--fontScale) / 100);
                     text-align: left;
                     vertical-align: top;
                     word-break: break-word;
+                    line-height: 1.2;
                 }
                 .meta-table th,
-                .item-table th { background: #cfcfcf; font-weight: 700; }
+                .item-table th { background: #c8c8c8; font-weight: 700; color: #000; }
+                .meta-table td,
+                .item-table td { background: #fff; }
+                .item-table td strong { color: #c7302a; font-weight: 600; }
 
                 .meta-table th:nth-child(1), .meta-table td:nth-child(1) { width: 28%; }
                 .meta-table th:nth-child(2), .meta-table td:nth-child(2) { width: 14%; }
@@ -1130,26 +1137,28 @@ private func buildReflowHTML(from doc: PDFDocument, fontPercent: Int) -> String 
                 .item-table th:nth-child(5), .item-table td:nth-child(5) { width: 16%; }
 
                 .item-desc {
-                    margin-top: -5px;
-                    padding: 0 3px;
-                    min-height: 18px;
-                    font-size: calc(10px * var(--fontScale) / 100);
+                    margin-top: -3px;
+                    padding: 3px 4px;
+                    min-height: 16px;
+                    font-size: calc(9px * var(--fontScale) / 100);
                     line-height: 1.2;
                     word-break: break-word;
+                    background: #fff;
+                    color: #c7302a;
                 }
 
                 .page-label {
                     justify-self: end;
-                    font-size: calc(9px * var(--fontScale) / 100);
-                    color: #595959;
-                    margin-top: 2px;
+                    font-size: calc(8px * var(--fontScale) / 100);
+                    color: #666;
+                    margin-top: 3px;
                 }
 
                 @media (max-width: 760px) {
                     .ticket-inner { min-height: 112vw; }
-                    .title { font-size: calc(18px * var(--fontScale) / 100); }
-                    .so { font-size: calc(14px * var(--fontScale) / 100); }
-                    .date { font-size: calc(11px * var(--fontScale) / 100); }
+                    .title { font-size: calc(17px * var(--fontScale) / 100); }
+                    .so { font-size: calc(13px * var(--fontScale) / 100); }
+                    .date { font-size: calc(10px * var(--fontScale) / 100); }
                 }
 
         .empty { color: #ddd; padding: 20px; }
