@@ -1,5 +1,6 @@
 import SwiftUI
 import PDFKit
+import WebKit
 
 // MARK: - SO Number Helpers
 
@@ -458,6 +459,8 @@ private struct PdfDetailView: View {
     @State private var soTitle: String = ""
     @State private var singlePageMode = false
     @State private var autoCropEnabled = true
+    @State private var showReflowMode = false
+    @State private var reflowFontPercent = 100
 
     init(document: PDFDocument, title: String, safeArea: EdgeInsets,
          currentPage: Binding<Int>, onBack: @escaping () -> Void) {
@@ -487,8 +490,12 @@ private struct PdfDetailView: View {
                 Divider().opacity(0.12)
 
                 // ── Content ───────────────────────────────────────────────
-                PdfKitView(document: displayDoc, currentPageIdx: $currentPage,
-                           singlePage: singlePageMode, autoCrop: autoCropEnabled)
+                if showReflowMode {
+                    ReflowWebView(document: displayDoc, fontPercent: reflowFontPercent)
+                } else {
+                    PdfKitView(document: displayDoc, currentPageIdx: $currentPage,
+                               singlePage: singlePageMode, autoCrop: autoCropEnabled)
+                }
 
                 Divider().opacity(0.12)
 
@@ -510,23 +517,59 @@ private struct PdfDetailView: View {
 
                     Divider().frame(height: 20).opacity(0.2)
 
-                    // Auto-crop toggle
-                    Button { autoCropEnabled.toggle() } label: {
-                        Image(systemName: autoCropEnabled ? "crop" : "arrow.up.left.and.arrow.down.right")
-                            .font(.system(size: 13))
-                            .foregroundColor(autoCropEnabled ? .orange : .white.opacity(0.45))
-                            .padding(.horizontal, 8).padding(.vertical, 10)
+                    modeSegment(label: "PDF", active: !showReflowMode) {
+                        showReflowMode = false
                     }
-                    .buttonStyle(.plain)
 
-                    // Single page toggle
-                    Button { singlePageMode.toggle() } label: {
-                        Image(systemName: singlePageMode ? "doc" : "doc.on.doc")
-                            .font(.system(size: 13))
-                            .foregroundColor(singlePageMode ? .orange : .white.opacity(0.45))
-                            .padding(.horizontal, 8).padding(.vertical, 10)
+                    modeSegment(label: "REFLOW", active: showReflowMode) {
+                        showReflowMode = true
                     }
-                    .buttonStyle(.plain)
+
+                    Divider().frame(height: 20).opacity(0.2)
+
+                    if showReflowMode {
+                        Button { reflowFontPercent = max(70, reflowFontPercent - 10) } label: {
+                            Image(systemName: "minus.circle")
+                                .font(.system(size: 13))
+                                .foregroundColor(reflowFontPercent <= 70 ? .white.opacity(0.2) : .white.opacity(0.55))
+                                .padding(.horizontal, 6).padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+
+                        Button { reflowFontPercent = min(220, reflowFontPercent + 10) } label: {
+                            Image(systemName: "plus.circle")
+                                .font(.system(size: 13))
+                                .foregroundColor(reflowFontPercent >= 220 ? .white.opacity(0.2) : .white.opacity(0.55))
+                                .padding(.horizontal, 6).padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+
+                        Button { reflowFontPercent = 100 } label: {
+                            Text("\(reflowFontPercent)%")
+                                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                .foregroundColor(.orange.opacity(0.7))
+                                .padding(.horizontal, 4).padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        // Auto-crop toggle
+                        Button { autoCropEnabled.toggle() } label: {
+                            Image(systemName: autoCropEnabled ? "crop" : "arrow.up.left.and.arrow.down.right")
+                                .font(.system(size: 13))
+                                .foregroundColor(autoCropEnabled ? .orange : .white.opacity(0.45))
+                                .padding(.horizontal, 8).padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+
+                        // Single page toggle
+                        Button { singlePageMode.toggle() } label: {
+                            Image(systemName: singlePageMode ? "doc" : "doc.on.doc")
+                                .font(.system(size: 13))
+                                .foregroundColor(singlePageMode ? .orange : .white.opacity(0.45))
+                                .padding(.horizontal, 8).padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+                    }
 
                     Spacer()
 
@@ -556,6 +599,19 @@ private struct PdfDetailView: View {
             .presentationDetents([.height(360)])
             .presentationDragIndicator(.visible)
         }
+    }
+
+    private func modeSegment(label: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundColor(active ? .black : .white.opacity(0.45))
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(active ? Color.white.opacity(0.88) : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 5))
+                .padding(.horizontal, 2).padding(.vertical, 4)
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -790,6 +846,121 @@ private func autoCropped(_ source: PDFDocument) -> PDFDocument {
         out.insert(copy, at: i)
     }
     return out
+}
+
+private func htmlEscaped(_ text: String) -> String {
+        text
+                .replacingOccurrences(of: "&", with: "&amp;")
+                .replacingOccurrences(of: "<", with: "&lt;")
+                .replacingOccurrences(of: ">", with: "&gt;")
+                .replacingOccurrences(of: "\"", with: "&quot;")
+                .replacingOccurrences(of: "'", with: "&#39;")
+}
+
+private func buildReflowHTML(from doc: PDFDocument, fontPercent: Int) -> String {
+        var blocks: [String] = []
+        for i in 0..<doc.pageCount {
+                let raw = (doc.page(at: i)?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !raw.isEmpty else { continue }
+                let block = """
+                <section class=\"page\">
+                    <div class=\"page-title\">Page \(i + 1)</div>
+                    <pre class=\"page-text\">\(htmlEscaped(raw))</pre>
+                </section>
+                """
+                blocks.append(block)
+        }
+
+        let content = blocks.isEmpty
+                ? "<section class=\"page\"><div class=\"page-title\">No selectable text found</div></section>"
+                : blocks.joined(separator: "\n")
+
+        return """
+        <!doctype html>
+        <html>
+        <head>
+            <meta charset=\"utf-8\" />
+            <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0\" />
+            <style>
+                :root { --fontScale: \(fontPercent)%; }
+                * { box-sizing: border-box; }
+                body {
+                    margin: 0;
+                    padding: 12px;
+                    background: #0f0f0f;
+                    color: #f2f2f2;
+                    font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;
+                }
+                .page {
+                    background: #1b1b1b;
+                    border: 1px solid #2b2b2b;
+                    border-radius: 12px;
+                    padding: 12px;
+                    margin-bottom: 10px;
+                }
+                .page-title {
+                    font-size: 11px;
+                    letter-spacing: 0.08em;
+                    text-transform: uppercase;
+                    color: #a9a9a9;
+                    margin-bottom: 8px;
+                }
+                .page-text {
+                    margin: 0;
+                    white-space: pre-wrap;
+                    word-wrap: break-word;
+                    overflow-wrap: anywhere;
+                    line-height: 1.45;
+                    font-size: calc(14px * var(--fontScale) / 100);
+                    font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;
+                    color: #f4f4f4;
+                }
+            </style>
+        </head>
+        <body>
+            \(content)
+        </body>
+        </html>
+        """
+}
+
+// MARK: - Reflow Web View
+
+private struct ReflowWebView: UIViewRepresentable {
+        let document: PDFDocument
+        let fontPercent: Int
+
+        func makeCoordinator() -> Coordinator { Coordinator() }
+
+        func makeUIView(context: Context) -> WKWebView {
+                let config = WKWebViewConfiguration()
+                let view = WKWebView(frame: .zero, configuration: config)
+                view.isOpaque = false
+                view.backgroundColor = .black
+                view.scrollView.backgroundColor = .black
+                view.scrollView.contentInsetAdjustmentBehavior = .never
+
+                context.coordinator.sourceDoc = document
+                context.coordinator.fontPercent = fontPercent
+                view.loadHTMLString(buildReflowHTML(from: document, fontPercent: fontPercent), baseURL: nil)
+                return view
+        }
+
+        func updateUIView(_ uiView: WKWebView, context: Context) {
+                let c = context.coordinator
+                let docChanged = c.sourceDoc !== document
+                let fontChanged = c.fontPercent != fontPercent
+                guard docChanged || fontChanged else { return }
+
+                c.sourceDoc = document
+                c.fontPercent = fontPercent
+                uiView.loadHTMLString(buildReflowHTML(from: document, fontPercent: fontPercent), baseURL: nil)
+        }
+
+        final class Coordinator {
+                weak var sourceDoc: PDFDocument?
+                var fontPercent: Int = 100
+        }
 }
 
 // MARK: - PDFKit View
