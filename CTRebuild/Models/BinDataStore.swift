@@ -61,25 +61,45 @@ final class BinDataStore: ObservableObject {
     )
 
     /// Extracts (binCode, committedQty) pairs from a single PDF page's text.
-    /// If multiple bin codes appear on a page, each is paired with the committed qty.
-    /// If no committed number is found, the bin is skipped.
+    /// Each bin code is paired with the nearest committed quantity that follows it.
+    /// If no committed number appears after a bin, that bin is skipped.
     private func extractBinCommitted(from text: String) -> [(String, Int)] {
         let ns = text as NSString
         let fullRange = NSRange(location: 0, length: ns.length)
 
-        // Find all bin codes on this page
-        let bins = Self.binRegex.matches(in: text, range: fullRange)
-            .map { ns.substring(with: $0.range(at: 1)).uppercased() }
+        // Find all bin codes with their positions
+        let binMatches = Self.binRegex.matches(in: text, range: fullRange)
+        // Find all committed quantities with their positions
+        let commitMatches = Self.committedRegex.matches(in: text, range: fullRange)
 
-        guard !bins.isEmpty else { return [] }
+        guard !binMatches.isEmpty, !commitMatches.isEmpty else { return [] }
 
-        // Find committed number
-        guard let cm = Self.committedRegex.firstMatch(in: text, range: fullRange),
-              let qty = Int(ns.substring(with: cm.range(at: 1))) else {
-            return []
+        var results: [(String, Int)] = []
+
+        for binMatch in binMatches {
+            let binCode = ns.substring(with: binMatch.range(at: 1)).uppercased()
+            let binPos = binMatch.range.location
+
+            // Find the closest committed qty by absolute distance to this bin
+            var bestQty: Int? = nil
+            var bestDist = Int.max
+
+            for cm in commitMatches {
+                guard let qty = Int(ns.substring(with: cm.range(at: 1))) else { continue }
+                let cmPos = cm.range.location
+                let dist = abs(cmPos - binPos)
+                if dist < bestDist {
+                    bestDist = dist
+                    bestQty = qty
+                }
+            }
+
+            if let qty = bestQty, qty > 0 {
+                results.append((binCode, qty))
+            }
         }
 
-        return bins.map { ($0, qty) }
+        return results
     }
 
     // MARK: - Recalculation
