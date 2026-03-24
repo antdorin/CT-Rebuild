@@ -655,8 +655,22 @@ private struct PdfSortSheet: View {
     let document: PDFDocument
     let onSort: (PdfSortField) -> Void
     @Environment(\.dismiss) private var dismiss
-    @State private var searchText: String = ""
+    @AppStorage("pdfSortSearchText") private var searchText: String = ""
+    @AppStorage("pdfSortSearchHistory") private var historyRaw: String = ""
     @State private var matchingPages: [Int] = []
+    @State private var showHistory: Bool = false
+    @FocusState private var searchFocused: Bool
+
+    private var history: [String] {
+        historyRaw.isEmpty ? [] : historyRaw.components(separatedBy: "\u{001F}")
+    }
+
+    private func addToHistory(_ query: String) {
+        var list = history.filter { $0 != query }
+        list.insert(query, at: 0)
+        if list.count > 5 { list = Array(list.prefix(5)) }
+        historyRaw = list.joined(separator: "\u{001F}")
+    }
 
     var body: some View {
         ZStack {
@@ -677,6 +691,7 @@ private struct PdfSortSheet: View {
                         .font(.system(size: 13, weight: .medium, design: .monospaced))
                         .foregroundColor(.white.opacity(0.9))
                         .tint(.orange)
+                        .focused($searchFocused)
                         .onSubmit { performSearch() }
                         .submitLabel(.search)
                     if !searchText.isEmpty {
@@ -695,19 +710,53 @@ private struct PdfSortSheet: View {
                 .padding(.vertical, 8)
                 .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
                 .padding(.horizontal, 16)
-                .padding(.bottom, 12)
+                .padding(.bottom, 0)
+                .onTapGesture { showHistory = true }
+
+                // Recent searches dropdown
+                if showHistory && !history.isEmpty && searchText.isEmpty {
+                    VStack(spacing: 0) {
+                        ForEach(history, id: \.self) { item in
+                            Button {
+                                searchText = item
+                                showHistory = false
+                                performSearch()
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "clock.arrow.circlepath")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.white.opacity(0.3))
+                                    Text(item)
+                                        .font(.system(size: 13, design: .monospaced))
+                                        .foregroundColor(.white.opacity(0.75))
+                                        .lineLimit(1)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .transition(.opacity)
+                }
 
                 // Search results indicator
                 if !searchText.isEmpty && !matchingPages.isEmpty {
                     Text("\(matchingPages.count) page\(matchingPages.count == 1 ? "" : "s") matched")
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
                         .foregroundColor(.orange.opacity(0.7))
-                        .padding(.bottom, 12)
+                        .padding(.top, 8).padding(.bottom, 12)
                 } else if !searchText.isEmpty && matchingPages.isEmpty {
                     Text("No matches")
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundColor(.white.opacity(0.3))
-                        .padding(.bottom, 12)
+                        .padding(.top, 8).padding(.bottom, 12)
+                } else {
+                    Spacer().frame(height: 12)
                 }
 
                 VStack(spacing: 0) {
@@ -745,6 +794,8 @@ private struct PdfSortSheet: View {
 
     private func performSearch() {
         guard !searchText.isEmpty else { matchingPages = []; return }
+        showHistory = false
+        addToHistory(searchText)
         let query = searchText.lowercased()
         var pages: [Int] = []
         for i in 0..<document.pageCount {
