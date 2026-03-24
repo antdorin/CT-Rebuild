@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="CT Documents">
+  <title>CT Documents</title>
+  <style>
+    :root {
+      --bg: #0f0f0f;
+      --card: #1a1a1a;
+      --text: #ffffff;
+      --muted: #9a9a9a;
+      --accent: #7ac0f8;
+      --line: rgba(122,192,248,.4);
+      --orange: #f97316;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      min-height: 100vh;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(15,15,15,.96);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      padding: max(14px, env(safe-area-inset-top)) 16px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .title { font-size: 22px; font-weight: 800; color: var(--accent); }
+    .doc-count { font-size: 13px; color: var(--muted); margin-top: 2px; }
+    .search-bar {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+    }
+    .search-bar input {
+      flex: 1;
+      background: rgba(255,255,255,.07);
+      border: 1.5px solid var(--line);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 16px;
+      padding: 10px 14px;
+      outline: none;
+      min-width: 0;
+    }
+    .search-bar input::placeholder { color: var(--muted); }
+    .search-bar input:focus { border-color: var(--accent); }
+    .list {
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .doc-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--card);
+      border: 1.5px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 14px;
+      text-decoration: none;
+      color: inherit;
+      min-height: 62px;
+      -webkit-tap-highlight-color: transparent;
+      transition: border-color .12s, background .12s;
+    }
+    .doc-row:active { background: rgba(122,192,248,.12); border-color: var(--accent); }
+    .doc-icon {
+      font-size: 28px;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+    .doc-info { flex: 1; min-width: 0; }
+    .doc-name {
+      font-size: 15px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .doc-meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .doc-arrow { color: var(--muted); font-size: 18px; flex-shrink: 0; }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 6px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .badge-shipped {
+      background: rgba(249,115,22,.18);
+      color: var(--orange);
+      border: 1px solid rgba(249,115,22,.4);
+    }
+    .badge-picked {
+      background: rgba(122,192,248,.14);
+      color: var(--accent);
+      border: 1px solid rgba(122,192,248,.35);
+    }
+    .empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.6;
+    }
+    .empty strong { color: var(--text); font-size: 18px; display: block; margin-bottom: 8px; }
+    .loading {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+    .group-header {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      padding: 6px 4px 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-inner">
+      <div>
+        <div class="title">📋 CT Documents</div>
+        <div id="docCount" class="doc-count">Loading…</div>
+      </div>
+    </div>
+    <div class="search-bar">
+      <input id="searchInput" type="search" placeholder="Search documents…" autocomplete="off" />
+    </div>
+  </div>
+
+  <div id="list" class="list">
+    <div class="loading">Loading documents…</div>
+  </div>
+
+  <script>
+    const listEl = document.getElementById('list');
+    const countEl = document.getElementById('docCount');
+    const searchInput = document.getElementById('searchInput');
+
+    let allDocs = [];
+
+    // Safe localStorage wrappers — Safari Private Browsing throws SecurityError on any access
+    function lsGet(key) { try { return localStorage.getItem(key); } catch { return null; } }
+    function lsLength() { try { return localStorage.length; }        catch { return 0; } }
+    function lsKey(i)   { try { return localStorage.key(i); }         catch { return null; } }
+
+    function isShipped(name) {
+      const n = lsLength();
+      for (let i = 0; i < n; i++) {
+        const k = lsKey(i);
+        if (k && k.startsWith('docstate:' + name + ':') && k.endsWith(':shipped')) {
+          if (lsGet(k) === '1') return true;
+        }
+      }
+      return false;
+    }
+
+    function isPicked(name) {
+      const n = lsLength();
+      for (let i = 0; i < n; i++) {
+        const k = lsKey(i);
+        if (k && k.startsWith('docstate:' + name + ':') && k.endsWith(':picked')) {
+          if (lsGet(k) === '1') return true;
+        }
+      }
+      return false;
+    }
+
+    function formatDate(isoStr) {
+      if (!isoStr) return '';
+      try {
+        const d = new Date(isoStr);
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      } catch { return ''; }
+    }
+
+    function render(docs) {
+      if (!docs.length) {
+        listEl.innerHTML = '<div class="empty"><strong>No documents found</strong>Make sure the PDF folder is set in CT-Hub and contains PDF files.</div>';
+        return;
+      }
+
+      // Group by date (from filename or modified date)
+      const groups = {};
+      for (const doc of docs) {
+        const d = formatDate(doc.modified) || 'Unknown Date';
+        if (!groups[d]) groups[d] = [];
+        groups[d].push(doc);
+      }
+
+      listEl.innerHTML = '';
+      for (const [date, items] of Object.entries(groups)) {
+        const gh = document.createElement('div');
+        gh.className = 'group-header';
+        gh.textContent = date;
+        listEl.appendChild(gh);
+
+        for (const doc of items) {
+          const shipped = isShipped(doc.name);
+          const picked = isPicked(doc.name);
+
+          const a = document.createElement('a');
+          a.className = 'doc-row';
+          a.href = '/reader.html?file=' + encodeURIComponent(doc.name);
+
+          const badges = (picked ? '<span class="status-badge badge-picked">✔ Picked</span>' : '') +
+                         (shipped ? '<span class="status-badge badge-shipped">✔ Shipped</span>' : '');
+
+          a.innerHTML = `
+            <div class="doc-icon">📄</div>
+            <div class="doc-info">
+              <div class="doc-name">${escHtml(doc.name)}${badges}</div>
+              <div class="doc-meta">${formatDate(doc.modified)}</div>
+            </div>
+            <div class="doc-arrow">›</div>
+          `;
+          listEl.appendChild(a);
+        }
+      }
+    }
+
+    function escHtml(s) {
+      return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function filterAndRender() {
+      const q = (searchInput.value || '').toLowerCase().trim();
+      const filtered = q ? allDocs.filter(d => d.name.toLowerCase().includes(q)) : allDocs;
+      render(filtered);
+    }
+
+    searchInput.addEventListener('input', filterAndRender);
+
+    async function load() {
+      try {
+        const res = await fetch('/api/docs/list');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        allDocs = await res.json();
+        // Sort newest-modified first
+        allDocs.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+        countEl.textContent = allDocs.length + ' document' + (allDocs.length === 1 ? '' : 's');
+        render(allDocs);
+      } catch (err) {
+        listEl.innerHTML = '<div class="empty"><strong>Could not load documents</strong>' + escHtml(String(err.message || err)) + '</div>';
+        countEl.textContent = 'Error';
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

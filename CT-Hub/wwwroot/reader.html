@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Chase Tactical QR">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <title>Doc's Reader</title>
+  <style>
+    :root{
+      --bg:#0f0f0f;
+      --card:#151515;
+      --text:#ffffff;
+      --muted:#b7b7b7;
+      --accent:#7ac0f8;
+      --accent-soft:rgba(122,192,248,.18);
+      --line:rgba(122,192,248,.55);
+    }
+    body.light-mode{
+      --bg:#f5f5f5;
+      --card:#ffffff;
+      --text:#1a1a1a;
+      --muted:#4f4f4f;
+      --accent:#4c95d0;
+      --accent-soft:rgba(76,149,208,.14);
+      --line:rgba(76,149,208,.45);
+    }
+    *{box-sizing:border-box}
+    .hidden{display:none!important}
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font-family:Segoe UI,Arial,sans-serif;
+      min-height:100vh;
+      padding:0;
+      overflow:hidden;
+    }
+    .title{font-size:24px;font-weight:800;color:var(--accent);margin:0 0 6px}
+    .subtitle{font-size:14px;color:var(--muted);margin:0}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+    .btn{
+      border:2px solid var(--line);
+      background:var(--accent-soft);
+      color:var(--text);
+      border-radius:10px;
+      padding:11px 14px;
+      text-decoration:none;
+      font-size:15px;
+      font-weight:700;
+      cursor:pointer;
+      min-height:46px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .btn.primary{background:var(--accent);color:#111;border-color:var(--accent)}
+    .btn:disabled{opacity:.45;cursor:not-allowed}
+    .page-label{font-size:15px;font-weight:700;color:var(--text);min-width:100px;text-align:center}
+    .mode-group{display:flex;gap:8px;align-items:center}
+    .mode-group .btn.active{background:var(--accent);color:#111;border-color:var(--accent)}
+    .status{font-size:14px;color:var(--muted)}
+    .viewer-wrap{
+      position:fixed;
+      inset:0;
+      background:#000;
+      border:none;
+      border-radius:0;
+      padding:0;
+      padding-top:max(24px, env(safe-area-inset-top));
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+    }
+    .sidepanel-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1200}
+    .sidepanel-left{
+      position:fixed;
+      top:0;
+      left:0;
+      height:100vh;
+      width:min(88vw,360px);
+      max-width:100vw;
+      transform:translateX(-100%);
+      transition:transform .22s ease;
+      z-index:1201;
+      background:rgba(8,12,20,.96);
+      backdrop-filter:blur(8px);
+      -webkit-backdrop-filter:blur(8px);
+      border-right:2px solid var(--line);
+      padding:12px;
+      padding-top:max(12px,env(safe-area-inset-top));
+      overflow-y:auto;
+      overflow-x:hidden;
+    }
+    .panel-title{font-size:20px;font-weight:800;color:var(--accent);margin:0 0 6px}
+    .panel-sub{font-size:13px;color:var(--muted);margin:0 0 10px}
+    .panel-stack{display:flex;flex-direction:column;gap:8px}
+    .panel-row{display:flex;gap:8px}
+    .panel-row .btn{flex:1}
+    .panel-control{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+    .panel-control label{font-size:13px;color:var(--muted);font-weight:700}
+    .panel-control input[type="range"]{width:100%}
+    .panel-control .panel-value{font-size:12px;color:var(--muted);text-align:right}
+    .panel-control .panel-check{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text);font-weight:700}
+    .panel-control .panel-check input{transform:scale(1.15)}
+    body.sidepanel-left-open .sidepanel-left{transform:translateX(0)}
+    body.sidepanel-left-open .sidepanel-backdrop{display:block}
+    canvas{
+      width:auto;
+      height:auto;
+      max-width:none;
+      border-radius:0;
+      display:block;
+      margin:0 auto;
+      background:#fff;
+    }
+    .text-view{
+      width:100%;
+      height:100%;
+      min-height:0;
+      border-radius:0;
+      border:none;
+      background:#000;
+      color:var(--text);
+      padding:0;
+      font-size:17px;
+      line-height:1.55;
+      white-space:normal;
+      overflow-x:auto;
+      overflow-y:auto;
+      -webkit-overflow-scrolling:touch;
+      display:flex;
+      align-items:flex-start;
+      justify-content:flex-start;
+    }
+    body.light-mode .text-view{background:#fff}
+    .text-page{
+      position:relative;
+      background:#fff;
+      color:#111;
+      overflow:visible;
+      flex:0 0 auto;
+      margin:0;
+      box-shadow:0 0 0 1px rgba(0,0,0,.08) inset;
+    }
+    .text-run{
+      position:absolute;
+      display:block;
+      white-space:pre-wrap;
+      overflow-wrap:break-word;
+      word-break:break-word;
+      color:#111;
+      line-height:1.2;
+      overflow:visible;
+      transform-origin:top left;
+      pointer-events:none;
+      user-select:text;
+    }
+    .panel-search-wrap{
+      display:flex;
+      gap:6px;
+      align-items:stretch;
+    }
+    .panel-search-wrap input{
+      flex:1;
+      background:rgba(255,255,255,.08);
+      border:2px solid var(--line);
+      border-radius:8px;
+      color:var(--text);
+      font-size:14px;
+      padding:8px 10px;
+      outline:none;
+      min-width:0;
+    }
+    .panel-search-wrap input::placeholder{color:var(--muted)}
+    .panel-search-wrap input:focus{border-color:var(--accent)}
+    .search-results{
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+      max-height:220px;
+      overflow-y:auto;
+      margin-top:2px;
+    }
+    .search-result-item{
+      background:rgba(122,192,248,.10);
+      border:1px solid var(--line);
+      border-radius:7px;
+      padding:7px 10px;
+      font-size:13px;
+      color:var(--text);
+      cursor:pointer;
+      line-height:1.3;
+    }
+    .search-result-item:active{background:var(--accent-soft)}
+    .search-result-page{font-size:11px;color:var(--accent);font-weight:700;margin-bottom:2px}
+    .search-result-snippet em{background:rgba(249,115,22,.35);border-radius:2px;font-style:normal;font-weight:700}
+    .search-none{font-size:13px;color:var(--muted);padding:4px 2px}
+    .doc-status-bar{
+      position:fixed;
+      top:max(12px, env(safe-area-inset-top));
+      right:12px;
+      z-index:1100;
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      align-items:flex-end;
+    }
+    .doc-status-btn{
+      display:flex;
+      align-items:center;
+      gap:7px;
+      background:rgba(15,15,15,.82);
+      border:2px solid rgba(255,255,255,.18);
+      border-radius:10px;
+      padding:7px 12px;
+      font-size:14px;
+      font-weight:700;
+      color:#fff;
+      cursor:pointer;
+      backdrop-filter:blur(6px);
+      -webkit-backdrop-filter:blur(6px);
+      transition:border-color .15s, background .15s;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .doc-status-btn.active-picked{
+      border-color:#f97316;
+      background:rgba(249,115,22,.22);
+      color:#f97316;
+    }
+    .doc-status-btn.active-shipped{
+      border-color:#f97316;
+      background:rgba(249,115,22,.22);
+      color:#f97316;
+    }
+    .doc-status-btn .chk-box{
+      width:18px;
+      height:18px;
+      border:2px solid currentColor;
+      border-radius:4px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:12px;
+      flex-shrink:0;
+    }
+    .doc-stamp{
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      z-index:1050;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      overflow:hidden;
+      contain:layout paint;
+    }
+    .doc-stamp-text{
+      font-size:clamp(52px, 14vw, 96px);
+      font-weight:900;
+      letter-spacing:.08em;
+      color:#f97316;
+      opacity:.55;
+      border:6px solid #f97316;
+      border-radius:8px;
+      padding:4px 18px;
+      line-height:1;
+      white-space:nowrap;
+      transform:rotate(-30deg);
+      max-width:90vw;
+    }
+    .sr-only{
+      position:absolute;
+      width:1px;
+      height:1px;
+      padding:0;
+      margin:-1px;
+      overflow:hidden;
+      clip:rect(0,0,0,0);
+      white-space:nowrap;
+      border:0;
+    }
+  </style>
+</head>
+<body>
+  <p id="docName" class="sr-only">Preparing document...</p>
+  <div id="status" class="sr-only" aria-live="polite">Loading PDF...</div>
+
+  <div id="sidepanelBackdrop" class="sidepanel-backdrop"></div>
+  <aside id="sidepanelLeft" class="sidepanel-left" aria-hidden="true">
+    <h2 class="panel-title">Reader Controls</h2>
+    <p id="pageLabel" class="panel-sub">Page 0 / 0</p>
+    <div class="panel-stack">
+      <div class="panel-row">
+        <button id="prevBtn" class="btn" type="button">Prev</button>
+        <button id="nextBtn" class="btn" type="button">Next</button>
+      </div>
+      <button id="fullscreenBtn" class="btn" type="button">Fullscreen</button>
+      <div class="panel-row">
+        <button id="imageModeBtn" class="btn" type="button">Page View</button>
+        <button id="textModeBtn" class="btn active" type="button">Text View</button>
+      </div>
+      <div class="panel-control">
+        <label for="textSizeRange">Text Size</label>
+        <input id="textSizeRange" type="range" min="0.80" max="2.00" step="0.05" value="1.45" />
+        <div id="textSizeValue" class="panel-value">145%</div>
+      </div>
+      <div class="panel-control">
+        <label class="panel-check" for="textBoldToggle">
+          <input id="textBoldToggle" type="checkbox" />
+          <span>Bold Text</span>
+        </label>
+      </div>
+      <div class="panel-control" style="margin-top:4px;border-top:1px solid var(--line);padding-top:10px">
+        <label for="searchInput" style="font-size:13px;color:var(--muted);font-weight:700">Search Document</label>
+        <div class="panel-search-wrap" style="margin-top:4px">
+          <input id="searchInput" type="search" placeholder="Search all pages&#x2026;" autocomplete="off" />
+          <button id="searchBtn" class="btn" type="button" style="padding:8px 12px;min-height:0">Go</button>
+        </div>
+        <button id="clearSearchBtn" class="btn" type="button" style="margin-top:6px;display:none">Clear Search</button>
+        <div id="searchResults" class="search-results"></div>
+      </div>
+      <div class="panel-control" style="margin-top:4px;border-top:1px solid var(--line);padding-top:10px">
+        <label style="font-size:13px;color:var(--muted);font-weight:700">Sort &amp; Filter</label>
+        <div class="panel-row" style="margin-top:6px">
+          <button id="sortBtn" class="btn" type="button" style="flex:1;text-align:left" title="Cycle sort order">Sort: Default</button>
+        </div>
+        <div style="margin-top:6px">
+          <label class="panel-check" for="hideShippedToggle">
+            <input id="hideShippedToggle" type="checkbox" />
+            <span>Hide Shipped Pages</span>
+          </label>
+        </div>
+      </div>
+      <a class="btn" href="/documents.html">Back</a>
+    </div>
+  </aside>
+
+  <div id="viewerWrap" class="viewer-wrap">
+    <canvas id="pageCanvas"></canvas>
+    <div id="textView" class="text-view hidden"></div>
+  </div>
+
+  <!-- Picked / Shipped top-right buttons -->
+  <div class="doc-status-bar">
+    <button id="pickedToggle" class="doc-status-btn" type="button" aria-pressed="false">
+      <span class="chk-box" id="pickedChkBox"></span>
+      <span id="pickedLabel">Picked</span>
+    </button>
+    <button id="shippedToggle" class="doc-status-btn" type="button" aria-pressed="false">
+      <span class="chk-box" id="shippedChkBox"></span>
+      <span id="shippedLabel">Shipped</span>
+    </button>
+  </div>
+
+  <!-- Center stamp overlay -->
+  <div id="docStamp" class="doc-stamp hidden"></div>
+
+  <script type="module">
+    (async function() {
+      const theme = localStorage.getItem('theme') || 'dark';
+      if (theme === 'light') document.body.classList.add('light-mode');
+
+      const qs = new URLSearchParams(window.location.search);
+      const file = (qs.get('file') || '').trim();
+      const docName = document.getElementById('docName');
+      const statusEl = document.getElementById('status');
+      const pageLabel = document.getElementById('pageLabel');
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const fullscreenBtn = document.getElementById('fullscreenBtn');
+      const imageModeBtn = document.getElementById('imageModeBtn');
+      const textModeBtn = document.getElementById('textModeBtn');
+      const textSizeRange = document.getElementById('textSizeRange');
+      const textSizeValue = document.getElementById('textSizeValue');
+      const textBoldToggle = document.getElementById('textBoldToggle');
+      const searchInput = document.getElementById('searchInput');
+      const searchBtn = document.getElementById('searchBtn');
+      const searchResults = document.getElementById('searchResults');
+      const clearSearchBtn = document.getElementById('clearSearchBtn');
+      const sortBtn = document.getElementById('sortBtn');
+      const hideShippedToggle = document.getElementById('hideShippedToggle');
+      const pickedToggle = document.getElementById('pickedToggle');
+      const shippedToggle = document.getElementById('shippedToggle');
+      const pickedLabel = document.getElementById('pickedLabel');
+      const shippedLabel = document.getElementById('shippedLabel');
+      const pickedChkBox = document.getElementById('pickedChkBox');
+      const shippedChkBox = document.getElementById('shippedChkBox');
+      const docStamp = document.getElementById('docStamp');
+      const sidepanelLeft = document.getElementById('sidepanelLeft');
+      const sidepanelBackdrop = document.getElementById('sidepanelBackdrop');
+      const canvas = document.getElementById('pageCanvas');
+      const textView = document.getElementById('textView');
+      const viewerWrap = document.getElementById('viewerWrap');
+
+      function setStatus(message) {
+        if (statusEl) statusEl.textContent = message;
+      }
+
+      function setPanelOpen(open) {
+        document.body.classList.toggle('sidepanel-left-open', !!open);
+        if (sidepanelLeft) sidepanelLeft.setAttribute('aria-hidden', open ? 'false' : 'true');
+      }
+
+      if (!file) {
+        setStatus('Missing file name in URL.');
+        prevBtn.disabled = true;
+        nextBtn.disabled = true;
+        imageModeBtn.disabled = true;
+        textModeBtn.disabled = true;
+        return;
+      }
+
+      docName.textContent = file;
+
+      let pdfDoc = null;
+      let currentPage = 1;
+      let currentMode = 'text';
+
+      // --- Picked / Shipped state ---
+      function docStateKey(suffix) {
+        return 'docstate:' + file + ':p' + currentPage + ':' + suffix;
+      }
+      function updateStamp(picked, shipped) {
+        docStamp.innerHTML = '';
+        if (picked) {
+          const t = document.createElement('div');
+          t.className = 'doc-stamp-text';
+          t.textContent = 'PICKED';
+          docStamp.appendChild(t);
+        }
+        if (shipped) {
+          const t = document.createElement('div');
+          t.className = 'doc-stamp-text';
+          t.textContent = 'SHIPPED';
+          docStamp.appendChild(t);
+        }
+        docStamp.classList.toggle('hidden', !picked && !shipped);
+      }
+      function applyDocState(picked, shipped) {
+        pickedToggle.classList.toggle('active-picked', picked);
+        pickedToggle.setAttribute('aria-pressed', String(picked));
+        pickedChkBox.textContent = picked ? '\u2714' : '';
+        pickedLabel.textContent = 'Picked';
+        shippedToggle.classList.toggle('active-shipped', shipped);
+        shippedToggle.setAttribute('aria-pressed', String(shipped));
+        shippedChkBox.textContent = shipped ? '\u2714' : '';
+        shippedLabel.textContent = 'Shipped';
+        updateStamp(picked, shipped);
+      }
+      function loadDocState() {
+        const picked = localStorage.getItem(docStateKey('picked')) === '1';
+        const shipped = localStorage.getItem(docStateKey('shipped')) === '1';
+        applyDocState(picked, shipped);
+      }
+      pickedToggle.addEventListener('click', () => {
+        const next = pickedToggle.getAttribute('aria-pressed') !== 'true';
+        localStorage.setItem(docStateKey('picked'), next ? '1' : '0');
+        const shipped = shippedToggle.getAttribute('aria-pressed') === 'true';
+        applyDocState(next, shipped);
+      });
+      shippedToggle.addEventListener('click', async () => {
+        const next = shippedToggle.getAttribute('aria-pressed') !== 'true';
+        localStorage.setItem(docStateKey('shipped'), next ? '1' : '0');
+        const picked = pickedToggle.getAttribute('aria-pressed') === 'true';
+        applyDocState(picked, next);
+        if (hideShipped) await buildPageList();
+      });
+      loadDocState();
+
+      // --- Full-document search ---
+      async function runSearch() {
+        const query = (searchInput.value || '').trim().toLowerCase();
+        searchResults.innerHTML = '';
+        if (!query || !pdfDoc) return;
+
+        const searchingEl = document.createElement('div');
+        searchingEl.className = 'search-none';
+        searchingEl.textContent = 'Searching\u2026';
+        searchResults.appendChild(searchingEl);
+
+        const matches = [];
+        for (let p = 1; p <= pdfDoc.numPages; p++) {
+          const page = await pdfDoc.getPage(p);
+          const layout = await extractStructuredTextLayout(page);
+          if (!layout || !layout.runs) continue;
+          const fullText = layout.runs.map(r => r.text).join(' ');
+          const lower = fullText.toLowerCase();
+          let idx = lower.indexOf(query);
+          while (idx !== -1) {
+            const start = Math.max(0, idx - 30);
+            const end = Math.min(fullText.length, idx + query.length + 30);
+            const before = fullText.slice(start, idx);
+            const match = fullText.slice(idx, idx + query.length);
+            const after = fullText.slice(idx + query.length, end);
+            matches.push({ page: p, before, match, after });
+            idx = lower.indexOf(query, idx + 1);
+          }
+        }
+
+        searchResults.innerHTML = '';
+        if (!matches.length) {
+          const none = document.createElement('div');
+          none.className = 'search-none';
+          none.textContent = 'No results found.';
+          searchResults.appendChild(none);
+          searchPages = [];
+          clearSearchBtn.style.display = 'none';
+          updatePager();
+          return;
+        }
+
+        // Collect unique pages in sort/filter order and activate filter
+        const allFilteredPages = searchPages.length ? searchPages : Array.from({length: pdfDoc.numPages}, (_,i)=>i+1);
+        const matchedSet = new Set(matches.map(m => m.page));
+        searchPages = allFilteredPages.filter(p => matchedSet.has(p));
+        clearSearchBtn.style.display = '';
+        if (!searchPages.length) {
+          const none = document.createElement('div');
+          none.className = 'search-none';
+          none.textContent = 'No results in current page set.';
+          searchResults.appendChild(none);
+          updatePager();
+          return;
+        }
+        currentPage = searchPages[0];
+        await renderPage();
+
+        for (const m of matches) {
+          const item = document.createElement('div');
+          item.className = 'search-result-item';
+          const pg = document.createElement('div');
+          pg.className = 'search-result-page';
+          pg.textContent = 'Page ' + m.page;
+          const snippet = document.createElement('div');
+          snippet.className = 'search-result-snippet';
+          snippet.innerHTML = (m.before.length === 30 ? '\u2026' : '') +
+            escHtml(m.before) + '<em>' + escHtml(m.match) + '</em>' + escHtml(m.after) +
+            (m.after.length === 30 ? '\u2026' : '');
+          item.appendChild(pg);
+          item.appendChild(snippet);
+          item.addEventListener('click', async () => {
+            currentPage = m.page;
+            await renderPage();
+            setPanelOpen(false);
+          });
+          searchResults.appendChild(item);
+        }
+      }
+
+      function escHtml(str) {
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      }
+
+      searchBtn.addEventListener('click', runSearch);
+      searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
+      clearSearchBtn.addEventListener('click', async () => {
+        searchInput.value = '';
+        searchResults.innerHTML = '';
+        clearSearchBtn.style.display = 'none';
+        // Rebuild page list with current sort/filter (don't reset those)
+        await buildPageList();
+      });
+
+      const textViewSettings = {
+        sizeScale: 1.45,
+        forceBold: false
+      };
+      const textCache = new Map();
+      let searchPages = []; // empty = no filter; populated after search
+      const pageMetaCache = new Map(); // pageNum -> { date, soNum, bin }
+
+      // Sort modes: default (page order), date, soNum, bin
+      const SORT_MODES = ['default', 'date', 'soNum', 'bin'];
+      const SORT_LABELS = { default: 'Sort: Default', date: 'Sort: Date', soNum: 'Sort: SO #', bin: 'Sort: Bin Loc' };
+      let sortMode = 'default';
+      let hideShipped = false;
+
+      function extractPageMeta(pageNum, layout) {
+        if (pageMetaCache.has(pageNum)) return pageMetaCache.get(pageNum);
+        const text = layout && layout.runs ? layout.runs.map(r => r.text).join(' ') : '';
+        // Date: matches patterns like 3/18/2026 or 03/18/2026
+        const dateMatch = text.match(/\b(\d{1,2}\/\d{1,2}\/\d{4})\b/);
+        // SO number: matches #SO-XX-XXXX or SO-XX-XXXX
+        const soMatch = text.match(/#?(SO-[\d]+-[\d]+)/i);
+        // Bin: first bin-like token e.g. 1-B-2C or 3-A-1B
+        const binMatch = text.match(/\b(\d+-[A-Z]-\d+[A-Z]?)\b/);
+        const meta = {
+          date: dateMatch ? dateMatch[1] : '',
+          soNum: soMatch ? soMatch[1].toUpperCase() : '',
+          bin: binMatch ? binMatch[1] : ''
+        };
+        pageMetaCache.set(pageNum, meta);
+        return meta;
+      }
+
+      function isPageShipped(pageNum) {
+        return localStorage.getItem('docstate:' + file + ':p' + pageNum + ':shipped') === '1';
+      }
+
+      async function buildPageList() {
+        if (!pdfDoc) return;
+        const total = pdfDoc.numPages;
+
+        // Ensure metadata is cached for all pages
+        for (let p = 1; p <= total; p++) {
+          if (!pageMetaCache.has(p)) {
+            const pg = await pdfDoc.getPage(p);
+            const layout = await extractStructuredTextLayout(pg);
+            extractPageMeta(p, layout);
+          }
+        }
+
+        let pages = Array.from({ length: total }, (_, i) => i + 1);
+
+        // Hide shipped
+        if (hideShipped) {
+          pages = pages.filter(p => !isPageShipped(p));
+        }
+
+        // Sort
+        if (sortMode === 'date') {
+          pages.sort((a, b) => {
+            const da = pageMetaCache.get(a)?.date || '';
+            const db = pageMetaCache.get(b)?.date || '';
+            return new Date(da) - new Date(db) || a - b;
+          });
+        } else if (sortMode === 'soNum') {
+          pages.sort((a, b) => {
+            const sa = pageMetaCache.get(a)?.soNum || '';
+            const sb = pageMetaCache.get(b)?.soNum || '';
+            return sa.localeCompare(sb) || a - b;
+          });
+        } else if (sortMode === 'bin') {
+          pages.sort((a, b) => {
+            const ba = pageMetaCache.get(a)?.bin || '';
+            const bb = pageMetaCache.get(b)?.bin || '';
+            return ba.localeCompare(bb) || a - b;
+          });
+        }
+
+        searchPages = pages;
+        // If current page was removed (shipped), jump to first available
+        if (!searchPages.includes(currentPage) && searchPages.length) {
+          currentPage = searchPages[0];
+          await renderPage();
+        } else {
+          updatePager();
+        }
+      }
+
+      sortBtn.addEventListener('click', async () => {
+        const idx = SORT_MODES.indexOf(sortMode);
+        sortMode = SORT_MODES[(idx + 1) % SORT_MODES.length];
+        sortBtn.textContent = SORT_LABELS[sortMode];
+        await buildPageList();
+      });
+
+      hideShippedToggle.addEventListener('change', async () => {
+        hideShipped = hideShippedToggle.checked;
+        await buildPageList();
+      });
+
+      function updateTextControlsUi() {
+        if (textSizeRange) textSizeRange.value = String(textViewSettings.sizeScale);
+        if (textSizeValue) textSizeValue.textContent = Math.round(textViewSettings.sizeScale * 100) + '%';
+        if (textBoldToggle) textBoldToggle.checked = !!textViewSettings.forceBold;
+      }
+
+      async function importPdfJs() {
+        const lib = await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
+        const worker = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+        lib.GlobalWorkerOptions.workerSrc = worker;
+        return lib;
+      }
+
+      function setMode(mode) {
+        currentMode = mode === 'text' ? 'text' : 'image';
+        imageModeBtn.classList.toggle('active', currentMode === 'image');
+        textModeBtn.classList.toggle('active', currentMode === 'text');
+        canvas.classList.toggle('hidden', currentMode !== 'image');
+        textView.classList.toggle('hidden', currentMode !== 'text');
+      }
+
+      function updatePager() {
+        const total = pdfDoc ? pdfDoc.numPages : 0;
+        if (searchPages.length) {
+          const pos = searchPages.indexOf(currentPage);
+          const isSorted = sortMode !== 'default' || hideShipped;
+          const prefix = isSorted ? 'Page' : 'Result';
+          pageLabel.textContent = prefix + ' ' + (pos + 1) + ' / ' + searchPages.length + ' (p.' + currentPage + ')';
+          prevBtn.disabled = pos <= 0;
+          nextBtn.disabled = pos >= searchPages.length - 1;
+        } else {
+          pageLabel.textContent = 'Page ' + currentPage + ' / ' + total;
+          prevBtn.disabled = !pdfDoc || currentPage <= 1;
+          nextBtn.disabled = !pdfDoc || currentPage >= total;
+        }
+      }
+
+      async function extractStructuredTextLayout(page) {
+        if (textCache.has(page.pageNumber)) return textCache.get(page.pageNumber);
+
+        const viewport = page.getViewport({ scale: 1 });
+        const content = await page.getTextContent();
+        const items = Array.isArray(content.items) ? content.items : [];
+        const styles = content && content.styles ? content.styles : {};
+
+        const runs = [];
+        for (const item of items) {
+          const str = String(item.str || '');
+          if (!str.trim()) continue;
+
+          const t = Array.isArray(item.transform) ? item.transform : [1, 0, 0, 1, 0, 0];
+          const x = Number(t[4]) || 0;
+          const y = Number(t[5]) || 0;
+          const fontSize = Math.max(6, Math.abs(Number(t[3]) || 0) || Math.hypot(Number(t[2]) || 0, Number(t[3]) || 0) || 10);
+          const width = Math.max(1, Number(item.width) || (str.length * fontSize * 0.5));
+          const top = (viewport.height - y) - fontSize;
+          const fontName = String(item.fontName || '');
+          const fontFamily = (styles[fontName] && styles[fontName].fontFamily) ? String(styles[fontName].fontFamily) : 'Arial, sans-serif';
+
+          runs.push({
+            text: str,
+            left: x,
+            top,
+            width,
+            height: fontSize,
+            fontSize,
+            fontFamily
+          });
+        }
+
+        if (!runs.length) {
+          const empty = {
+            pageWidth: viewport.width,
+            pageHeight: viewport.height,
+            runs: [],
+            bounds: { left: 0, top: 0, width: viewport.width, height: viewport.height }
+          };
+          textCache.set(page.pageNumber, empty);
+          return empty;
+        }
+
+        let minLeft = Number.POSITIVE_INFINITY;
+        let minTop = Number.POSITIVE_INFINITY;
+        let maxRight = Number.NEGATIVE_INFINITY;
+        let maxBottom = Number.NEGATIVE_INFINITY;
+
+        for (const run of runs) {
+          minLeft = Math.min(minLeft, run.left);
+          minTop = Math.min(minTop, run.top);
+          maxRight = Math.max(maxRight, run.left + run.width);
+          maxBottom = Math.max(maxBottom, run.top + run.height);
+        }
+
+        const pad = 8;
+        const bounds = {
+          left: Math.max(0, minLeft - pad),
+          top: Math.max(0, minTop - pad),
+          width: Math.max(1, Math.min(viewport.width, maxRight + pad) - Math.max(0, minLeft - pad)),
+          height: Math.max(1, Math.min(viewport.height, maxBottom + pad) - Math.max(0, minTop - pad))
+        };
+
+        const layout = {
+          pageWidth: viewport.width,
+          pageHeight: viewport.height,
+          runs,
+          bounds
+        };
+        textCache.set(page.pageNumber, layout);
+        return layout;
+      }
+
+      function renderStructuredTextLayout(layout) {
+        textView.innerHTML = '';
+
+        if (!layout || !Array.isArray(layout.runs) || !layout.runs.length) {
+          const empty = document.createElement('div');
+          empty.className = 'text-page';
+          empty.style.width = '100%';
+          empty.style.height = '100%';
+          empty.style.display = 'flex';
+          empty.style.alignItems = 'center';
+          empty.style.justifyContent = 'center';
+          empty.style.fontSize = '18px';
+          empty.textContent = '[No extractable text on this page]';
+          textView.appendChild(empty);
+          return;
+        }
+
+        const wrapW = Math.max(1, viewerWrap.clientWidth);
+        // fitScale: always fit PDF to screen width
+        // effectiveScale: used for vertical positioning and font size (zoom = vertical scroll)
+        const fitScale = wrapW / Math.max(1, layout.bounds.width);
+        const effectiveScale = fitScale * textViewSettings.sizeScale;
+        // Page width always matches viewport; height grows with zoom
+        const outW = wrapW;
+        const outH = Math.max(1, Math.floor(layout.bounds.height * effectiveScale));
+
+        const pageEl = document.createElement('div');
+        pageEl.className = 'text-page';
+        pageEl.style.width = outW + 'px';
+        pageEl.style.height = outH + 'px';
+
+        for (const run of layout.runs) {
+          const span = document.createElement('span');
+          span.className = 'text-run';
+          span.textContent = run.text;
+          // X uses fitScale (stays within viewport); Y uses effectiveScale (scrolls vertically)
+          span.style.left = ((run.left - layout.bounds.left) * fitScale) + 'px';
+          span.style.top  = ((run.top  - layout.bounds.top)  * effectiveScale) + 'px';
+          span.style.fontSize = Math.max(6, run.fontSize * effectiveScale) + 'px';
+          if (textViewSettings.forceBold) { span.style.fontWeight = '700'; }
+          span.style.fontFamily = run.fontFamily;
+          pageEl.appendChild(span);
+        }
+
+        textView.appendChild(pageEl);
+      }
+
+      function detectContentBoundsFromImageData(imageData, width, height) {
+        const data = imageData.data;
+        const sampleStep = 2;
+        const whiteThreshold = 246;
+
+        function pixelHasContent(idx) {
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+          const a = data[idx + 3];
+          if (a < 8) return false;
+          return (r < whiteThreshold) || (g < whiteThreshold) || (b < whiteThreshold);
+        }
+
+        function rowHasContent(y) {
+          const row = y * width;
+          for (let x = 0; x < width; x += sampleStep) {
+            if (pixelHasContent((row + x) * 4)) return true;
+          }
+          return false;
+        }
+
+        function colHasContent(x, top, bottom) {
+          for (let y = top; y <= bottom; y += sampleStep) {
+            if (pixelHasContent((y * width + x) * 4)) return true;
+          }
+          return false;
+        }
+
+        let top = 0;
+        while (top < height && !rowHasContent(top)) top += 1;
+
+        let bottom = height - 1;
+        while (bottom >= top && !rowHasContent(bottom)) bottom -= 1;
+
+        if (top >= bottom) {
+          return { left: 0, top: 0, width, height };
+        }
+
+        let left = 0;
+        while (left < width && !colHasContent(left, top, bottom)) left += 1;
+
+        let right = width - 1;
+        while (right >= left && !colHasContent(right, top, bottom)) right -= 1;
+
+        if (left >= right) {
+          return { left: 0, top: 0, width, height };
+        }
+
+        const pad = 6;
+        const cropLeft = Math.max(0, left - pad);
+        const cropTop = Math.max(0, top - pad);
+        const cropRight = Math.min(width - 1, right + pad);
+        const cropBottom = Math.min(height - 1, bottom + pad);
+
+        return {
+          left: cropLeft,
+          top: cropTop,
+          width: Math.max(1, cropRight - cropLeft + 1),
+          height: Math.max(1, cropBottom - cropTop + 1)
+        };
+      }
+
+      async function renderPage() {
+        if (!pdfDoc) return;
+        updatePager();
+        setStatus('Rendering page ' + currentPage + '...');
+
+        const page = await pdfDoc.getPage(currentPage);
+
+        if (currentMode === 'image') {
+          const viewport = page.getViewport({ scale: 1 });
+          const wrapW = Math.max(1, viewerWrap.clientWidth);
+          const wrapH = Math.max(1, viewerWrap.clientHeight);
+          const widthScale = wrapW / viewport.width;
+          const heightScale = wrapH / viewport.height;
+
+          // First pass: render full page at fit scale.
+          const scale = Math.min(widthScale, heightScale);
+          const scaled = page.getViewport({ scale });
+
+          const scratch = document.createElement('canvas');
+          scratch.width = Math.max(1, Math.floor(scaled.width));
+          scratch.height = Math.max(1, Math.floor(scaled.height));
+          const scratchCtx = scratch.getContext('2d', { willReadFrequently: true });
+
+          await page.render({ canvasContext: scratchCtx, viewport: scaled }).promise;
+
+          // Trim white margins and fit trimmed content to the viewport.
+          const imageData = scratchCtx.getImageData(0, 0, scratch.width, scratch.height);
+          const bounds = detectContentBoundsFromImageData(imageData, scratch.width, scratch.height);
+
+          const fitTrimScale = Math.min(
+            wrapW / Math.max(1, bounds.width),
+            wrapH / Math.max(1, bounds.height)
+          );
+
+          const outW = Math.max(1, Math.floor(bounds.width * fitTrimScale));
+          const outH = Math.max(1, Math.floor(bounds.height * fitTrimScale));
+
+          const ctx = canvas.getContext('2d');
+          canvas.width = outW;
+          canvas.height = outH;
+          canvas.style.width = outW + 'px';
+          canvas.style.height = outH + 'px';
+
+          ctx.clearRect(0, 0, outW, outH);
+          ctx.drawImage(
+            scratch,
+            bounds.left,
+            bounds.top,
+            bounds.width,
+            bounds.height,
+            0,
+            0,
+            outW,
+            outH
+          );
+
+          setStatus('Showing page image view (auto-trimmed).');
+        } else {
+          setStatus('Building structured text view...');
+          const layout = await extractStructuredTextLayout(page);
+          renderStructuredTextLayout(layout);
+          setStatus('Showing page text view (layout-preserving).');
+        }
+        loadDocState();
+      }
+
+      async function loadPdf() {
+        try {
+          const pdfjsLib = await importPdfJs();
+          const src = '/api/docs/open/' + encodeURIComponent(file);
+          const loadingTask = pdfjsLib.getDocument({ url: src, withCredentials: false });
+          pdfDoc = await loadingTask.promise;
+          currentPage = 1;
+          updatePager();
+          await renderPage();
+          await buildPageList();
+          setStatus('Loaded. Swipe to navigate pages. Swipe right to open controls.');
+        } catch (err) {
+          setStatus('Failed to load PDF. ' + (err && err.message ? err.message : 'Unknown error'));
+          prevBtn.disabled = true;
+          nextBtn.disabled = true;
+          imageModeBtn.disabled = true;
+          textModeBtn.disabled = true;
+          fullscreenBtn.disabled = true;
+        }
+      }
+
+      prevBtn.addEventListener('click', async () => {
+        if (!pdfDoc) return;
+        if (searchPages.length) {
+          const pos = searchPages.indexOf(currentPage);
+          if (pos <= 0) return;
+          currentPage = searchPages[pos - 1];
+        } else {
+          if (currentPage <= 1) return;
+          currentPage -= 1;
+        }
+        await renderPage();
+      });
+
+      nextBtn.addEventListener('click', async () => {
+        if (!pdfDoc) return;
+        if (searchPages.length) {
+          const pos = searchPages.indexOf(currentPage);
+          if (pos >= searchPages.length - 1) return;
+          currentPage = searchPages[pos + 1];
+        } else {
+          if (currentPage >= pdfDoc.numPages) return;
+          currentPage += 1;
+        }
+        await renderPage();
+      });
+
+      imageModeBtn.addEventListener('click', async () => {
+        if (currentMode === 'image') return;
+        setMode('image');
+        await renderPage();
+      });
+
+      textModeBtn.addEventListener('click', async () => {
+        if (currentMode === 'text') return;
+        setMode('text');
+        await renderPage();
+      });
+
+      textSizeRange?.addEventListener('input', async () => {
+        const next = Number(textSizeRange.value);
+        if (!Number.isFinite(next)) return;
+        textViewSettings.sizeScale = Math.max(0.8, Math.min(2, next));
+        updateTextControlsUi();
+        if (currentMode === 'text') {
+          await renderPage();
+        }
+      });
+
+      textBoldToggle?.addEventListener('change', async () => {
+        textViewSettings.forceBold = !!textBoldToggle.checked;
+        updateTextControlsUi();
+        if (currentMode === 'text') {
+          await renderPage();
+        }
+      });
+
+      fullscreenBtn.addEventListener('click', async () => {
+        try {
+          if (!document.fullscreenElement) {
+            await viewerWrap.requestFullscreen();
+          } else {
+            await document.exitFullscreen();
+          }
+        } catch {}
+      });
+
+      let touchStartX = 0;
+      let touchStartY = 0;
+      viewerWrap.addEventListener('touchstart', (e) => {
+        const t = e.changedTouches && e.changedTouches[0];
+        if (!t) return;
+        touchStartX = t.clientX;
+        touchStartY = t.clientY;
+      }, { passive: true });
+
+      viewerWrap.addEventListener('touchend', async (e) => {
+        if (!pdfDoc) return;
+        const t = e.changedTouches && e.changedTouches[0];
+        if (!t) return;
+        const dx = t.clientX - touchStartX;
+        const dy = t.clientY - touchStartY;
+        const horizontalDominant = Math.abs(dx) > Math.abs(dy);
+        const verticalDominant = Math.abs(dy) > Math.abs(dx);
+
+        if (horizontalDominant && dx > 45) {
+          // Keep right-swipe reserved for opening the controls panel.
+          setPanelOpen(true);
+          return;
+        }
+
+        if (!verticalDominant || Math.abs(dy) < 45) return;
+
+        // Vertical paging: swipe up -> next page, swipe down -> previous page.
+        if (dy < 0 && currentPage < pdfDoc.numPages) {
+          if (searchPages.length) {
+            const pos = searchPages.indexOf(currentPage);
+            if (pos < searchPages.length - 1) { currentPage = searchPages[pos + 1]; await renderPage(); }
+          } else {
+            currentPage += 1; await renderPage();
+          }
+        } else if (dy > 0 && currentPage > 1) {
+          if (searchPages.length) {
+            const pos = searchPages.indexOf(currentPage);
+            if (pos > 0) { currentPage = searchPages[pos - 1]; await renderPage(); }
+          } else {
+            currentPage -= 1; await renderPage();
+          }
+        }
+      }, { passive: true });
+
+      sidepanelBackdrop?.addEventListener('click', () => setPanelOpen(false));
+
+      let panelTouchStartX = 0;
+      let panelTouchStartY = 0;
+      sidepanelLeft?.addEventListener('touchstart', (e) => {
+        const t = e.changedTouches && e.changedTouches[0];
+        if (!t) return;
+        panelTouchStartX = t.clientX;
+        panelTouchStartY = t.clientY;
+      }, { passive: true });
+
+      sidepanelLeft?.addEventListener('touchend', (e) => {
+        const t = e.changedTouches && e.changedTouches[0];
+        if (!t) return;
+        const dx = t.clientX - panelTouchStartX;
+        const dy = t.clientY - panelTouchStartY;
+        const isLeftSwipe = dx < -45 && Math.abs(dx) > Math.abs(dy);
+        if (isLeftSwipe) setPanelOpen(false);
+      }, { passive: true });
+
+      window.addEventListener('resize', () => {
+        if (currentMode === 'image') {
+          renderPage().catch(() => {});
+        }
+      });
+
+      updateTextControlsUi();
+      setMode('text');
+      await loadPdf();
+    })();
+  </script>
+</body>
+</html>
