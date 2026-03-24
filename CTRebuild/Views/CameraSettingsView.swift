@@ -16,6 +16,10 @@ struct CameraSettingsView: View {
     @AppStorage("cam_defaultZoom") private var defaultZoom: Double = 1.0
     @AppStorage("cam_scanRegionEnabled") private var scanRegionEnabled = false
     @AppStorage("cam_hapticOnScan") private var hapticOnScan = true
+    @AppStorage("cam_arkitEnabled") private var arkitEnabled = false
+    @AppStorage("cam_coremlEnabled") private var coremlEnabled = false
+    @AppStorage("cam_dragZoomSensitivity") private var dragZoomSensitivity: Double = 80
+    @AppStorage("cam_maxZoomLevel") private var maxZoomLevel: Double = 10
 
     var body: some View {
         ZStack {
@@ -85,6 +89,40 @@ struct CameraSettingsView: View {
                                   label: "Haptic on Scan",
                                   detail: "Vibrate when a barcode is detected",
                                   isOn: $hapticOnScan)
+
+                        divider
+
+                        // ── Frameworks ──────────────────────────────────────
+                        sectionHeader("FRAMEWORKS")
+
+                        toggleRow(icon: "arkit",
+                                  label: "ARKit",
+                                  detail: "Spatial tracking & depth sensing",
+                                  isOn: $arkitEnabled)
+
+                        toggleRow(icon: "brain",
+                                  label: "Core ML",
+                                  detail: "On-device machine learning models",
+                                  isOn: $coremlEnabled)
+
+                        divider
+
+                        // ── Drag Zoom ───────────────────────────────────────
+                        sectionHeader("DRAG ZOOM")
+
+                        sliderRow(icon: "hand.draw",
+                                  label: "Sensitivity",
+                                  value: $dragZoomSensitivity,
+                                  range: 30...200,
+                                  step: 10,
+                                  format: "%.0f pt")
+
+                        sliderRow(icon: "arrow.up.left.and.arrow.down.right",
+                                  label: "Max Zoom",
+                                  value: $maxZoomLevel,
+                                  range: 2...20,
+                                  step: 1,
+                                  format: "%.0f×")
 
                         divider
 
@@ -230,5 +268,9 @@ struct CameraSettingsView: View {
         defaultZoom = 1.0
         scanRegionEnabled = false
         hapticOnScan = true
+        arkitEnabled = false
+        coremlEnabled = false
+        dragZoomSensitivity = 80
+        maxZoomLevel = 10
     }
 }

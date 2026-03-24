@@ -8,6 +8,9 @@ struct BottomPanelView: View {
     @State private var zoomAtDragStart: CGFloat? = nil   // nil = not dragging
     @State private var showZoomBadge: Bool = false
     @State private var zoomBadgeTask: DispatchWorkItem? = nil
+    // Drag zoom settings
+    @AppStorage("cam_dragZoomSensitivity") private var dragZoomSensitivity: Double = 80
+    @AppStorage("cam_maxZoomLevel") private var maxZoomLevel: Double = 10
     // Modal routing
     @State private var pendingScan: ScanResult? = nil
     @State private var recentScans: [ScanResult] = []
@@ -73,8 +76,7 @@ struct BottomPanelView: View {
                                     zoomAtDragStart = viewModel.zoomFactor
                                 }
                                 if let base = zoomAtDragStart {
-                                    // 80 pt up/down = 2× zoom change
-                                    let newZoom = base * pow(2.0, -value.translation.height / 80)
+                                    let newZoom = base * pow(2.0, -value.translation.height / dragZoomSensitivity)
                                     viewModel.setZoom(newZoom)
                                 }
                                 showZoomBadge = true

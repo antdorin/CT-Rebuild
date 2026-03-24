@@ -1,4 +1,14 @@
 import AVFoundation
+import Vision
+
+// MARK: - OCR Result
+
+struct OCRResult: Identifiable {
+    let id = UUID()
+    let text: String
+    let confidence: Float
+    let boundingBox: CGRect
+}
 
 // MARK: - Scan Result
 
@@ -37,6 +47,12 @@ final class CameraViewModel: NSObject, ObservableObject {
     // Zoom
     private weak var captureDevice: AVCaptureDevice?
     @Published private(set) var zoomFactor: CGFloat = 1.0
+
+    // Vision pipeline
+    private var videoOutput: AVCaptureVideoDataOutput?
+    private let visionQueue = DispatchQueue(label: "com.ctrebuild.camera.vision", qos: .userInitiated)
+    @Published private(set) var ocrResults: [OCRResult] = []
+    @Published private(set) var visionBarcodes: [ScanResult] = []
 
     // MARK: - Permission
 
@@ -124,14 +140,26 @@ final class CameraViewModel: NSObject, ObservableObject {
             device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: 60)
             device.unlockForConfiguration()
         }
+
+        // Vision video output — runs OCR + barcode detection per frame
+        let vidOutput = AVCaptureVideoDataOutput()
+        vidOutput.alwaysDiscardsLateVideoFrames = true
+        vidOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange]
+        if session.canAddOutput(vidOutput) {
+            session.addOutput(vidOutput)
+            vidOutput.setSampleBufferDelegate(self, queue: visionQueue)
+            videoOutput = vidOutput
+        }
     }
 
     // MARK: - Zoom
 
     func setZoom(_ factor: CGFloat) {
         guard let device = captureDevice else { return }
+        let maxSetting = UserDefaults.standard.double(forKey: "cam_maxZoomLevel")
+        let maxCap = maxSetting > 0 ? maxSetting : 10.0
         let minZ = device.minAvailableVideoZoomFactor
-        let maxZ = min(device.maxAvailableVideoZoomFactor, 10.0)
+        let maxZ = min(device.maxAvailableVideoZoomFactor, maxCap)
         let clamped = max(minZ, min(maxZ, factor))
         sessionQueue.async {
             try? device.lockForConfiguration()
@@ -141,6 +169,56 @@ final class CameraViewModel: NSObject, ObservableObject {
                 self?.zoomFactor = clamped
             }
         }
+    }
+}
+
+// MARK: - AVCaptureVideoDataOutputSampleBufferDelegate (Vision)
+
+extension CameraViewModel: AVCaptureVideoDataOutputSampleBufferDelegate {
+    func captureOutput(_ output: AVCaptureOutput,
+                       didOutput sampleBuffer: CMSampleBuffer,
+                       from connection: AVCaptureConnection) {
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+
+        let ocrRequest = VNRecognizeTextRequest { [weak self] request, _ in
+            guard let observations = request.results as? [VNRecognizedTextObservation] else { return }
+            let results = observations.compactMap { obs -> OCRResult? in
+                guard let candidate = obs.topCandidates(1).first else { return nil }
+                return OCRResult(text: candidate.string,
+                                 confidence: candidate.confidence,
+                                 boundingBox: obs.boundingBox)
+            }
+            DispatchQueue.main.async { self?.ocrResults = results }
+        }
+        ocrRequest.recognitionLevel = .fast
+        ocrRequest.usesLanguageCorrection = false
+
+        let barcodeRequest = VNDetectBarcodesRequest { [weak self] request, _ in
+            guard let observations = request.results as? [VNBarcodeObservation] else { return }
+            let scans = observations.compactMap { obs -> ScanResult? in
+                guard let payload = obs.payloadStringValue, !payload.isEmpty else { return nil }
+                let symbology: AVMetadataObject.ObjectType
+                switch obs.symbology {
+                case .qr:        symbology = .qr
+                case .ean8:      symbology = .ean8
+                case .ean13:     symbology = .ean13
+                case .code128:   symbology = .code128
+                case .code39:    symbology = .code39
+                case .code93:    symbology = .code93
+                case .pdf417:    symbology = .pdf417
+                case .aztec:     symbology = .aztec
+                case .dataMatrix: symbology = .dataMatrix
+                case .itf14:     symbology = .itf14
+                case .upce:      symbology = .upce
+                default:         symbology = .qr
+                }
+                return ScanResult(value: payload, symbology: symbology)
+            }
+            DispatchQueue.main.async { self?.visionBarcodes = scans }
+        }
+
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
+        try? handler.perform([ocrRequest, barcodeRequest])
     }
 }
 
