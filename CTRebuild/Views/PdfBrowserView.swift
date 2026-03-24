@@ -973,55 +973,39 @@ private func ticketSectionHTML(fields: TicketFields, page: Int) -> String {
 
     return """
     <section class=\"ticket\">
-      <div class=\"ticket-inner\">
-                <div class=\"title\">Picking Ticket</div>
-                <div class=\"so\">#\(htmlEscaped(fields.soNumber))</div>
-                <div class=\"date\">\(htmlEscaped(fields.date))</div>
+      <div class=\"title\">Picking Ticket</div>
+      <div class=\"so\">#\(htmlEscaped(fields.soNumber))</div>
+      <div class=\"date\">\(htmlEscaped(fields.date))</div>
 
-                <div class=\"address-head\">
-                    <span>Ship To</span>
-                    <span>Notes:</span>
-                </div>
-                <div class=\"address-row\">
-                    <div class=\"ship-block\">\(shipTo)</div>
-                    <div class=\"notes\">\(notes)</div>
-                </div>
-
-                <table class=\"meta-table\" cellspacing=\"0\" cellpadding=\"0\">
-                    <tr>
-                        <th>Company Name</th>
-                        <th>Terms</th>
-                        <th>Shipping Method</th>
-                        <th>3rd Party Account #</th>
-                    </tr>
-                    <tr>
-                        <td>\(htmlEscaped(fields.companyName))</td>
-                        <td>\(htmlEscaped(fields.terms))</td>
-                        <td>\(htmlEscaped(fields.shippingMethod))</td>
-                        <td>\(htmlEscaped(fields.thirdPartyAccount))</td>
-                    </tr>
-                </table>
-
-                <table class=\"item-table\" cellspacing=\"0\" cellpadding=\"0\">
-                    <tr>
-                        <th>Bin Location</th>
-                        <th>Item</th>
-                        <th>Quantity</th>
-                        <th>Units</th>
-                        <th>Committed</th>
-                    </tr>
-                    <tr>
-                        <td>\(htmlEscaped(fields.binLocation))</td>
-                        <td><strong>\(htmlEscaped(fields.itemCode))</strong></td>
-                        <td>\(htmlEscaped(fields.quantity))</td>
-                        <td>\(htmlEscaped(fields.units))</td>
-                        <td>\(htmlEscaped(fields.committed))</td>
-                    </tr>
-                </table>
-
-                <div class=\"item-desc\">\(htmlEscaped(fields.itemDescription))</div>
-                <div class=\"page-label\">Page \(page)</div>
+      <div class=\"address-head\"><span>Ship To</span><span>Notes:</span></div>
+      <div class=\"address-row\">
+        <div class=\"ship-block\">\(shipTo)</div>
+        <div class=\"notes\">\(notes)</div>
       </div>
+
+      <table class=\"band-table meta-band\" cellspacing=\"0\" cellpadding=\"0\">
+        <tr><th>Company Name</th><th>Terms</th><th>Shipping Method</th><th>3rd Party Account #</th></tr>
+        <tr>
+          <td>\(htmlEscaped(fields.companyName))</td>
+          <td>\(htmlEscaped(fields.terms))</td>
+          <td>\(htmlEscaped(fields.shippingMethod))</td>
+          <td>\(htmlEscaped(fields.thirdPartyAccount))</td>
+        </tr>
+      </table>
+
+      <table class=\"band-table item-band\" cellspacing=\"0\" cellpadding=\"0\">
+        <tr><th>Bin Location</th><th>Item</th><th>Quantity</th><th>Units</th><th>Committed</th></tr>
+        <tr>
+          <td>\(htmlEscaped(fields.binLocation))</td>
+          <td class=\"item-code\">\(htmlEscaped(fields.itemCode))</td>
+          <td>\(htmlEscaped(fields.quantity))</td>
+          <td>\(htmlEscaped(fields.units))</td>
+          <td>\(htmlEscaped(fields.committed))</td>
+        </tr>
+        <tr class=\"desc-row\"><td></td><td colspan=\"4\">\(htmlEscaped(fields.itemDescription))</td></tr>
+      </table>
+
+      <div class=\"page-label\">Page \(page)</div>
     </section>
     """
 }
@@ -1046,122 +1030,107 @@ private func buildReflowHTML(from doc: PDFDocument, fontPercent: Int) -> String 
       <meta charset=\"utf-8\" />
       <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0\" />
       <style>
-        :root { --fontScale: \(fontPercent)%; }
-        * { box-sizing: border-box; }
+        :root { --fontScale: \(fontPercent); }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-          margin: 0;
-          padding: 10px;
-          background: #0f0f0f;
-          color: #000;
+          background: #111;
           font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;
+          padding: 12px;
+          color: #111;
         }
         .ticket {
-          background: #f8f8f8;
-          border-radius: 10px;
-          margin: 0 0 10px 0;
-          overflow: hidden;
+          background: #fff;
+          border-radius: 8px;
+          margin-bottom: 12px;
+          padding: 20px 18px 18px;
         }
-        .ticket-inner {
-                    width: 100%;
-                    min-height: 94vw;
-                    max-width: 980px;
-                    margin: 0 auto;
-                    padding: 14px 12px 10px;
-                    display: grid;
-                    gap: 4px;
-                }
-
-                .title { font-size: calc(20px * var(--fontScale) / 100); font-weight: 500; line-height: 1.15; }
-                .so { margin-top: 1px; font-size: calc(15px * var(--fontScale) / 100); font-weight: 700; line-height: 1.1; }
-                .date { margin-top: -1px; font-size: calc(11px * var(--fontScale) / 100); color: #111; }
-
-                .address-row {
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 6px;
-                }
-                .address-head {
-                    margin-top: 8px;
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    font-size: calc(10px * var(--fontScale) / 100);
-                    font-weight: 700;
-                    color: #000;
-                }
-                .ship-block,
-                .notes {
-                    font-size: calc(10px * var(--fontScale) / 100);
-                    line-height: 1.18;
-                    white-space: pre-wrap;
-                    word-break: break-word;
-                    min-height: 64px;
-                    color: #000;
-                }
-
-                .meta-table,
-                .item-table {
-                    width: 100%;
-                    border-collapse: separate;
-                    border-spacing: 0;
-                    table-layout: fixed;
-                    background: transparent;
-                    margin-top: 2px;
-                }
-                .meta-table th,
-                .meta-table td,
-                .item-table th,
-                .item-table td {
-                    border: 0;
-                    padding: 3px 4px;
-                    font-size: calc(9px * var(--fontScale) / 100);
-                    text-align: left;
-                    vertical-align: top;
-                    word-break: break-word;
-                    line-height: 1.2;
-                }
-                .meta-table th,
-                .item-table th { background: #c8c8c8; font-weight: 700; color: #000; }
-                .meta-table td,
-                .item-table td { background: #fff; }
-                .item-table td strong { color: #c7302a; font-weight: 600; }
-
-                .meta-table th:nth-child(1), .meta-table td:nth-child(1) { width: 28%; }
-                .meta-table th:nth-child(2), .meta-table td:nth-child(2) { width: 14%; }
-                .meta-table th:nth-child(3), .meta-table td:nth-child(3) { width: 26%; }
-                .meta-table th:nth-child(4), .meta-table td:nth-child(4) { width: 32%; }
-
-                .item-table th:nth-child(1), .item-table td:nth-child(1) { width: 14%; }
-                .item-table th:nth-child(2), .item-table td:nth-child(2) { width: 46%; }
-                .item-table th:nth-child(3), .item-table td:nth-child(3) { width: 12%; }
-                .item-table th:nth-child(4), .item-table td:nth-child(4) { width: 12%; }
-                .item-table th:nth-child(5), .item-table td:nth-child(5) { width: 16%; }
-
-                .item-desc {
-                    margin-top: -3px;
-                    padding: 3px 4px;
-                    min-height: 16px;
-                    font-size: calc(9px * var(--fontScale) / 100);
-                    line-height: 1.2;
-                    word-break: break-word;
-                    background: #fff;
-                    color: #c7302a;
-                }
-
-                .page-label {
-                    justify-self: end;
-                    font-size: calc(8px * var(--fontScale) / 100);
-                    color: #666;
-                    margin-top: 3px;
-                }
-
-                @media (max-width: 760px) {
-                    .ticket-inner { min-height: 112vw; }
-                    .title { font-size: calc(17px * var(--fontScale) / 100); }
-                    .so { font-size: calc(13px * var(--fontScale) / 100); }
-                    .date { font-size: calc(10px * var(--fontScale) / 100); }
-                }
-
-        .empty { color: #ddd; padding: 20px; }
+        .title {
+          font-size: calc(28px * var(--fontScale) / 100);
+          font-weight: 400;
+          line-height: 1.15;
+          color: #111;
+        }
+        .so {
+          font-size: calc(22px * var(--fontScale) / 100);
+          font-weight: 700;
+          margin-top: 3px;
+          color: #111;
+        }
+        .date {
+          font-size: calc(14px * var(--fontScale) / 100);
+          color: #444;
+          margin-top: 2px;
+          margin-bottom: 22px;
+        }
+        .address-head {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          font-size: calc(14px * var(--fontScale) / 100);
+          font-weight: 700;
+          margin-bottom: 5px;
+        }
+        .address-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+          margin-bottom: 20px;
+          min-height: 72px;
+        }
+        .ship-block, .notes {
+          font-size: calc(14px * var(--fontScale) / 100);
+          line-height: 1.45;
+          color: #222;
+          white-space: pre-wrap;
+          word-break: break-word;
+        }
+        .band-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 14px;
+          table-layout: fixed;
+        }
+        .band-table th {
+          background: #d0d0d0;
+          font-size: calc(12px * var(--fontScale) / 100);
+          font-weight: 700;
+          padding: 7px 8px;
+          text-align: left;
+          vertical-align: bottom;
+          line-height: 1.25;
+        }
+        .band-table td {
+          font-size: calc(14px * var(--fontScale) / 100);
+          padding: 8px 8px;
+          vertical-align: top;
+          line-height: 1.4;
+          word-break: break-word;
+        }
+        .meta-band th:nth-child(1), .meta-band td:nth-child(1) { width: 30%; }
+        .meta-band th:nth-child(2), .meta-band td:nth-child(2) { width: 18%; }
+        .meta-band th:nth-child(3), .meta-band td:nth-child(3) { width: 28%; }
+        .meta-band th:nth-child(4), .meta-band td:nth-child(4) { width: 24%; }
+        .item-band th:nth-child(1), .item-band td:nth-child(1) { width: 14%; }
+        .item-band th:nth-child(2), .item-band td:nth-child(2) { width: 44%; }
+        .item-band th:nth-child(3), .item-band td:nth-child(3) { width: 14%; text-align: right; }
+        .item-band th:nth-child(4), .item-band td:nth-child(4) { width: 14%; text-align: right; }
+        .item-band th:nth-child(5), .item-band td:nth-child(5) { width: 14%; text-align: right; }
+        .item-band td:nth-child(3),
+        .item-band td:nth-child(4),
+        .item-band td:nth-child(5) { text-align: right; }
+        .item-code { font-weight: 700; color: #111; }
+        .desc-row td {
+          font-size: calc(13px * var(--fontScale) / 100);
+          color: #444;
+          padding: 3px 8px 8px;
+          line-height: 1.35;
+        }
+        .page-label {
+          text-align: right;
+          font-size: calc(12px * var(--fontScale) / 100);
+          color: #888;
+          margin-top: 6px;
+        }
+        .empty { color: #ccc; padding: 20px; }
       </style>
     </head>
     <body>
