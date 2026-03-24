@@ -652,16 +652,11 @@ private struct PdfDetailView: View {
 // MARK: - Sort Sheet
 
 private struct PdfSortSheet: View {
+    let document: PDFDocument
     let onSort: (PdfSortField) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var searchText: String = ""
-
-    private var filteredFields: [PdfSortField] {
-        guard !searchText.isEmpty else { return PdfSortField.allCases }
-        return PdfSortField.allCases.filter {
-            $0.rawValue.localizedCaseInsensitiveContains(searchText)
-        }
-    }
+    @State private var matchingPages: [Int] = []
 
     var body: some View {
         ZStack {
@@ -673,17 +668,22 @@ private struct PdfSortSheet: View {
                     .tracking(3)
                     .padding(.top, 22).padding(.bottom, 12)
 
-                // Search bar
+                // Search bar — searches PDF text content
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.white.opacity(0.4))
-                    TextField("Search…", text: $searchText)
+                    TextField("Search PDF text\u{2026}", text: $searchText)
                         .font(.system(size: 13, weight: .medium, design: .monospaced))
                         .foregroundColor(.white.opacity(0.9))
                         .tint(.orange)
+                        .onSubmit { performSearch() }
+                        .submitLabel(.search)
                     if !searchText.isEmpty {
-                        Button { searchText = "" } label: {
+                        Button {
+                            searchText = ""
+                            matchingPages = []
+                        } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: 13))
                                 .foregroundColor(.white.opacity(0.35))
@@ -697,8 +697,21 @@ private struct PdfSortSheet: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 12)
 
+                // Search results indicator
+                if !searchText.isEmpty && !matchingPages.isEmpty {
+                    Text("\(matchingPages.count) page\(matchingPages.count == 1 ? "" : "s") matched")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundColor(.orange.opacity(0.7))
+                        .padding(.bottom, 12)
+                } else if !searchText.isEmpty && matchingPages.isEmpty {
+                    Text("No matches")
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.3))
+                        .padding(.bottom, 12)
+                }
+
                 VStack(spacing: 0) {
-                    ForEach(Array(filteredFields.enumerated()), id: \.element.id) { idx, field in
+                    ForEach(Array(PdfSortField.allCases.enumerated()), id: \.element.id) { idx, field in
                         if idx > 0 { Divider().opacity(0.1).padding(.leading, 54) }
                         Button {
                             onSort(field)
@@ -728,6 +741,19 @@ private struct PdfSortSheet: View {
                 Spacer()
             }
         }
+    }
+
+    private func performSearch() {
+        guard !searchText.isEmpty else { matchingPages = []; return }
+        let query = searchText.lowercased()
+        var pages: [Int] = []
+        for i in 0..<document.pageCount {
+            if let text = document.page(at: i)?.string?.lowercased(),
+               text.contains(query) {
+                pages.append(i + 1)
+            }
+        }
+        matchingPages = pages
     }
 }
 
