@@ -1,6 +1,5 @@
 import SwiftUI
 import PDFKit
-import Vision
 
 // MARK: - SO Number Helpers
 
@@ -454,13 +453,11 @@ private struct PdfDetailView: View {
     @Binding var currentPage: Int
     let onBack: () -> Void
 
-    @State private var showTextMode = false
     @State private var showSortSheet = false
     @State private var displayDoc: PDFDocument
     @State private var soTitle: String = ""
     @State private var singlePageMode = false
-    @State private var scaleFactor: CGFloat = 1.0
-    @State private var showOcrMode = false
+    @State private var autoCropEnabled = true
 
     init(document: PDFDocument, title: String, safeArea: EdgeInsets,
          currentPage: Binding<Int>, onBack: @escaping () -> Void) {
@@ -470,31 +467,6 @@ private struct PdfDetailView: View {
         self._currentPage = currentPage
         self.onBack      = onBack
         self._displayDoc = State(initialValue: document)
-    }
-
-    private var extractedText: String {
-        var parts: [String] = []
-        for i in 0..<displayDoc.pageCount {
-            if let t = displayDoc.page(at: i)?.string,
-               !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                parts.append("\u{2500}\u{2500} Page \(i + 1) \u{2500}\u{2500}\n\(t)")
-            }
-        }
-        return parts.isEmpty ? "No selectable text found in this PDF." : parts.joined(separator: "\n\n")
-    }
-
-    /// Render a single PDF page to a UIImage at the given scale multiplier.
-    private func renderPageImage(_ page: PDFPage, scale: CGFloat) -> UIImage? {
-        let bounds = page.bounds(for: .mediaBox)
-        let size = CGSize(width: bounds.width * scale, height: bounds.height * scale)
-        let renderer = UIGraphicsImageRenderer(size: size)
-        return renderer.image { ctx in
-            UIColor.white.setFill()
-            ctx.fill(CGRect(origin: .zero, size: size))
-            ctx.cgContext.translateBy(x: 0, y: size.height)
-            ctx.cgContext.scaleBy(x: scale, y: -scale)
-            page.draw(with: .mediaBox, to: ctx.cgContext)
-        }
     }
 
     var body: some View {
@@ -515,45 +487,8 @@ private struct PdfDetailView: View {
                 Divider().opacity(0.12)
 
                 // ── Content ───────────────────────────────────────────────
-                if showOcrMode {
-                    GeometryReader { geo in
-                        ScrollView {
-                            LazyVStack(spacing: 12) {
-                                ForEach(0..<displayDoc.pageCount, id: \.self) { i in
-                                    if let page = displayDoc.page(at: i) {
-                                        OcrPageView(page: page,
-                                                    availableWidth: geo.size.width - 16,
-                                                    scaleFactor: scaleFactor)
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 12)
-                        }
-                    }
-                } else if showTextMode {
-                    GeometryReader { geo in
-                        ScrollView {
-                            LazyVStack(spacing: 12) {
-                                ForEach(0..<displayDoc.pageCount, id: \.self) { i in
-                                    if let page = displayDoc.page(at: i),
-                                       let img = renderPageImage(page, scale: scaleFactor * 3.0) {
-                                        Image(uiImage: img)
-                                            .resizable()
-                                            .scaledToFit()
-                                            .frame(width: geo.size.width - 16)
-                                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 12)
-                        }
-                    }
-                } else {
-                    PdfKitView(document: displayDoc, currentPageIdx: $currentPage,
-                               singlePage: singlePageMode)
-                }
+                PdfKitView(document: displayDoc, currentPageIdx: $currentPage,
+                           singlePage: singlePageMode, autoCrop: autoCropEnabled)
 
                 Divider().opacity(0.12)
 
@@ -575,22 +510,14 @@ private struct PdfDetailView: View {
 
                     Divider().frame(height: 20).opacity(0.2)
 
-                    // PDF segment
-                    barSegment(label: "PDF", active: !showTextMode && !showOcrMode) {
-                        showTextMode = false; showOcrMode = false
+                    // Auto-crop toggle
+                    Button { autoCropEnabled.toggle() } label: {
+                        Image(systemName: autoCropEnabled ? "crop" : "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: 13))
+                            .foregroundColor(autoCropEnabled ? .orange : .white.opacity(0.45))
+                            .padding(.horizontal, 8).padding(.vertical, 10)
                     }
-
-                    // TEXT segment
-                    barSegment(label: "TEXT", active: showTextMode) {
-                        showTextMode = true; showOcrMode = false
-                    }
-
-                    // SCAN segment
-                    barSegment(label: "SCAN", active: showOcrMode) {
-                        showOcrMode = true; showTextMode = false
-                    }
-
-                    Divider().frame(height: 20).opacity(0.2)
+                    .buttonStyle(.plain)
 
                     // Single page toggle
                     Button { singlePageMode.toggle() } label: {
@@ -600,37 +527,6 @@ private struct PdfDetailView: View {
                             .padding(.horizontal, 8).padding(.vertical, 10)
                     }
                     .buttonStyle(.plain)
-
-                    // Text size controls (TEXT / SCAN mode)
-                    if showTextMode || showOcrMode {
-                        Divider().frame(height: 20).opacity(0.2)
-
-                        Button { scaleFactor = max(0.5, scaleFactor - 0.25) } label: {
-                            Image(systemName: "minus.circle")
-                                .font(.system(size: 13))
-                                .foregroundColor(scaleFactor <= 0.5 ? .white.opacity(0.2) : .white.opacity(0.55))
-                                .padding(.horizontal, 6).padding(.vertical, 10)
-                        }
-                        .buttonStyle(.plain)
-
-                        Button { scaleFactor = min(4.0, scaleFactor + 0.25) } label: {
-                            Image(systemName: "plus.circle")
-                                .font(.system(size: 13))
-                                .foregroundColor(scaleFactor >= 4.0 ? .white.opacity(0.2) : .white.opacity(0.55))
-                                .padding(.horizontal, 6).padding(.vertical, 10)
-                        }
-                        .buttonStyle(.plain)
-
-                        if scaleFactor != 1.0 {
-                            Button { scaleFactor = 1.0 } label: {
-                                Text("\(Int(scaleFactor * 100))%")
-                                    .font(.system(size: 9, weight: .medium, design: .monospaced))
-                                    .foregroundColor(.orange.opacity(0.7))
-                                    .padding(.horizontal, 4).padding(.vertical, 10)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
 
                     Spacer()
 
@@ -660,19 +556,6 @@ private struct PdfDetailView: View {
             .presentationDetents([.height(360)])
             .presentationDragIndicator(.visible)
         }
-    }
-
-    private func barSegment(label: String, active: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(label)
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundColor(active ? .black : .white.opacity(0.45))
-                .padding(.horizontal, 12).padding(.vertical, 6)
-                .background(active ? Color.white.opacity(0.88) : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 5))
-                .padding(.horizontal, 3).padding(.vertical, 4)
-        }
-        .buttonStyle(.plain)
     }
 }
 
@@ -835,105 +718,78 @@ private struct PdfSortSheet: View {
     }
 }
 
-// MARK: - OCR Page View
+// MARK: - Auto-Crop Helpers
 
-private struct OcrPageView: View {
-    let page: PDFPage
-    let availableWidth: CGFloat
-    let scaleFactor: CGFloat
+/// Scans a PDF page bitmap to find the bounding box of non-white content.
+/// Returns the crop rect in PDF page coordinate space, or nil if the page is blank.
+private func contentBounds(for page: PDFPage, threshold: UInt8 = 245) -> CGRect? {
+    let mediaBox = page.bounds(for: .mediaBox)
+    let sampleScale: CGFloat = 1.0   // 1× is enough for edge detection
+    let w = Int(mediaBox.width * sampleScale)
+    let h = Int(mediaBox.height * sampleScale)
+    guard w > 0, h > 0 else { return nil }
 
-    @State private var pageImage: UIImage?
-    @State private var textBlocks: [TextBlock] = []
-    @State private var isProcessing = true
+    // Render page to a 32-bit RGBA bitmap
+    let bytesPerRow = w * 4
+    guard let ctx = CGContext(data: nil, width: w, height: h,
+                              bitsPerComponent: 8, bytesPerRow: bytesPerRow,
+                              space: CGColorSpaceCreateDeviceRGB(),
+                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+    else { return nil }
 
-    private struct TextBlock: Identifiable, Sendable {
-        let id = UUID()
-        let text: String
-        let box: CGRect
-    }
+    ctx.setFillColor(UIColor.white.cgColor)
+    ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+    ctx.translateBy(x: 0, y: CGFloat(h))
+    ctx.scaleBy(x: sampleScale, y: -sampleScale)
+    page.draw(with: .mediaBox, to: ctx)
 
-    var body: some View {
-        ZStack {
-            if let img = pageImage {
-                let aspect = img.size.height / img.size.width
-                let h = availableWidth * aspect
+    guard let data = ctx.data else { return nil }
+    let ptr = data.bindMemory(to: UInt8.self, capacity: bytesPerRow * h)
 
-                ZStack {
-                    Image(uiImage: img)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: availableWidth)
-                        .opacity(0.35)
+    var minX = w, minY = h, maxX = 0, maxY = 0
 
-                    ForEach(textBlocks) { block in
-                        let bx = block.box.origin.x * availableWidth
-                        let by = (1 - block.box.origin.y - block.box.height) * h
-                        let bw = block.box.width * availableWidth
-                        let bh = block.box.height * h
-
-                        Text(block.text)
-                            .font(.system(size: max(4, bh * 0.72 * scaleFactor),
-                                          design: .monospaced))
-                            .foregroundColor(.white.opacity(0.92))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.3)
-                            .frame(width: bw, height: bh, alignment: .leading)
-                            .background(Color.black.opacity(0.45))
-                            .position(x: bx + bw / 2, y: by + bh / 2)
-                    }
-                    .frame(width: availableWidth, height: h)
-
-                    if isProcessing {
-                        ProgressView().tint(.orange)
-                    }
-                }
-                .frame(width: availableWidth, height: h)
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-            } else {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.white.opacity(0.04))
-                    .frame(height: availableWidth * 1.414)
-                    .overlay { ProgressView().tint(.orange) }
+    for y in 0..<h {
+        let row = y * bytesPerRow
+        for x in 0..<w {
+            let offset = row + x * 4
+            let r = ptr[offset], g = ptr[offset + 1], b = ptr[offset + 2]
+            if r < threshold || g < threshold || b < threshold {
+                if x < minX { minX = x }
+                if x > maxX { maxX = x }
+                if y < minY { minY = y }
+                if y > maxY { maxY = y }
             }
         }
-        .task { await processPage() }
     }
 
-    private func processPage() async {
-        let bounds = page.bounds(for: .mediaBox)
-        let renderScale: CGFloat = 2.0
-        let size = CGSize(width: bounds.width * renderScale,
-                          height: bounds.height * renderScale)
-        let renderer = UIGraphicsImageRenderer(size: size)
-        let img = renderer.image { ctx in
-            UIColor.white.setFill()
-            ctx.fill(CGRect(origin: .zero, size: size))
-            ctx.cgContext.translateBy(x: 0, y: size.height)
-            ctx.cgContext.scaleBy(x: renderScale, y: -renderScale)
-            page.draw(with: .mediaBox, to: ctx.cgContext)
+    guard maxX >= minX, maxY >= minY else { return nil }
+
+    // Add a small margin (4pt equivalent)
+    let margin: CGFloat = 4.0 * sampleScale
+    let cx = max(0, CGFloat(minX) - margin)
+    let cy = max(0, CGFloat(minY) - margin)
+    let cw = min(CGFloat(w), CGFloat(maxX) + margin) - cx
+    let ch = min(CGFloat(h), CGFloat(maxY) + margin) - cy
+
+    // Convert pixel coords back to PDF page coords (flip Y)
+    return CGRect(x: cx / sampleScale,
+                  y: (CGFloat(h) - cy - ch) / sampleScale,
+                  width: cw / sampleScale,
+                  height: ch / sampleScale)
+}
+
+/// Returns a new PDFDocument with each page's cropBox set to its content bounds.
+private func autoCropped(_ source: PDFDocument) -> PDFDocument {
+    let out = PDFDocument()
+    for i in 0..<source.pageCount {
+        guard let page = source.page(at: i),
+              let copy = page.copy() as? PDFPage else { continue }
+        if let crop = contentBounds(for: copy) {
+            copy.setBounds(crop, for: .cropBox)
         }
-        pageImage = img
-
-        guard let cgImage = img.cgImage else { isProcessing = false; return }
-
-        let blocks = await withCheckedContinuation { (cont: CheckedContinuation<[TextBlock], Never>) in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let request = VNRecognizeTextRequest()
-                request.recognitionLevel = .accurate
-                request.usesLanguageCorrection = true
-                let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-                try? handler.perform([request])
-                let results: [TextBlock] = (request.results ?? []).compactMap { obs in
-                    guard let text = obs.topCandidates(1).first?.string else { return nil }
-                    return TextBlock(text: text, box: obs.boundingBox)
-                }
-                cont.resume(returning: results)
-            }
-        }
-
-        textBlocks = blocks
-        isProcessing = false
+        out.insert(copy, at: i)
     }
+    return out
 }
 
 // MARK: - PDFKit View
@@ -942,6 +798,7 @@ private struct PdfKitView: UIViewRepresentable {
     let document: PDFDocument
     @Binding var currentPageIdx: Int
     var singlePage: Bool = false
+    var autoCrop: Bool = false
 
     func makeCoordinator() -> Coordinator { Coordinator(binding: $currentPageIdx) }
 
@@ -952,9 +809,11 @@ private struct PdfKitView: UIViewRepresentable {
         view.displayDirection = .vertical
         view.backgroundColor = .black
         view.usePageViewController(singlePage)
-        view.document = document
-        // Restore saved position
-        if currentPageIdx > 0, let page = document.page(at: currentPageIdx) {
+        let doc = autoCrop ? autoCropped(document) : document
+        view.document = doc
+        context.coordinator.lastAutoCrop = autoCrop
+        context.coordinator.sourceDoc = document
+        if currentPageIdx > 0, let page = doc.page(at: currentPageIdx) {
             DispatchQueue.main.async { view.go(to: page) }
         }
         NotificationCenter.default.addObserver(
@@ -967,14 +826,20 @@ private struct PdfKitView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: PDFView, context: Context) {
-        // Swap document when sort is applied
-        if uiView.document !== document {
-            uiView.document = document
-            if let first = document.page(at: 0) {
-                uiView.go(to: first)
+        let coord = context.coordinator
+        let docChanged = coord.sourceDoc !== document
+        let cropChanged = coord.lastAutoCrop != autoCrop
+
+        if docChanged || cropChanged {
+            coord.sourceDoc = document
+            coord.lastAutoCrop = autoCrop
+            let doc = autoCrop ? autoCropped(document) : document
+            uiView.document = doc
+            let pageIdx = docChanged ? 0 : currentPageIdx
+            if let page = doc.page(at: pageIdx) {
+                uiView.go(to: page)
             }
         }
-        // Display mode + swipe navigation
         let mode: PDFDisplayMode = singlePage ? .singlePage : .singlePageContinuous
         if uiView.displayMode != mode {
             uiView.displayMode = mode
@@ -984,6 +849,8 @@ private struct PdfKitView: UIViewRepresentable {
 
     final class Coordinator: NSObject {
         @Binding var currentPageIdx: Int
+        var lastAutoCrop: Bool = false
+        weak var sourceDoc: PDFDocument?
         init(binding: Binding<Int>) { _currentPageIdx = binding }
 
         @objc func pageChanged(_ note: Notification) {
