@@ -8,6 +8,7 @@
       "bundleIdentifier": "com.ctrebuild.app",
       "developerName": "Chase Tactical",
       "localizedDescription": "Chase Tactical warehouse management app.",
+      "iconURL": "https://raw.githubusercontent.com/antdorin/CT-Rebuild/main/CTRebuild/Assets.xcassets/CTHelmet.imageset/CTHelmet.png",
       "tintColor": "7AC0F8",
       "version": "1.0.140",
       "versionDate": "2026-03-25",
