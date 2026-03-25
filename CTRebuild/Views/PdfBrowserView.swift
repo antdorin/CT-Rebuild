@@ -212,11 +212,14 @@ struct PdfBrowserView: View {
     @State private var isLoadingGroup = false
     @State private var groupError: String? = nil
 
-    // per-group last-page memory (group.id → page index)
+    // per-group last-page memory (group.id → page index) — persisted to UserDefaults
     @State private var lastPages: [String: Int] = [:]
 
     // per-group cached merged PDFDocuments (for bin extraction without re-download)
     @State private var cachedDocs: [String: PDFDocument] = [:]
+
+    // persists which group was open when the panel closed
+    @AppStorage("pdfOpenedGroupId") private var openedGroupId: String = ""
 
     @ObservedObject private var binStore = BinDataStore.shared
 
@@ -232,12 +235,18 @@ struct PdfBrowserView: View {
                     filenames: group.filenames,
                     currentPage: Binding(
                         get: { lastPages[group.id] ?? 0 },
-                        set: { lastPages[group.id] = $0 }
+                        set: { newPage in
+                            var updated = lastPages
+                            updated[group.id] = newPage
+                            lastPages = updated
+                            UserDefaults.standard.set(updated, forKey: "pdfLastPages")
+                        }
                     ),
                     onBack: {
                         withAnimation(.easeInOut(duration: 0.22)) {
                             openedGroup = nil
                             mergedDoc = nil
+                            openedGroupId = ""
                         }
                     }
                 )
@@ -254,7 +263,17 @@ struct PdfBrowserView: View {
             }
         }
         .animation(.easeInOut(duration: 0.22), value: openedGroup != nil)
-        .task { await loadFiles() }
+        .task {
+            if let stored = UserDefaults.standard.dictionary(forKey: "pdfLastPages") as? [String: Int] {
+                lastPages = stored
+            }
+            await loadFiles()
+            // Restore previously opened group
+            if openedGroup == nil, !openedGroupId.isEmpty,
+               let group = groups.first(where: { $0.id == openedGroupId }) {
+                await openGroup(group)
+            }
+        }
     }
 
     // MARK: - File List
@@ -411,6 +430,7 @@ struct PdfBrowserView: View {
             withAnimation(.easeInOut(duration: 0.22)) {
                 mergedDoc = doc
                 openedGroup = group
+                openedGroupId = group.id
             }
         } catch {
             groupError = error.localizedDescription
