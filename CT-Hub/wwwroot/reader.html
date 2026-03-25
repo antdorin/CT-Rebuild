@@ -10,7 +10,7 @@
   <title>Doc's Reader</title>
   <style>
     :root{
-      --bg:#0f0f0f;
+      --bg:#000;
       --card:#151515;
       --text:#ffffff;
       --muted:#b7b7b7;
@@ -65,7 +65,7 @@
     .viewer-wrap{
       position:fixed;
       inset:0;
-      background:#111;
+      background:#000;
       border:none;
       border-radius:0;
       padding:0;
@@ -575,19 +575,7 @@
     <div id="textView" class="text-view"></div>
   </div>
 
-  <button id="pageIndicator" class="page-indicator" type="button" aria-label="Open controls">Page &#x2014; / &#x2014;</button>
 
-  <!-- Picked / Shipped top-right buttons -->
-  <div class="doc-status-bar">
-    <button id="pickedToggle" class="doc-status-btn" type="button" aria-pressed="false">
-      <span class="chk-box" id="pickedChkBox"></span>
-      <span id="pickedLabel">Picked</span>
-    </button>
-    <button id="shippedToggle" class="doc-status-btn" type="button" aria-pressed="false">
-      <span class="chk-box" id="shippedChkBox"></span>
-      <span id="shippedLabel">Shipped</span>
-    </button>
-  </div>
 
   <!-- Center stamp overlay -->
   <div id="docStamp" class="doc-stamp hidden"></div>

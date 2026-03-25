@@ -9,6 +9,7 @@ struct AppSettingsView: View {
     @State private var showHubSettings     = false
     @State private var showCameraSettings  = false
     @State private var showPanelSettings   = false
+    @AppStorage("panel_showMaterial") private var showMaterial = true
 
     var body: some View {
         ZStack {
@@ -131,6 +132,13 @@ struct AppSettingsView: View {
                     settingsRow(icon: "textformat.size", label: "Text Size", detail: "Default") {}
                         .opacity(0.4)
 
+                    toggleRow(
+                        icon: "square.stack.3d.up",
+                        label: "Panel Material",
+                        detail: "Frosted glass background on all panels",
+                        value: $showMaterial
+                    )
+
                     Divider()
                         .background(Color.white.opacity(0.08))
                         .padding(.vertical, 10)
@@ -206,5 +214,35 @@ struct AppSettingsView: View {
             .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
+    }
+
+    private func toggleRow(
+        icon: String,
+        label: String,
+        detail: String,
+        value: Binding<Bool>
+    ) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundColor(.white.opacity(0.75))
+                .frame(width: 28)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.9))
+                Text(detail)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.4))
+            }
+
+            Spacer()
+
+            Toggle("", isOn: value).labelsHidden()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
     }
 }

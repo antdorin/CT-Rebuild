@@ -6,6 +6,7 @@ struct TopPanelView: View {
     let safeArea: EdgeInsets
 
     @State private var selectedTab: Int? = 1
+    @AppStorage("panel_showMaterial") private var showMaterial = true
 
     // Read directly from UIKit — reliable even when parent ignores safe area
     private var topInset: CGFloat {
@@ -16,7 +17,7 @@ struct TopPanelView: View {
 
     var body: some View {
         ZStack {
-            if selectedTab != nil {
+            if selectedTab != nil && showMaterial {
                 Rectangle()
                     .fill(.ultraThinMaterial)
                     .ignoresSafeArea()

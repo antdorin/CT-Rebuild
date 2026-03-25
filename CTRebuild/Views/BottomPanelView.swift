@@ -12,6 +12,7 @@ struct BottomPanelView: View {
     // Drag zoom settings
     @AppStorage("cam_dragZoomSensitivity") private var dragZoomSensitivity: Double = 80
     @AppStorage("cam_maxZoomLevel") private var maxZoomLevel: Double = 10
+    @AppStorage("panel_showMaterial") private var showMaterial = true
     // Modal routing
     @State private var pendingScan: ScanResult? = nil
     @State private var recentScans: [ScanResult] = []
@@ -20,9 +21,11 @@ struct BottomPanelView: View {
     var body: some View {
         ZStack {
             // ── Translucent background ────────────────────────────────────────
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .ignoresSafeArea()
+            if showMaterial {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .ignoresSafeArea()
+            }
 
             GeometryReader { geo in
                 VStack(spacing: 0) {

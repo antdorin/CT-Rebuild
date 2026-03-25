@@ -14,6 +14,7 @@ struct LeftPanelView: View {
     @ObservedObject private var binStore = BinDataStore.shared
     @AppStorage("panel_autoPickerLeft") private var autoPickerLeft = false
     @AppStorage("panel_leftColumns")    private var storedColumns: Int = 3
+    @AppStorage("panel_showMaterial")   private var showMaterial = true
 
     private let levelLabels = ["A", "B", "C", "D", "E", "F"]
 
@@ -27,12 +28,20 @@ struct LeftPanelView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                if !isPPOpen {
+                // Background — only when content is visible
+                if !isPPOpen && showMaterial {
                     Rectangle()
                         .fill(.ultraThinMaterial)
                         .ignoresSafeArea()
                 }
 
+                // Grid content — below wheel in z-order
+                if !isPPOpen {
+                    leftPageContent(geo: geo)
+                        .transition(.pageTransition)
+                }
+
+                // Wheel picker — always on top
                 if isPPOpen {
                     LeftWheelSelector(
                         columnPage: $columnPage,
@@ -43,9 +52,6 @@ struct LeftPanelView: View {
                         colNum: colNum
                     )
                     .transition(.opacity.animation(.easeInOut(duration: 0.2)))
-                } else {
-                    leftPageContent(geo: geo)
-                        .transition(.pageTransition)
                 }
             }
         }
@@ -269,11 +275,10 @@ private struct LeftWheelSelector: View {
                     .zIndex(1.0 - abs(distCenter) * 0.5)
             }
         }
-        .drawingGroup()
         .frame(width: panelSize.width, height: panelSize.height)
         .contentShape(Rectangle())
-        .highPriorityGesture(
-            DragGesture(minimumDistance: 8)
+        .gesture(
+            DragGesture()
                 .onChanged { value in
                     dragOffset = value.translation.height
                 }

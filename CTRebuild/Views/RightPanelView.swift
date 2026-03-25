@@ -8,13 +8,14 @@ struct RightPanelView: View {
     // true = Panel Page Picker is open; false = full-page content shown
     @State private var isPPOpen = false
     @AppStorage("rightPanelSelectedIndex") private var selectedIndex = 0
-    @AppStorage("panel_autoPickerRight")   private var autoPickerRight = false
-    @AppStorage("panel_rightStartPage")    private var rightStartPage: Int = 0
+    @AppStorage("panel_autoPickerRight") private var autoPickerRight = false
+    @AppStorage("panel_rightStartPage")  private var rightStartPage: Int = 0
+    @AppStorage("panel_showMaterial")    private var showMaterial = true
 
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                if !isPPOpen {
+                if !isPPOpen && showMaterial {
                     Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
                 }
 
