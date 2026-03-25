@@ -9,11 +9,11 @@
       "developerName": "Chase Tactical",
       "localizedDescription": "Chase Tactical warehouse management app.",
       "tintColor": "7AC0F8",
-      "version": "1.0.0",
+      "version": "1.0.140",
       "versionDate": "2026-03-25",
       "versionDescription": "Initial release.",
-      "downloadURL": "",
-      "size": 0
+      "downloadURL": "https://github.com/antdorin/CT-Rebuild/releases/download/v1.0.140/CTRebuild.ipa",
+      "size": 1067878
     }
   ]
 }
