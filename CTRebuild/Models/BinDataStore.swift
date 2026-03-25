@@ -15,14 +15,20 @@ final class BinDataStore: ObservableObject {
     /// bin code → total committed qty (summed across all active groups / pages)
     @Published private(set) var binQuantities: [String: Int] = [:]
 
+    /// Ordered list of active groups for display (e.g. in the camera overlay)
+    @Published private(set) var activeEntries: [(id: String, label: String, doc: PDFDocument)] = []
+
     /// group.id → per-page extracted data for that group
     private var groupData: [String: [String: Int]] = [:]
+
+    /// group.id → (display label, merged PDFDocument)
+    private var activeMeta: [String: (label: String, doc: PDFDocument)] = [:]
 
     // MARK: - Public API
 
     /// Called when a PDF group is toggled active.
     /// Extracts bin locations + committed numbers from the merged document.
-    func activate(groupId: String, document: PDFDocument) {
+    func activate(groupId: String, label: String = "", document: PDFDocument) {
         var perGroup: [String: Int] = [:]
         for i in 0..<document.pageCount {
             guard let text = document.page(at: i)?.string else { continue }
@@ -32,12 +38,14 @@ final class BinDataStore: ObservableObject {
             }
         }
         groupData[groupId] = perGroup
+        activeMeta[groupId] = (label: label.isEmpty ? groupId : label, doc: document)
         recalculate()
     }
 
     /// Called when a PDF group is toggled inactive.
     func deactivate(groupId: String) {
         groupData.removeValue(forKey: groupId)
+        activeMeta.removeValue(forKey: groupId)
         recalculate()
     }
 
@@ -116,5 +124,8 @@ final class BinDataStore: ObservableObject {
             }
         }
         binQuantities = merged
+        activeEntries = activeMeta
+            .map { (id: $0.key, label: $0.value.label, doc: $0.value.doc) }
+            .sorted { $0.id < $1.id }
     }
 }

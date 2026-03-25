@@ -424,7 +424,8 @@ struct PdfBrowserView: View {
             // Download + merge if not already cached
             do {
                 let doc = try await downloadAndMerge(group)
-                binStore.activate(groupId: group.id, document: doc)
+                let label = group.soLabel.isEmpty ? group.dateLabel : group.soLabel
+                binStore.activate(groupId: group.id, label: label, document: doc)
             } catch {
                 // Silently skip on network error (user can retry)
             }

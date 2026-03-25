@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import PDFKit
 
 struct BottomPanelView: View {
     let safeArea: EdgeInsets
@@ -22,6 +23,10 @@ struct BottomPanelView: View {
     @State private var pendingScan: ScanResult? = nil
     @State private var recentScans: [ScanResult] = []
     private let maxRecent = 20
+    // Active PDF sheet
+    @ObservedObject private var binStore = BinDataStore.shared
+    @State private var activePdfSheetDoc: PDFDocument? = nil
+    @State private var activePdfSheetTitle: String = ""
 
     var body: some View {
         ZStack {
@@ -76,26 +81,74 @@ struct BottomPanelView: View {
                         if isCamOverlayOpen {
                             HStack(spacing: 0) {
                                 Spacer()
-                                Rectangle()
-                                    .fill(.ultraThinMaterial)
-                                    .overlay(alignment: .leading) {
-                                        Rectangle()
-                                            .fill(Color.white.opacity(0.10))
-                                            .frame(width: 0.5)
-                                    }
-                                    .frame(width: geo.size.width * 0.30)
-                                    .contentShape(Rectangle())
-                                    .gesture(
-                                        DragGesture(minimumDistance: 10)
-                                            .onEnded { value in
-                                                let adx = abs(value.translation.width)
-                                                let ady = abs(value.translation.height)
-                                                guard adx > ady, value.translation.width > 50 else { return }
-                                                withAnimation(.easeInOut(duration: 0.07)) {
-                                                    isCamOverlayOpen = false
+                                ZStack(alignment: .topLeading) {
+                                    Rectangle()
+                                        .fill(.ultraThinMaterial)
+                                        .overlay(alignment: .leading) {
+                                            Rectangle()
+                                                .fill(Color.white.opacity(0.10))
+                                                .frame(width: 0.5)
+                                        }
+
+                                    // ── Active PDF list ───────────────────
+                                    VStack(spacing: 0) {
+                                        Text("ACTIVE")
+                                            .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                                            .foregroundColor(.white.opacity(0.4))
+                                            .tracking(3)
+                                            .padding(.top, 10)
+                                            .padding(.bottom, 6)
+
+                                        if binStore.activeEntries.isEmpty {
+                                            Spacer()
+                                            Text("None")
+                                                .font(.system(size: 10, design: .monospaced))
+                                                .foregroundColor(.white.opacity(0.25))
+                                            Spacer()
+                                        } else {
+                                            ScrollView(showsIndicators: false) {
+                                                VStack(spacing: 6) {
+                                                    ForEach(binStore.activeEntries, id: \.id) { entry in
+                                                        Button {
+                                                            activePdfSheetTitle = entry.label
+                                                            activePdfSheetDoc = entry.doc
+                                                        } label: {
+                                                            VStack(spacing: 2) {
+                                                                Text(entry.label)
+                                                                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                                                    .foregroundColor(.white.opacity(0.85))
+                                                                    .lineLimit(2)
+                                                                    .multilineTextAlignment(.center)
+                                                                Text("\(entry.doc.pageCount)p")
+                                                                    .font(.system(size: 8, design: .monospaced))
+                                                                    .foregroundColor(.white.opacity(0.35))
+                                                            }
+                                                            .padding(.vertical, 8)
+                                                            .padding(.horizontal, 6)
+                                                            .frame(maxWidth: .infinity)
+                                                            .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                                                        }
+                                                        .buttonStyle(.plain)
+                                                    }
                                                 }
+                                                .padding(.horizontal, 6)
                                             }
-                                    )
+                                        }
+                                    }
+                                }
+                                .frame(width: geo.size.width * 0.30)
+                                .contentShape(Rectangle())
+                                .gesture(
+                                    DragGesture(minimumDistance: 10)
+                                        .onEnded { value in
+                                            let adx = abs(value.translation.width)
+                                            let ady = abs(value.translation.height)
+                                            guard adx > ady, value.translation.width > 50 else { return }
+                                            withAnimation(.easeInOut(duration: 0.07)) {
+                                                isCamOverlayOpen = false
+                                            }
+                                        }
+                                )
                             }
                             .transition(.move(edge: .trailing))
                         }
@@ -200,6 +253,23 @@ struct BottomPanelView: View {
                 AssignedItemModal(record: record) { pendingScan = nil }
             } else {
                 UnassignedItemModal(rawBarcode: scan.value) { pendingScan = nil }
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { activePdfSheetDoc != nil },
+            set: { if !$0 { activePdfSheetDoc = nil } }
+        )) {
+            if let doc = activePdfSheetDoc {
+                NavigationStack {
+                    CamPdfViewer(document: doc)
+                        .navigationTitle(activePdfSheetTitle)
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button("Done") { activePdfSheetDoc = nil }
+                            }
+                        }
+                }
             }
         }
     }
@@ -308,6 +378,28 @@ struct BottomPanelView: View {
             .padding(.vertical, 8)
             .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
             .foregroundColor(.white)
+        }
+    }
+}
+
+// MARK: - Camera PDF Viewer (used in the active-PDF sheet)
+
+private struct CamPdfViewer: UIViewRepresentable {
+    let document: PDFDocument
+
+    func makeUIView(context: Context) -> PDFView {
+        let view = PDFView()
+        view.autoScales = true
+        view.displayMode = .singlePageContinuous
+        view.displayDirection = .vertical
+        view.backgroundColor = .black
+        view.document = document
+        return view
+    }
+
+    func updateUIView(_ uiView: PDFView, context: Context) {
+        if uiView.document !== document {
+            uiView.document = document
         }
     }
 }
