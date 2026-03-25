@@ -13,6 +13,8 @@ struct DashboardView: View {
     @State private var longPressActive: Bool = false
     private let screen = UIScreen.main.bounds
     @ObservedObject private var gestureSettings = GestureSettings.shared
+    @AppStorage("panel_hapticOnChange") private var panelHapticOnChange = false
+    @AppStorage("panel_dimOnOpen")       private var panelDimOnOpen = true
 
     var body: some View {
         // GeometryReader ignores safe area so panels slide in from the true
@@ -37,7 +39,7 @@ struct DashboardView: View {
                 placeholderContent(safeArea: safe)
 
                 // ── Dim Backdrop (tap anywhere to dismiss) ────────────────────
-                if activePanel != .none {
+                if activePanel != .none && panelDimOnOpen {
                     Color.black.opacity(0.55)
                         .ignoresSafeArea()
                         .onTapGesture { activePanel = .none }
@@ -182,14 +184,6 @@ struct DashboardView: View {
         // Close threshold is fixed at 50pt — not configurable to avoid lockout.
         if !allowSwitch, activePanel != .none {
             let t: CGFloat = 50
-            // Panel picker swipe overrides (configurable in Gesture Settings)
-            if adx > ady && adx > t {
-                let pickerAction = dx > 0 ? gestureSettings.pickerSwipeRight : gestureSettings.pickerSwipeLeft
-                if pickerAction != .none {
-                    executeAction(pickerAction)
-                    return
-                }
-            }
             switch activePanel {
             case .left   where dx < -t && adx > ady: activePanel = .none
             case .right  where dx >  t && adx > ady: activePanel = .none
@@ -234,20 +228,20 @@ struct DashboardView: View {
 
     private func executeAction(_ action: GestureAction) {
         switch action {
-        case .none:           break
-        case .openLeft:       if activePanel == .none { activePanel = .left }
-        case .openRight:      if activePanel == .none { activePanel = .right }
-        case .openTop:        if activePanel == .none { activePanel = .top }
-        case .openBottom:     if activePanel == .none { activePanel = .bottom }
-        case .closePanel:     activePanel = .none
-        case .toggleLeft:     activePanel = activePanel == .left  ? .none : .left
-        case .toggleRight:    activePanel = activePanel == .right ? .none : .right
-        case .toggleTop:      activePanel = activePanel == .top   ? .none : .top
-        case .toggleBottom:   activePanel = activePanel == .bottom ? .none : .bottom
-        case .switchLeft:     activePanel = .left
-        case .switchRight:    activePanel = .right
-        case .switchTop:      activePanel = .top
-        case .switchBottom:   activePanel = .bottom
+        case .none: break
+        case .openLeft:       if activePanel == .none { activePanel = .left;   if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() } }
+        case .openRight:      if activePanel == .none { activePanel = .right;  if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() } }
+        case .openTop:        if activePanel == .none { activePanel = .top;    if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() } }
+        case .openBottom:     if activePanel == .none { activePanel = .bottom; if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() } }
+        case .closePanel:     activePanel = .none;     if panelHapticOnChange { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+        case .toggleLeft:     activePanel = activePanel == .left  ? .none : .left;   if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+        case .toggleRight:    activePanel = activePanel == .right ? .none : .right;  if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+        case .toggleTop:      activePanel = activePanel == .top   ? .none : .top;    if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+        case .toggleBottom:   activePanel = activePanel == .bottom ? .none : .bottom; if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+        case .switchLeft:     activePanel = .left;   if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+        case .switchRight:    activePanel = .right;  if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+        case .switchTop:      activePanel = .top;    if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+        case .switchBottom:   activePanel = .bottom; if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
         case .haptic:
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         case .dismissKeyboard:

@@ -8,6 +8,8 @@ struct RightPanelView: View {
     // true = Panel Page Picker is open; false = full-page content shown
     @State private var isPPOpen = false
     @AppStorage("rightPanelSelectedIndex") private var selectedIndex = 0
+    @AppStorage("panel_autoPickerRight")   private var autoPickerRight = false
+    @AppStorage("panel_rightStartPage")    private var rightStartPage: Int = 0
 
     var body: some View {
         GeometryReader { geo in
@@ -32,6 +34,13 @@ struct RightPanelView: View {
             }
         }
         .ignoresSafeArea()
+        .onAppear {
+            if autoPickerRight { isPPOpen = true }
+            else { selectedIndex = rightStartPage }
+        }
+        .onDisappear {
+            isPPOpen = false
+        }
         .onReceive(NotificationCenter.default.publisher(for: .gestureActionFired)) { note in
             guard let raw = note.userInfo?["action"] as? String else { return }
             switch raw {

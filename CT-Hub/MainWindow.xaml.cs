@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -310,5 +311,256 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             PdfFolderPathText.Text = folder;
             Touch();
         }
+    }
+
+    private void PdfDelete_Click(object sender, RoutedEventArgs e)
+    {
+        if (PdfFileList.SelectedItem is not string selected) return;
+
+        var folder = _hub.PdfFolder.CurrentFolder;
+        if (string.IsNullOrEmpty(folder)) return;
+
+        var fullPath = Path.Combine(folder, selected);
+
+        var confirm = MessageBox.Show(
+            $"Permanently delete '{selected}'?",
+            "Delete PDF",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (confirm != MessageBoxResult.Yes) return;
+
+        try
+        {
+            File.Delete(fullPath);
+            StatusText = $"Deleted: {selected}";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Delete failed: {ex.Message}";
+        }
+    }
+
+    private async void PdfScale_Click(object sender, RoutedEventArgs e)
+    {
+        if (PdfFileList.SelectedItem is not string selected)
+        {
+            StatusText = "Select a PDF in the list first.";
+            return;
+        }
+
+        var folder = _hub.PdfFolder.CurrentFolder;
+        if (string.IsNullOrEmpty(folder)) return;
+
+        var inputPath = Path.Combine(folder, selected);
+
+        // Read source page size so presets can compute exact scales
+        double srcW = 612, srcH = 792; // fallback: Letter
+        try
+        {
+            using var probe = PdfSharp.Pdf.IO.PdfReader.Open(inputPath, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+            if (probe.PageCount > 0)
+            {
+                srcW = probe.Pages[0].Width.Point;
+                srcH = probe.Pages[0].Height.Point;
+            }
+        }
+        catch { /* use fallback */ }
+
+        var opts = ShowScaleDialog(srcW, srcH);
+        if (opts is null) return;
+
+        StatusText = $"Scaling {selected}…";
+        try
+        {
+            var outputPath = await Task.Run(() => PdfResizeService.Scale(inputPath, opts));
+            StatusText = $"Saved: {Path.GetFileName(outputPath)}";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Scale failed: {ex.Message}";
+        }
+    }
+
+    private PdfScaleOptions? ShowScaleDialog(double srcW, double srcH)
+    {
+        PdfScaleOptions? result = null;
+
+        // ── Helpers ───────────────────────────────────────────────────────────
+        Brush Fg(byte r, byte g, byte b) =>
+            new SolidColorBrush(Color.FromRgb(r, g, b));
+
+        TextBox MakeInput(string text) => new TextBox
+        {
+            Text            = text,
+            FontFamily      = new System.Windows.Media.FontFamily("Consolas"),
+            FontSize        = 13,
+            Width           = 72,
+            Background      = Fg(0x3C, 0x3C, 0x3C),
+            Foreground      = Fg(0xD4, 0xD4, 0xD4),
+            CaretBrush      = new SolidColorBrush(Colors.White),
+            BorderBrush     = Fg(0x55, 0x55, 0x55),
+            BorderThickness = new Thickness(1),
+            Padding         = new Thickness(6, 3, 6, 3),
+            TextAlignment   = TextAlignment.Center
+        };
+
+        TextBlock MakeLabel(string text, bool muted = false) => new TextBlock
+        {
+            Text              = text,
+            Foreground        = muted ? Fg(0x85, 0x85, 0x85) : Fg(0xD4, 0xD4, 0xD4),
+            FontFamily        = new System.Windows.Media.FontFamily("Segoe UI"),
+            FontSize          = 12,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        Button MakeBtn(string text, bool primary = false) => new Button
+        {
+            Content         = text,
+            Padding         = new Thickness(primary ? 20 : 14, 6, primary ? 20 : 14, 6),
+            Margin          = new Thickness(0, 0, 6, 0),
+            Background      = primary ? Fg(0x00, 0x7A, 0xCC) : Fg(0x3C, 0x3C, 0x3C),
+            Foreground      = primary ? new SolidColorBrush(Colors.White) : Fg(0xD4, 0xD4, 0xD4),
+            BorderBrush     = primary ? Fg(0x00, 0x7A, 0xCC) : Fg(0x55, 0x55, 0x55),
+            BorderThickness = new Thickness(1),
+            FontFamily      = new System.Windows.Media.FontFamily("Segoe UI"),
+            FontSize        = 12,
+            Cursor          = System.Windows.Input.Cursors.Hand
+        };
+
+        Separator MakeSep() => new Separator
+        {
+            Background = Fg(0x3C, 0x3C, 0x3C),
+            Margin     = new Thickness(0, 10, 0, 10)
+        };
+
+        // ── Dialog ────────────────────────────────────────────────────────────
+        var dlg = new Window
+        {
+            Title                 = "Scale PDF",
+            Width                 = 420,
+            SizeToContent         = SizeToContent.Height,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode            = ResizeMode.NoResize,
+            WindowStyle           = WindowStyle.ToolWindow,
+            Background            = Fg(0x25, 0x25, 0x26),
+            ShowInTaskbar         = false,
+            Owner                 = this
+        };
+
+        var root = new StackPanel { Margin = new Thickness(20) };
+
+        // ── Presets ───────────────────────────────────────────────────────────
+        root.Children.Add(MakeLabel("Preset page size"));
+        var presetPanel = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
+        foreach (var kv in PdfResizeService.Presets)
+        {
+            var pb = MakeBtn(kv.Key);
+            pb.Margin = new Thickness(0, 0, 6, 6);
+            presetPanel.Children.Add(pb);
+        }
+        root.Children.Add(presetPanel);
+        root.Children.Add(MakeSep());
+
+        // ── Lock aspect ratio ─────────────────────────────────────────────────
+        var lockRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
+        var lockChk = new CheckBox { IsChecked = true, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+        lockRow.Children.Add(lockChk);
+        lockRow.Children.Add(MakeLabel("Lock aspect ratio"));
+        root.Children.Add(lockRow);
+
+        // ── X / Y inputs ──────────────────────────────────────────────────────
+        var xRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+        var tbX  = MakeInput("100");
+        xRow.Children.Add(tbX);
+        xRow.Children.Add(new TextBlock { Text = "%", Foreground = Fg(0x85, 0x85, 0x85), FontSize = 12, Margin = new Thickness(4, 0, 14, 0), VerticalAlignment = VerticalAlignment.Center });
+        xRow.Children.Add(MakeLabel("Horizontal (X)"));
+        root.Children.Add(xRow);
+
+        var yRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+        var tbY  = MakeInput("100");
+        yRow.Children.Add(tbY);
+        yRow.Children.Add(new TextBlock { Text = "%", Foreground = Fg(0x85, 0x85, 0x85), FontSize = 12, Margin = new Thickness(4, 0, 14, 0), VerticalAlignment = VerticalAlignment.Center });
+        yRow.Children.Add(MakeLabel("Vertical (Y)"));
+        root.Children.Add(yRow);
+
+        // ── DPI ───────────────────────────────────────────────────────────────
+        root.Children.Add(MakeSep());
+        var dpiRow = new StackPanel { Orientation = Orientation.Horizontal };
+        var tbDpi  = MakeInput("150");
+        dpiRow.Children.Add(tbDpi);
+        dpiRow.Children.Add(new TextBlock { Text = "DPI", Foreground = Fg(0x85, 0x85, 0x85), FontSize = 12, Margin = new Thickness(8, 0, 14, 0), VerticalAlignment = VerticalAlignment.Center });
+        dpiRow.Children.Add(MakeLabel("Render quality", muted: true));
+        root.Children.Add(dpiRow);
+        root.Children.Add(new TextBlock { Text = "Higher DPI = sharper raster images; 72–300 recommended", Foreground = Fg(0x60, 0x60, 0x60), FontSize = 11, Margin = new Thickness(0, 3, 0, 0) });
+
+        // ── Action buttons ────────────────────────────────────────────────────
+        root.Children.Add(MakeSep());
+        var btnRow    = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        var okBtn     = MakeBtn("Scale", primary: true);
+        var cancelBtn = MakeBtn("Cancel");
+        btnRow.Children.Add(okBtn);
+        btnRow.Children.Add(cancelBtn);
+        root.Children.Add(btnRow);
+
+        dlg.Content = root;
+
+        // ── Aspect lock ───────────────────────────────────────────────────────
+        bool syncing = false;
+        tbX.TextChanged += (_, _) =>
+        {
+            if (syncing || lockChk.IsChecked != true) return;
+            syncing = true; tbY.Text = tbX.Text; syncing = false;
+        };
+        tbY.TextChanged += (_, _) =>
+        {
+            if (syncing || lockChk.IsChecked != true) return;
+            syncing = true; tbX.Text = tbY.Text; syncing = false;
+        };
+
+        // ── Wire preset buttons ───────────────────────────────────────────────
+        foreach (Button pb in presetPanel.Children)
+        {
+            var presetKey = (string)pb.Content;
+            pb.Click += (_, _) =>
+            {
+                var (sx, sy) = PdfResizeService.ScaleForPreset(presetKey, srcW, srcH);
+                syncing = true;
+                tbX.Text = Math.Round(sx * 100, 1).ToString();
+                tbY.Text = Math.Round(sy * 100, 1).ToString();
+                syncing = false;
+                lockChk.IsChecked = Math.Abs(sx - sy) < 0.001;
+            };
+        }
+
+        // ── Validate & confirm ────────────────────────────────────────────────
+        bool Validate(out double sx, out double sy, out int dpi)
+        {
+            sx = sy = 0; dpi = 0;
+            return double.TryParse(tbX.Text, out sx)  && sx  >= 10 && sx  <= 1000 &&
+                   double.TryParse(tbY.Text, out sy)  && sy  >= 10 && sy  <= 1000 &&
+                   int.TryParse(tbDpi.Text,  out dpi) && dpi >= 36 && dpi <= 600;
+        }
+
+        okBtn.Click += (_, _) =>
+        {
+            if (Validate(out var sx, out var sy, out var dpi))
+            {
+                result           = new PdfScaleOptions(sx / 100.0, sy / 100.0, dpi);
+                dlg.DialogResult = true;
+            }
+            else
+            {
+                tbX.BorderBrush  = Fg(0xFF, 0x45, 0x00);
+                tbY.BorderBrush  = Fg(0xFF, 0x45, 0x00);
+                tbDpi.BorderBrush = Fg(0xFF, 0x45, 0x00);
+            }
+        };
+
+        cancelBtn.Click += (_, _) => dlg.DialogResult = false;
+
+        dlg.Loaded += (_, _) => { tbX.Focus(); tbX.SelectAll(); };
+        dlg.ShowDialog();
+        return result;
     }
 }

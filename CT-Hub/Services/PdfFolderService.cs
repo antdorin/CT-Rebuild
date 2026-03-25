@@ -47,7 +47,9 @@ public sealed class PdfFolderService : IDisposable
     private void Refresh()
     {
         var files = Directory.Exists(_folder)
-            ? Directory.GetFiles(_folder, "*.pdf", SearchOption.TopDirectoryOnly)
+            ? Directory.GetFiles(_folder, "*", SearchOption.TopDirectoryOnly)
+                       .Where(f => f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)
+                                || f.EndsWith(".nl",  StringComparison.OrdinalIgnoreCase))
                        .Select(Path.GetFileName)
                        .Where(f => f is not null)
                        .OrderBy(f => f)
@@ -79,8 +81,9 @@ public sealed class PdfFolderService : IDisposable
         _watcher?.Dispose();
         if (!Directory.Exists(folderPath)) return;
 
-        _watcher = new FileSystemWatcher(folderPath, "*.pdf")
+        _watcher = new FileSystemWatcher(folderPath)
         {
+            Filter = "*",
             NotifyFilter = NotifyFilters.FileName,
             EnableRaisingEvents = true
         };
@@ -99,7 +102,9 @@ public sealed class PdfFolderService : IDisposable
         if (string.IsNullOrEmpty(_folder) || !Directory.Exists(_folder))
             return Array.Empty<PdfFileMeta>();
 
-        return Directory.GetFiles(_folder, "*.pdf", SearchOption.TopDirectoryOnly)
+        return Directory.GetFiles(_folder, "*", SearchOption.TopDirectoryOnly)
+            .Where(f => f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)
+                     || f.EndsWith(".nl",  StringComparison.OrdinalIgnoreCase))
             .Select(f => new FileInfo(f))
             .Where(fi => fi.Exists)
             .OrderBy(fi => fi.Name, StringComparer.OrdinalIgnoreCase)

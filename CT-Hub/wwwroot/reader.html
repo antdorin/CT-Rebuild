@@ -65,11 +65,12 @@
     .viewer-wrap{
       position:fixed;
       inset:0;
-      background:#000;
+      background:#111;
       border:none;
       border-radius:0;
       padding:0;
       padding-top:max(24px, env(safe-area-inset-top));
+      padding-bottom:max(50px, env(safe-area-inset-bottom));
       min-height:100vh;
       display:flex;
       align-items:center;
@@ -77,24 +78,50 @@
       overflow:hidden;
     }
     .sidepanel-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1200}
-    .sidepanel-left{
+    .sidepanel-bottom{
       position:fixed;
-      top:0;
+      bottom:0;
       left:0;
-      height:100vh;
-      width:min(88vw,360px);
-      max-width:100vw;
-      transform:translateX(-100%);
+      right:0;
+      max-height:80vh;
+      transform:translateY(100%);
       transition:transform .22s ease;
       z-index:1201;
       background:rgba(8,12,20,.96);
       backdrop-filter:blur(8px);
       -webkit-backdrop-filter:blur(8px);
-      border-right:2px solid var(--line);
-      padding:12px;
-      padding-top:max(12px,env(safe-area-inset-top));
+      border-top:2px solid var(--line);
+      border-radius:16px 16px 0 0;
+      padding:0 12px;
+      padding-bottom:max(12px,env(safe-area-inset-bottom));
       overflow-y:auto;
       overflow-x:hidden;
+    }
+    .panel-handle{
+      width:40px;
+      height:4px;
+      background:rgba(255,255,255,.25);
+      border-radius:2px;
+      margin:10px auto 12px;
+    }
+    .page-indicator{
+      position:fixed;
+      bottom:max(16px,env(safe-area-inset-bottom));
+      left:50%;
+      transform:translateX(-50%);
+      z-index:1100;
+      background:rgba(15,15,15,.82);
+      border:1.5px solid rgba(255,255,255,.18);
+      border-radius:20px;
+      padding:6px 18px;
+      font-size:13px;
+      font-weight:700;
+      color:#fff;
+      cursor:pointer;
+      backdrop-filter:blur(6px);
+      -webkit-backdrop-filter:blur(6px);
+      -webkit-tap-highlight-color:transparent;
+      white-space:nowrap;
     }
     .panel-title{font-size:20px;font-weight:800;color:var(--accent);margin:0 0 6px}
     .panel-sub{font-size:13px;color:var(--muted);margin:0 0 10px}
@@ -103,12 +130,60 @@
     .panel-row .btn{flex:1}
     .panel-control{display:flex;flex-direction:column;gap:6px;margin-top:2px}
     .panel-control label{font-size:13px;color:var(--muted);font-weight:700}
-    .panel-control input[type="range"]{width:100%}
+    .panel-control input[type="range"]{
+      width:100%;
+      height:36px;
+      padding:8px 0;
+      margin:4px 0;
+      cursor:pointer;
+      -webkit-appearance:none;
+      appearance:none;
+      background:transparent;
+    }
+    .panel-control input[type="range"]::-webkit-slider-container{ min-block-size:36px; }
+    .panel-control input[type="range"]::-webkit-slider-runnable-track{
+      height:6px;
+      border-radius:3px;
+      background:rgba(122,192,248,.35);
+    }
+    .panel-control input[type="range"]::-webkit-slider-thumb{
+      -webkit-appearance:none;
+      appearance:none;
+      width:28px;
+      height:28px;
+      border-radius:50%;
+      background:var(--accent);
+      margin-top:-11px;
+      box-shadow:0 1px 6px rgba(0,0,0,.5);
+    }
+    .re-range{
+      height:36px;
+      padding:8px 0;
+      cursor:pointer;
+      -webkit-appearance:none;
+      appearance:none;
+      background:transparent;
+    }
+    .re-range::-webkit-slider-runnable-track{
+      height:6px;
+      border-radius:3px;
+      background:rgba(122,192,248,.35);
+    }
+    .re-range::-webkit-slider-thumb{
+      -webkit-appearance:none;
+      appearance:none;
+      width:26px;
+      height:26px;
+      border-radius:50%;
+      background:var(--accent);
+      margin-top:-10px;
+      box-shadow:0 1px 6px rgba(0,0,0,.5);
+    }
     .panel-control .panel-value{font-size:12px;color:var(--muted);text-align:right}
     .panel-control .panel-check{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text);font-weight:700}
     .panel-control .panel-check input{transform:scale(1.15)}
-    body.sidepanel-left-open .sidepanel-left{transform:translateX(0)}
-    body.sidepanel-left-open .sidepanel-backdrop{display:block}
+    body.sidepanel-bottom-open .sidepanel-bottom{transform:translateY(0)}
+    body.sidepanel-bottom-open .sidepanel-backdrop{display:block}
     canvas{
       width:auto;
       height:auto;
@@ -124,7 +199,7 @@
       min-height:0;
       border-radius:0;
       border:none;
-      background:#000;
+      background:transparent;
       color:var(--text);
       padding:0;
       font-size:17px;
@@ -137,7 +212,7 @@
       align-items:flex-start;
       justify-content:flex-start;
     }
-    body.light-mode .text-view{background:#fff}
+    body.light-mode .text-view{background:transparent}
     .text-page{
       position:relative;
       background:#fff;
@@ -145,7 +220,8 @@
       overflow:visible;
       flex:0 0 auto;
       margin:0;
-      box-shadow:0 0 0 1px rgba(0,0,0,.08) inset;
+      border-radius:8px;
+      box-shadow:0 2px 24px rgba(0,0,0,.45);
     }
     .text-run{
       position:absolute;
@@ -286,6 +362,83 @@
       white-space:nowrap;
       border:0;
     }
+    .text-view.scroll-locked{ overflow:hidden; }
+    .text-run.run-selected{
+      outline:2px solid #f97316;
+      outline-offset:1px;
+      border-radius:2px;
+    }
+    #runEditor{
+      position:fixed;
+      z-index:2000;
+      background:rgba(8,12,20,.97);
+      border:2px solid var(--line);
+      border-radius:12px;
+      padding:10px 14px 12px;
+      min-width:230px;
+      max-width:82vw;
+      box-shadow:0 4px 24px rgba(0,0,0,.6);
+      backdrop-filter:blur(10px);
+      -webkit-backdrop-filter:blur(10px);
+      display:none;
+    }
+    #runEditor.visible{ display:block; }
+    #runEditor .re-title{
+      font-size:11px;
+      font-weight:700;
+      color:var(--muted);
+      margin-bottom:8px;
+      padding-right:20px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    #runEditor .re-row{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-bottom:6px;
+    }
+    #runEditor .re-label{
+      font-size:12px;
+      color:var(--muted);
+      font-weight:700;
+      width:46px;
+      flex-shrink:0;
+    }
+    #runEditor .re-range{ flex:1; }
+    #runEditor .re-val{
+      font-size:12px;
+      color:var(--text);
+      width:38px;
+      text-align:right;
+      flex-shrink:0;
+    }
+    #runEditor .re-close{
+      position:absolute;
+      top:7px;
+      right:10px;
+      background:none;
+      border:none;
+      color:var(--muted);
+      font-size:18px;
+      cursor:pointer;
+      padding:0;
+      line-height:1;
+    }
+    #runEditor .re-reset{
+      margin-top:4px;
+      width:100%;
+      background:rgba(249,115,22,.18);
+      border:1.5px solid rgba(249,115,22,.5);
+      border-radius:7px;
+      color:#f97316;
+      font-size:12px;
+      font-weight:700;
+      padding:5px 0;
+      cursor:pointer;
+    }
+    body.run-edit-mode .text-run{ pointer-events:auto; cursor:crosshair; }
   </style>
 </head>
 <body>
@@ -293,31 +446,11 @@
   <div id="status" class="sr-only" aria-live="polite">Loading PDF...</div>
 
   <div id="sidepanelBackdrop" class="sidepanel-backdrop"></div>
-  <aside id="sidepanelLeft" class="sidepanel-left" aria-hidden="true">
-    <h2 class="panel-title">Reader Controls</h2>
-    <p id="pageLabel" class="panel-sub">Page 0 / 0</p>
+  <div id="sidepanelBottom" class="sidepanel-bottom" aria-hidden="true">
+    <div class="panel-handle"></div>
+    <p id="pageLabel" class="panel-sub" style="text-align:center;margin-bottom:8px">Page 0 / 0</p>
     <div class="panel-stack">
-      <div class="panel-row">
-        <button id="prevBtn" class="btn" type="button">Prev</button>
-        <button id="nextBtn" class="btn" type="button">Next</button>
-      </div>
-      <button id="fullscreenBtn" class="btn" type="button">Fullscreen</button>
-      <div class="panel-row">
-        <button id="imageModeBtn" class="btn" type="button">Page View</button>
-        <button id="textModeBtn" class="btn active" type="button">Text View</button>
-      </div>
-      <div class="panel-control">
-        <label for="textSizeRange">Text Size</label>
-        <input id="textSizeRange" type="range" min="0.80" max="2.00" step="0.05" value="1.45" />
-        <div id="textSizeValue" class="panel-value">145%</div>
-      </div>
-      <div class="panel-control">
-        <label class="panel-check" for="textBoldToggle">
-          <input id="textBoldToggle" type="checkbox" />
-          <span>Bold Text</span>
-        </label>
-      </div>
-      <div class="panel-control" style="margin-top:4px;border-top:1px solid var(--line);padding-top:10px">
+      <div class="panel-control" style="margin-bottom:2px">
         <label for="searchInput" style="font-size:13px;color:var(--muted);font-weight:700">Search Document</label>
         <div class="panel-search-wrap" style="margin-top:4px">
           <input id="searchInput" type="search" placeholder="Search all pages&#x2026;" autocomplete="off" />
@@ -325,6 +458,91 @@
         </div>
         <button id="clearSearchBtn" class="btn" type="button" style="margin-top:6px;display:none">Clear Search</button>
         <div id="searchResults" class="search-results"></div>
+      </div>
+      <button id="fullscreenBtn" class="btn" type="button">Fullscreen</button>
+      <div class="panel-row">
+        <button id="lockScrollBtn" class="btn" type="button">&#x1F512; Lock Scroll: Off</button>
+        <button id="runEditModeBtn" class="btn" type="button">&#x270F; Edit Runs: Off</button>
+      </div>
+      <div class="panel-control">
+        <label for="pageZoomXRange">Page Zoom X (Width)</label>
+        <input id="pageZoomXRange" type="range" min="0.50" max="3.00" step="0.05" value="1.00" />
+        <div id="pageZoomXValue" class="panel-value">100%</div>
+      </div>
+      <div class="panel-control">
+        <label for="pageZoomYRange">Page Zoom Y (Height)</label>
+        <input id="pageZoomYRange" type="range" min="0.50" max="3.00" step="0.05" value="1.00" />
+        <div id="pageZoomYValue" class="panel-value">100%</div>
+      </div>
+      <div class="panel-control">
+        <label for="textSizeYRange">Text Size Y (Height)</label>
+        <input id="textSizeYRange" type="range" min="0.50" max="3.00" step="0.05" value="1.45" />
+        <div id="textSizeYValue" class="panel-value">145%</div>
+      </div>
+      <div class="panel-control">
+        <label for="textSizeXRange">Text Size X (Width)</label>
+        <input id="textSizeXRange" type="range" min="0.25" max="3.00" step="0.05" value="1.00" />
+        <div id="textSizeXValue" class="panel-value">100%</div>
+      </div>
+      <div class="panel-control">
+        <label for="textSpacingXRange">Text Spacing X (Letter)</label>
+        <input id="textSpacingXRange" type="range" min="-2" max="12" step="0.5" value="0" />
+        <div id="textSpacingXValue" class="panel-value">0px</div>
+      </div>
+      <div class="panel-control">
+        <label for="textSpacingYRange">Text Spacing Y (Line)</label>
+        <input id="textSpacingYRange" type="range" min="0.50" max="3.00" step="0.05" value="1.00" />
+        <div id="textSpacingYValue" class="panel-value">100%</div>
+      </div>
+      <div class="panel-control">
+        <label for="fontPickerSelect">Font</label>
+        <select id="fontPickerSelect" style="width:100%;background:rgba(255,255,255,.08);border:2px solid var(--line);border-radius:8px;color:var(--text);font-size:14px;padding:8px 10px;outline:none;appearance:none;-webkit-appearance:none;">
+          <option value="">— PDF Original —</option>
+          <optgroup label="Sans-Serif">
+            <option value="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">System UI</option>
+            <option value="'Arial',sans-serif">Arial</option>
+            <option value="'Helvetica Neue','Helvetica',sans-serif">Helvetica Neue</option>
+            <option value="'Calibri',sans-serif">Calibri</option>
+            <option value="'Verdana',sans-serif">Verdana</option>
+            <option value="'Tahoma',sans-serif">Tahoma</option>
+            <option value="'Trebuchet MS',sans-serif">Trebuchet MS</option>
+            <option value="'Gill Sans','Gill Sans MT',sans-serif">Gill Sans</option>
+            <option value="'Century Gothic',sans-serif">Century Gothic</option>
+            <option value="'Futura','Century Gothic',sans-serif">Futura</option>
+            <option value="'Optima',sans-serif">Optima</option>
+          </optgroup>
+          <optgroup label="Serif">
+            <option value="'Georgia',serif">Georgia</option>
+            <option value="'Times New Roman','Times',serif">Times New Roman</option>
+            <option value="'Palatino','Palatino Linotype',serif">Palatino</option>
+            <option value="'Book Antiqua','Palatino',serif">Book Antiqua</option>
+            <option value="'Garamond','EB Garamond',serif">Garamond</option>
+            <option value="'Baskerville','Baskerville Old Face',serif">Baskerville</option>
+            <option value="'Cambria',serif">Cambria</option>
+          </optgroup>
+          <optgroup label="Monospace">
+            <option value="'Courier New','Courier',monospace">Courier New</option>
+            <option value="'Consolas','Lucida Console',monospace">Consolas</option>
+            <option value="'Menlo','Monaco',monospace">Menlo</option>
+            <option value="'SF Mono','Fira Mono',monospace">SF Mono</option>
+          </optgroup>
+          <optgroup label="Condensed / Display">
+            <option value="'Arial Narrow',sans-serif">Arial Narrow</option>
+            <option value="'Impact','Franklin Gothic Heavy',sans-serif">Impact</option>
+            <option value="'Franklin Gothic Medium',sans-serif">Franklin Gothic</option>
+            <option value="'Rockwell',serif">Rockwell</option>
+          </optgroup>
+          <optgroup label="Rounded / Friendly">
+            <option value="'Nunito',system-ui,sans-serif">Nunito</option>
+            <option value="'Varela Round',sans-serif">Varela Round</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="panel-control">
+        <label class="panel-check" for="textBoldToggle">
+          <input id="textBoldToggle" type="checkbox" />
+          <span>Bold Text</span>
+        </label>
       </div>
       <div class="panel-control" style="margin-top:4px;border-top:1px solid var(--line);padding-top:10px">
         <label style="font-size:13px;color:var(--muted);font-weight:700">Sort &amp; Filter</label>
@@ -338,14 +556,25 @@
           </label>
         </div>
       </div>
-      <a class="btn" href="/documents.html">Back</a>
+      <div class="panel-control" style="margin-top:4px;border-top:1px solid var(--line);padding-top:10px">
+        <label style="font-size:13px;color:var(--muted);font-weight:700">Settings</label>
+        <div class="panel-row" style="margin-top:8px;gap:8px">
+          <button id="exportSettingsBtn" class="btn" type="button" style="flex:1">&#x2B07; Export</button>
+          <button id="importSettingsBtn" class="btn" type="button" style="flex:1">&#x2B06; Import</button>
+          <input id="importSettingsFile" type="file" accept=".json" style="display:none" />
+        </div>
+      </div>
+      <div class="panel-control" style="margin-top:4px;border-top:1px solid var(--line);padding-top:10px">
+        <button id="resetAllBtn" class="btn" type="button" style="width:100%;background:#c0392b;color:#fff;font-weight:700">&#x21BA; Reset All to Default</button>
+      </div>
     </div>
-  </aside>
+  </div>
 
   <div id="viewerWrap" class="viewer-wrap">
-    <canvas id="pageCanvas"></canvas>
-    <div id="textView" class="text-view hidden"></div>
+    <div id="textView" class="text-view"></div>
   </div>
+
+  <button id="pageIndicator" class="page-indicator" type="button" aria-label="Open controls">Page &#x2014; / &#x2014;</button>
 
   <!-- Picked / Shipped top-right buttons -->
   <div class="doc-status-bar">
@@ -362,23 +591,48 @@
   <!-- Center stamp overlay -->
   <div id="docStamp" class="doc-stamp hidden"></div>
 
+  <!-- Run editor popover -->
+  <div id="runEditor" role="dialog" aria-label="Run spacing editor">
+    <button class="re-close" id="runEditorClose" type="button" aria-label="Close">&times;</button>
+    <div class="re-title" id="runEditorTitle">Run: &ldquo;&rdquo;</div>
+    <div class="re-row">
+      <span class="re-label">Nudge X</span>
+      <input class="re-range" id="reNudgeX" type="range" min="-150" max="150" step="1" value="0" />
+      <span class="re-val" id="reNudgeXVal">0px</span>
+    </div>
+    <div class="re-row">
+      <span class="re-label">Nudge Y</span>
+      <input class="re-range" id="reNudgeY" type="range" min="-150" max="150" step="1" value="0" />
+      <span class="re-val" id="reNudgeYVal">0px</span>
+    </div>
+    <div class="re-row">
+      <span class="re-label">Size</span>
+      <input class="re-range" id="reSize" type="range" min="0.25" max="4" step="0.05" value="1" />
+      <span class="re-val" id="reSizeVal">100%</span>
+    </div>
+    <button class="re-reset" id="reReset" type="button">Reset this run</button>
+  </div>
+
   <script type="module">
     (async function() {
       const theme = localStorage.getItem('theme') || 'dark';
       if (theme === 'light') document.body.classList.add('light-mode');
+
+      const viewerWrapEl = document.getElementById('viewerWrap');
 
       const qs = new URLSearchParams(window.location.search);
       const file = (qs.get('file') || '').trim();
       const docName = document.getElementById('docName');
       const statusEl = document.getElementById('status');
       const pageLabel = document.getElementById('pageLabel');
-      const prevBtn = document.getElementById('prevBtn');
-      const nextBtn = document.getElementById('nextBtn');
+      const pageIndicator = document.getElementById('pageIndicator');
       const fullscreenBtn = document.getElementById('fullscreenBtn');
-      const imageModeBtn = document.getElementById('imageModeBtn');
-      const textModeBtn = document.getElementById('textModeBtn');
-      const textSizeRange = document.getElementById('textSizeRange');
-      const textSizeValue = document.getElementById('textSizeValue');
+      const textSizeRange = document.getElementById('textSizeYRange');
+      const textSizeValue = document.getElementById('textSizeYValue');
+      const pageZoomXRange = document.getElementById('pageZoomXRange');
+      const pageZoomXValue = document.getElementById('pageZoomXValue');
+      const pageZoomYRange = document.getElementById('pageZoomYRange');
+      const pageZoomYValue = document.getElementById('pageZoomYValue');
       const textBoldToggle = document.getElementById('textBoldToggle');
       const searchInput = document.getElementById('searchInput');
       const searchBtn = document.getElementById('searchBtn');
@@ -393,9 +647,8 @@
       const pickedChkBox = document.getElementById('pickedChkBox');
       const shippedChkBox = document.getElementById('shippedChkBox');
       const docStamp = document.getElementById('docStamp');
-      const sidepanelLeft = document.getElementById('sidepanelLeft');
+      const sidepanelBottom = document.getElementById('sidepanelBottom');
       const sidepanelBackdrop = document.getElementById('sidepanelBackdrop');
-      const canvas = document.getElementById('pageCanvas');
       const textView = document.getElementById('textView');
       const viewerWrap = document.getElementById('viewerWrap');
 
@@ -404,16 +657,12 @@
       }
 
       function setPanelOpen(open) {
-        document.body.classList.toggle('sidepanel-left-open', !!open);
-        if (sidepanelLeft) sidepanelLeft.setAttribute('aria-hidden', open ? 'false' : 'true');
+        document.body.classList.toggle('sidepanel-bottom-open', !!open);
+        if (sidepanelBottom) sidepanelBottom.setAttribute('aria-hidden', open ? 'false' : 'true');
       }
 
       if (!file) {
         setStatus('Missing file name in URL.');
-        prevBtn.disabled = true;
-        nextBtn.disabled = true;
-        imageModeBtn.disabled = true;
-        textModeBtn.disabled = true;
         return;
       }
 
@@ -421,7 +670,6 @@
 
       let pdfDoc = null;
       let currentPage = 1;
-      let currentMode = 'text';
 
       // --- Picked / Shipped state ---
       function docStateKey(suffix) {
@@ -568,11 +816,42 @@
         await buildPageList();
       });
 
+      const textOverrideFonts = ['Nunito','Varela Round'];
+      function loadGoogleFont(name) {
+        const id = 'gfont-' + name.replace(/\s/g,'');
+        if (!document.getElementById(id)) {
+          const l = document.createElement('link');
+          l.id = id; l.rel = 'stylesheet';
+          l.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(name) + ':wght@400;700&display=swap';
+          document.head.appendChild(l);
+        }
+      }
       const textViewSettings = {
-        sizeScale: 1.45,
-        forceBold: false
+        pageZoomX: parseFloat(localStorage.getItem('readerPageZoomX') || '1.00'),
+        pageZoomY: parseFloat(localStorage.getItem('readerPageZoomY') || '1.00'),
+        textSizeY: parseFloat(localStorage.getItem('readerTextSizeY') || '1.45'),
+        textSizeX: parseFloat(localStorage.getItem('readerTextSizeX') || '1.00'),
+        textSpacingX: parseFloat(localStorage.getItem('readerTextSpacingX') || '0'),
+        textSpacingY: parseFloat(localStorage.getItem('readerTextSpacingY') || '1'),
+        forceBold: localStorage.getItem('readerForceBold') === '1',
+        fontOverride: localStorage.getItem('readerFont') || ''
       };
+      // Preload saved Google Font on startup
+      textOverrideFonts.forEach(name => {
+        if (textViewSettings.fontOverride.includes(name)) loadGoogleFont(name);
+      });
       const textCache = new Map();
+      // Per-run overrides: key = `p${pageNum}:r${runIndex}`, value = { dx, dy, sizeScale }
+      // Persisted per file in localStorage
+      const RUN_OVERRIDES_KEY = 'runOverrides:global';
+      const runOverrides = new Map(
+        Object.entries(JSON.parse(localStorage.getItem(RUN_OVERRIDES_KEY) || '{}'))
+      );
+      function saveRunOverrides() {
+        const obj = {};
+        runOverrides.forEach((v, k) => { obj[k] = v; });
+        localStorage.setItem(RUN_OVERRIDES_KEY, JSON.stringify(obj));
+      }
       let searchPages = []; // empty = no filter; populated after search
       const pageMetaCache = new Map(); // pageNum -> { date, soNum, bin }
 
@@ -668,9 +947,27 @@
       });
 
       function updateTextControlsUi() {
-        if (textSizeRange) textSizeRange.value = String(textViewSettings.sizeScale);
-        if (textSizeValue) textSizeValue.textContent = Math.round(textViewSettings.sizeScale * 100) + '%';
+        if (pageZoomXRange) pageZoomXRange.value = String(textViewSettings.pageZoomX);
+        if (pageZoomXValue) pageZoomXValue.textContent = Math.round(textViewSettings.pageZoomX * 100) + '%';
+        if (pageZoomYRange) pageZoomYRange.value = String(textViewSettings.pageZoomY);
+        if (pageZoomYValue) pageZoomYValue.textContent = Math.round(textViewSettings.pageZoomY * 100) + '%';
+        if (textSizeRange) textSizeRange.value = String(textViewSettings.textSizeY);
+        if (textSizeValue) textSizeValue.textContent = Math.round(textViewSettings.textSizeY * 100) + '%';
+        const tsxR = document.getElementById('textSizeXRange');
+        const tsxV = document.getElementById('textSizeXValue');
+        if (tsxR) tsxR.value = String(textViewSettings.textSizeX);
+        if (tsxV) tsxV.textContent = Math.round(textViewSettings.textSizeX * 100) + '%';
+        const toxR = document.getElementById('textSpacingXRange');
+        const toxV = document.getElementById('textSpacingXValue');
+        const toyR = document.getElementById('textSpacingYRange');
+        const toyV = document.getElementById('textSpacingYValue');
+        if (toxR) toxR.value = String(textViewSettings.textSpacingX);
+        if (toxV) toxV.textContent = textViewSettings.textSpacingX + 'px';
+        if (toyR) toyR.value = String(textViewSettings.textSpacingY);
+        if (toyV) toyV.textContent = Math.round(textViewSettings.textSpacingY * 100) + '%';
         if (textBoldToggle) textBoldToggle.checked = !!textViewSettings.forceBold;
+        const fp = document.getElementById('fontPickerSelect');
+        if (fp) fp.value = textViewSettings.fontOverride;
       }
 
       async function importPdfJs() {
@@ -680,28 +977,19 @@
         return lib;
       }
 
-      function setMode(mode) {
-        currentMode = mode === 'text' ? 'text' : 'image';
-        imageModeBtn.classList.toggle('active', currentMode === 'image');
-        textModeBtn.classList.toggle('active', currentMode === 'text');
-        canvas.classList.toggle('hidden', currentMode !== 'image');
-        textView.classList.toggle('hidden', currentMode !== 'text');
-      }
-
       function updatePager() {
         const total = pdfDoc ? pdfDoc.numPages : 0;
+        let label;
         if (searchPages.length) {
           const pos = searchPages.indexOf(currentPage);
           const isSorted = sortMode !== 'default' || hideShipped;
           const prefix = isSorted ? 'Page' : 'Result';
-          pageLabel.textContent = prefix + ' ' + (pos + 1) + ' / ' + searchPages.length + ' (p.' + currentPage + ')';
-          prevBtn.disabled = pos <= 0;
-          nextBtn.disabled = pos >= searchPages.length - 1;
+          label = prefix + ' ' + (pos + 1) + ' / ' + searchPages.length + ' (p.' + currentPage + ')';
         } else {
-          pageLabel.textContent = 'Page ' + currentPage + ' / ' + total;
-          prevBtn.disabled = !pdfDoc || currentPage <= 1;
-          nextBtn.disabled = !pdfDoc || currentPage >= total;
+          label = 'Page ' + currentPage + ' / ' + total;
         }
+        if (pageLabel) pageLabel.textContent = label;
+        if (pageIndicator) pageIndicator.textContent = label;
       }
 
       async function extractStructuredTextLayout(page) {
@@ -796,29 +1084,43 @@
         }
 
         const wrapW = Math.max(1, viewerWrap.clientWidth);
-        // fitScale: always fit PDF to screen width
-        // effectiveScale: used for vertical positioning and font size (zoom = vertical scroll)
+        // fitScale: base scale to fit PDF width to viewport
         const fitScale = wrapW / Math.max(1, layout.bounds.width);
-        const effectiveScale = fitScale * textViewSettings.sizeScale;
-        // Page width always matches viewport; height grows with zoom
-        const outW = wrapW;
-        const outH = Math.max(1, Math.floor(layout.bounds.height * effectiveScale));
+        // Independent X and Y layout scales
+        const scaleX = fitScale * textViewSettings.pageZoomX;
+        const scaleY = fitScale * textViewSettings.pageZoomY;
+        // fontScaleY: controls font-size (glyph height); fontScaleX: applied via scaleX transform (glyph width)
+        const fontScaleY = Math.sqrt(scaleX * scaleY) * textViewSettings.textSizeY;
+        const fontScaleX = textViewSettings.textSizeX;
+        const outW = Math.max(1, Math.floor(layout.bounds.width * scaleX));
+        const outH = Math.max(1, Math.floor(layout.bounds.height * scaleY));
 
         const pageEl = document.createElement('div');
         pageEl.className = 'text-page';
         pageEl.style.width = outW + 'px';
         pageEl.style.height = outH + 'px';
 
-        for (const run of layout.runs) {
+        for (let ri = 0; ri < layout.runs.length; ri++) {
+          const run = layout.runs[ri];
+          const overrideKey = 'r' + ri;
+          const ov = runOverrides.get(overrideKey) || { dx: 0, dy: 0, sizeScale: 1 };
           const span = document.createElement('span');
           span.className = 'text-run';
+          span.dataset.runKey = overrideKey;
           span.textContent = run.text;
-          // X uses fitScale (stays within viewport); Y uses effectiveScale (scrolls vertically)
-          span.style.left = ((run.left - layout.bounds.left) * fitScale) + 'px';
-          span.style.top  = ((run.top  - layout.bounds.top)  * effectiveScale) + 'px';
-          span.style.fontSize = Math.max(6, run.fontSize * effectiveScale) + 'px';
+          const baseLeft = (run.left - layout.bounds.left) * scaleX;
+          const baseTop  = (run.top  - layout.bounds.top)  * scaleY * textViewSettings.textSpacingY;
+          const baseFs   = Math.max(6, run.fontSize * fontScaleY);
+          span.dataset.origLeft     = baseLeft + 'px';
+          span.dataset.origTop      = baseTop  + 'px';
+          span.dataset.origFontSize = baseFs    + 'px';
+          span.style.left = (baseLeft + ov.dx) + 'px';
+          span.style.top  = (baseTop  + ov.dy) + 'px';
+          if (textViewSettings.textSpacingX !== 0) span.style.letterSpacing = textViewSettings.textSpacingX + 'px';
+          span.style.fontSize = Math.max(6, baseFs * ov.sizeScale) + 'px';
+          if (fontScaleX !== 1) span.style.transform = 'scaleX(' + fontScaleX + ')';
           if (textViewSettings.forceBold) { span.style.fontWeight = '700'; }
-          span.style.fontFamily = run.fontFamily;
+          span.style.fontFamily = textViewSettings.fontOverride || run.fontFamily;
           pageEl.appendChild(span);
         }
 
@@ -892,65 +1194,10 @@
         if (!pdfDoc) return;
         updatePager();
         setStatus('Rendering page ' + currentPage + '...');
-
         const page = await pdfDoc.getPage(currentPage);
-
-        if (currentMode === 'image') {
-          const viewport = page.getViewport({ scale: 1 });
-          const wrapW = Math.max(1, viewerWrap.clientWidth);
-          const wrapH = Math.max(1, viewerWrap.clientHeight);
-          const widthScale = wrapW / viewport.width;
-          const heightScale = wrapH / viewport.height;
-
-          // First pass: render full page at fit scale.
-          const scale = Math.min(widthScale, heightScale);
-          const scaled = page.getViewport({ scale });
-
-          const scratch = document.createElement('canvas');
-          scratch.width = Math.max(1, Math.floor(scaled.width));
-          scratch.height = Math.max(1, Math.floor(scaled.height));
-          const scratchCtx = scratch.getContext('2d', { willReadFrequently: true });
-
-          await page.render({ canvasContext: scratchCtx, viewport: scaled }).promise;
-
-          // Trim white margins and fit trimmed content to the viewport.
-          const imageData = scratchCtx.getImageData(0, 0, scratch.width, scratch.height);
-          const bounds = detectContentBoundsFromImageData(imageData, scratch.width, scratch.height);
-
-          const fitTrimScale = Math.min(
-            wrapW / Math.max(1, bounds.width),
-            wrapH / Math.max(1, bounds.height)
-          );
-
-          const outW = Math.max(1, Math.floor(bounds.width * fitTrimScale));
-          const outH = Math.max(1, Math.floor(bounds.height * fitTrimScale));
-
-          const ctx = canvas.getContext('2d');
-          canvas.width = outW;
-          canvas.height = outH;
-          canvas.style.width = outW + 'px';
-          canvas.style.height = outH + 'px';
-
-          ctx.clearRect(0, 0, outW, outH);
-          ctx.drawImage(
-            scratch,
-            bounds.left,
-            bounds.top,
-            bounds.width,
-            bounds.height,
-            0,
-            0,
-            outW,
-            outH
-          );
-
-          setStatus('Showing page image view (auto-trimmed).');
-        } else {
-          setStatus('Building structured text view...');
-          const layout = await extractStructuredTextLayout(page);
-          renderStructuredTextLayout(layout);
-          setStatus('Showing page text view (layout-preserving).');
-        }
+        const layout = await extractStructuredTextLayout(page);
+        renderStructuredTextLayout(layout);
+        setStatus('Page ' + currentPage + ' of ' + pdfDoc.numPages + '.');
         loadDocState();
       }
 
@@ -964,71 +1211,219 @@
           updatePager();
           await renderPage();
           await buildPageList();
-          setStatus('Loaded. Swipe to navigate pages. Swipe right to open controls.');
+          setStatus('Loaded. Swipe up from bottom to open controls.');
         } catch (err) {
           setStatus('Failed to load PDF. ' + (err && err.message ? err.message : 'Unknown error'));
-          prevBtn.disabled = true;
-          nextBtn.disabled = true;
-          imageModeBtn.disabled = true;
-          textModeBtn.disabled = true;
-          fullscreenBtn.disabled = true;
+          if (fullscreenBtn) fullscreenBtn.disabled = true;
         }
       }
 
-      prevBtn.addEventListener('click', async () => {
-        if (!pdfDoc) return;
-        if (searchPages.length) {
-          const pos = searchPages.indexOf(currentPage);
-          if (pos <= 0) return;
-          currentPage = searchPages[pos - 1];
-        } else {
-          if (currentPage <= 1) return;
-          currentPage -= 1;
-        }
+      pageZoomXRange?.addEventListener('input', async () => {
+        const next = Number(pageZoomXRange.value);
+        if (!Number.isFinite(next)) return;
+        textViewSettings.pageZoomX = Math.max(0.5, Math.min(3, next));
+        localStorage.setItem('readerPageZoomX', String(textViewSettings.pageZoomX));
+        updateTextControlsUi();
         await renderPage();
       });
 
-      nextBtn.addEventListener('click', async () => {
-        if (!pdfDoc) return;
-        if (searchPages.length) {
-          const pos = searchPages.indexOf(currentPage);
-          if (pos >= searchPages.length - 1) return;
-          currentPage = searchPages[pos + 1];
-        } else {
-          if (currentPage >= pdfDoc.numPages) return;
-          currentPage += 1;
-        }
+      pageZoomYRange?.addEventListener('input', async () => {
+        const next = Number(pageZoomYRange.value);
+        if (!Number.isFinite(next)) return;
+        textViewSettings.pageZoomY = Math.max(0.5, Math.min(3, next));
+        localStorage.setItem('readerPageZoomY', String(textViewSettings.pageZoomY));
+        updateTextControlsUi();
         await renderPage();
       });
 
-      imageModeBtn.addEventListener('click', async () => {
-        if (currentMode === 'image') return;
-        setMode('image');
+      document.getElementById('textSpacingXRange')?.addEventListener('input', async () => {
+        const el = document.getElementById('textSpacingXRange');
+        const next = Number(el.value);
+        if (!Number.isFinite(next)) return;
+        textViewSettings.textSpacingX = Math.max(-2, Math.min(12, next));
+        localStorage.setItem('readerTextSpacingX', String(textViewSettings.textSpacingX));
+        updateTextControlsUi();
         await renderPage();
       });
 
-      textModeBtn.addEventListener('click', async () => {
-        if (currentMode === 'text') return;
-        setMode('text');
+      document.getElementById('textSpacingYRange')?.addEventListener('input', async () => {
+        const el = document.getElementById('textSpacingYRange');
+        const next = Number(el.value);
+        if (!Number.isFinite(next)) return;
+        textViewSettings.textSpacingY = Math.max(0.5, Math.min(3, next));
+        localStorage.setItem('readerTextSpacingY', String(textViewSettings.textSpacingY));
+        updateTextControlsUi();
         await renderPage();
       });
 
       textSizeRange?.addEventListener('input', async () => {
         const next = Number(textSizeRange.value);
         if (!Number.isFinite(next)) return;
-        textViewSettings.sizeScale = Math.max(0.8, Math.min(2, next));
+        textViewSettings.textSizeY = Math.max(0.5, Math.min(3, next));
+        localStorage.setItem('readerTextSizeY', String(textViewSettings.textSizeY));
+        updateTextControlsUi();
+        await renderPage();
+      });
+
+      document.getElementById('textSizeXRange')?.addEventListener('input', async () => {
+        const el = document.getElementById('textSizeXRange');
+        const next = Number(el.value);
+        if (!Number.isFinite(next)) return;
+        textViewSettings.textSizeX = Math.max(0.25, Math.min(3, next));
+        localStorage.setItem('readerTextSizeX', String(textViewSettings.textSizeX));
+        updateTextControlsUi();
+        await renderPage();
+      });
+
+      textBoldToggle?.addEventListener('change', async () => {
+        textViewSettings.forceBold = !!textBoldToggle.checked;
+        localStorage.setItem('readerForceBold', textViewSettings.forceBold ? '1' : '0');
         updateTextControlsUi();
         if (currentMode === 'text') {
           await renderPage();
         }
       });
 
-      textBoldToggle?.addEventListener('change', async () => {
-        textViewSettings.forceBold = !!textBoldToggle.checked;
-        updateTextControlsUi();
-        if (currentMode === 'text') {
-          await renderPage();
+      document.getElementById('fontPickerSelect')?.addEventListener('change', async () => {
+        const fp = document.getElementById('fontPickerSelect');
+        textViewSettings.fontOverride = fp.value;
+        localStorage.setItem('readerFont', fp.value);
+        // Preload Google Fonts for web-only fonts
+        textOverrideFonts.forEach(name => {
+          if (fp.value.includes(name)) loadGoogleFont(name);
+        });
+        await renderPage();
+      });
+
+      // Lock scroll
+      let scrollLocked = false;
+      document.getElementById('lockScrollBtn')?.addEventListener('click', () => {
+        scrollLocked = !scrollLocked;
+        textView.classList.toggle('scroll-locked', scrollLocked);
+        const btn = document.getElementById('lockScrollBtn');
+        if (btn) btn.textContent = '\uD83D\uDD12 Lock Scroll: ' + (scrollLocked ? 'On' : 'Off');
+        if (btn) btn.classList.toggle('primary', scrollLocked);
+      });
+
+      // Run edit mode
+      let runEditMode = false;
+      let selectedRunEl = null;
+
+      function setRunEditMode(on) {
+        runEditMode = on;
+        document.body.classList.toggle('run-edit-mode', on);
+        const btn = document.getElementById('runEditModeBtn');
+        if (btn) btn.textContent = '\u270F Edit Runs: ' + (on ? 'On' : 'Off');
+        if (btn) btn.classList.toggle('primary', on);
+        if (!on) closeRunEditor();
+      }
+
+      document.getElementById('runEditModeBtn')?.addEventListener('click', () => {
+        setRunEditMode(!runEditMode);
+      });
+
+      function closeRunEditor() {
+        document.getElementById('runEditor')?.classList.remove('visible');
+        if (selectedRunEl) { selectedRunEl.classList.remove('run-selected'); selectedRunEl = null; }
+      }
+
+      document.getElementById('runEditorClose')?.addEventListener('click', closeRunEditor);
+
+      function openRunEditor(spanEl) {
+        if (selectedRunEl) selectedRunEl.classList.remove('run-selected');
+        selectedRunEl = spanEl;
+        spanEl.classList.add('run-selected');
+
+        const key = spanEl.dataset.runKey;
+        const ov = runOverrides.get(key) || { dx: 0, dy: 0, sizeScale: 1 };
+
+        document.getElementById('runEditorTitle').textContent = 'Run: \u201c' + spanEl.textContent.slice(0, 32) + '\u201d';
+        document.getElementById('reNudgeX').value = String(ov.dx);
+        document.getElementById('reNudgeXVal').textContent = ov.dx + 'px';
+        document.getElementById('reNudgeY').value = String(ov.dy);
+        document.getElementById('reNudgeYVal').textContent = ov.dy + 'px';
+        document.getElementById('reSize').value = String(ov.sizeScale);
+        document.getElementById('reSizeVal').textContent = Math.round(ov.sizeScale * 100) + '%';
+
+        // Position popover near the span
+        const rect = spanEl.getBoundingClientRect();
+        const editorEl = document.getElementById('runEditor');
+        editorEl.classList.add('visible');
+        const eh = editorEl.offsetHeight;
+        const ew = editorEl.offsetWidth;
+        let top = rect.bottom + 6;
+        if (top + eh > window.innerHeight - 12) top = rect.top - eh - 6;
+        let left = rect.left;
+        if (left + ew > window.innerWidth - 12) left = window.innerWidth - ew - 12;
+        editorEl.style.top = Math.max(8, top) + 'px';
+        editorEl.style.left = Math.max(8, left) + 'px';
+      }
+
+      function applyRunOverride(key, patch) {
+        const existing = runOverrides.get(key) || { dx: 0, dy: 0, sizeScale: 1 };
+        const updated = Object.assign({}, existing, patch);
+        if (updated.dx === 0 && updated.dy === 0 && updated.sizeScale === 1) {
+          runOverrides.delete(key);
+        } else {
+          runOverrides.set(key, updated);
         }
+        saveRunOverrides();
+        // Update the span in-place without full re-render
+        const span = document.querySelector('[data-run-key="' + key + '"]');
+        if (span) {
+          const origLeft = parseFloat(span.dataset.origLeft);
+          const origTop  = parseFloat(span.dataset.origTop);
+          const origFs   = parseFloat(span.dataset.origFontSize);
+          span.style.left     = (origLeft + updated.dx) + 'px';
+          span.style.top      = (origTop  + updated.dy) + 'px';
+          span.style.fontSize = Math.max(6, origFs * updated.sizeScale) + 'px';
+        }
+      }
+
+      document.getElementById('reNudgeX')?.addEventListener('input', () => {
+        if (!selectedRunEl) return;
+        const v = Number(document.getElementById('reNudgeX').value);
+        document.getElementById('reNudgeXVal').textContent = v + 'px';
+        applyRunOverride(selectedRunEl.dataset.runKey, { dx: v });
+      });
+
+      document.getElementById('reNudgeY')?.addEventListener('input', () => {
+        if (!selectedRunEl) return;
+        const v = Number(document.getElementById('reNudgeY').value);
+        document.getElementById('reNudgeYVal').textContent = v + 'px';
+        applyRunOverride(selectedRunEl.dataset.runKey, { dy: v });
+      });
+
+      document.getElementById('reSize')?.addEventListener('input', () => {
+        if (!selectedRunEl) return;
+        const v = Number(document.getElementById('reSize').value);
+        document.getElementById('reSizeVal').textContent = Math.round(v * 100) + '%';
+        applyRunOverride(selectedRunEl.dataset.runKey, { sizeScale: v });
+      });
+
+      document.getElementById('reReset')?.addEventListener('click', async () => {
+        if (!selectedRunEl) return;
+        runOverrides.delete(selectedRunEl.dataset.runKey);
+        saveRunOverrides();
+        document.getElementById('reNudgeX').value = '0';
+        document.getElementById('reNudgeXVal').textContent = '0px';
+        document.getElementById('reNudgeY').value = '0';
+        document.getElementById('reNudgeYVal').textContent = '0px';
+        document.getElementById('reSize').value = '1';
+        document.getElementById('reSizeVal').textContent = '100%';
+        await renderPage();
+        // Re-select the same run after re-render
+        const reSpan = document.querySelector('[data-run-key="' + selectedRunEl?.dataset?.runKey + '"]');
+        if (reSpan) openRunEditor(reSpan);
+      });
+
+      // Tap on a text-run in edit mode
+      textView.addEventListener('click', (e) => {
+        if (!runEditMode) return;
+        const span = e.target.closest('.text-run');
+        if (!span) { closeRunEditor(); return; }
+        e.stopPropagation();
+        openRunEditor(span);
       });
 
       fullscreenBtn.addEventListener('click', async () => {
@@ -1039,6 +1434,72 @@
             await document.exitFullscreen();
           }
         } catch {}
+      });
+
+      const SETTINGS_KEYS = [
+        'readerPageZoomX','readerPageZoomY','readerTextSizeY','readerTextSizeX',
+        'readerTextSpacingX','readerTextSpacingY','readerFont','readerForceBold',
+        'runOverrides:global'
+      ];
+
+      function applySettingsBundle(bundle) {
+        SETTINGS_KEYS.forEach(k => {
+          if (bundle[k] !== undefined) localStorage.setItem(k, bundle[k]);
+          else localStorage.removeItem(k);
+        });
+        // Reload in-memory settings
+        textViewSettings.pageZoomX   = parseFloat(localStorage.getItem('readerPageZoomX')   || '1.00');
+        textViewSettings.pageZoomY   = parseFloat(localStorage.getItem('readerPageZoomY')   || '1.00');
+        textViewSettings.textSizeY   = parseFloat(localStorage.getItem('readerTextSizeY')   || '1.45');
+        textViewSettings.textSizeX   = parseFloat(localStorage.getItem('readerTextSizeX')   || '1.00');
+        textViewSettings.textSpacingX= parseFloat(localStorage.getItem('readerTextSpacingX')|| '0');
+        textViewSettings.textSpacingY= parseFloat(localStorage.getItem('readerTextSpacingY')|| '1');
+        textViewSettings.forceBold   = localStorage.getItem('readerForceBold') === '1';
+        textViewSettings.fontOverride= localStorage.getItem('readerFont') || '';
+        runOverrides.clear();
+        try {
+          Object.entries(JSON.parse(localStorage.getItem('runOverrides:global') || '{}')).forEach(([k,v]) => runOverrides.set(k, v));
+        } catch {}
+        updateTextControlsUi();
+        const fontSel = document.getElementById('fontPickerSelect');
+        if (fontSel) fontSel.value = textViewSettings.fontOverride;
+        const boldCb = document.getElementById('textBoldToggle');
+        if (boldCb) boldCb.checked = textViewSettings.forceBold;
+      }
+
+      document.getElementById('exportSettingsBtn')?.addEventListener('click', () => {
+        const bundle = {};
+        SETTINGS_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v !== null) bundle[k] = v; });
+        const json = JSON.stringify(bundle, null, 2);
+        const a = document.createElement('a');
+        a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(json);
+        a.download = 'ct-reader-settings.json';
+        a.click();
+      });
+
+      document.getElementById('importSettingsBtn')?.addEventListener('click', () => {
+        document.getElementById('importSettingsFile').click();
+      });
+
+      document.getElementById('importSettingsFile')?.addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const bundle = JSON.parse(text);
+          applySettingsBundle(bundle);
+          await renderPage();
+        } catch {
+          alert('Could not read settings file. Make sure it is a valid CT Reader export.');
+        }
+        e.target.value = '';
+      });
+
+      document.getElementById('resetAllBtn')?.addEventListener('click', async () => {
+        if (!confirm('Reset all reader settings and run edits to default?')) return;
+        SETTINGS_KEYS.forEach(k => localStorage.removeItem(k));
+        applySettingsBundle({});
+        await renderPage();
       });
 
       let touchStartX = 0;
@@ -1056,11 +1517,11 @@
         if (!t) return;
         const dx = t.clientX - touchStartX;
         const dy = t.clientY - touchStartY;
-        const horizontalDominant = Math.abs(dx) > Math.abs(dy);
         const verticalDominant = Math.abs(dy) > Math.abs(dx);
 
-        if (horizontalDominant && dx > 45) {
-          // Keep right-swipe reserved for opening the controls panel.
+        // Swipe up from lower quarter of screen → open controls panel
+        const nearBottom = touchStartY > window.innerHeight * 0.75;
+        if (nearBottom && dy < -45 && verticalDominant) {
           setPanelOpen(true);
           return;
         }
@@ -1086,33 +1547,30 @@
       }, { passive: true });
 
       sidepanelBackdrop?.addEventListener('click', () => setPanelOpen(false));
+      pageIndicator?.addEventListener('click', () => setPanelOpen(true));
 
       let panelTouchStartX = 0;
       let panelTouchStartY = 0;
-      sidepanelLeft?.addEventListener('touchstart', (e) => {
+      let panelSwipeIgnored = false;
+      sidepanelBottom?.addEventListener('touchstart', (e) => {
         const t = e.changedTouches && e.changedTouches[0];
         if (!t) return;
+        panelSwipeIgnored = e.target?.tagName === 'INPUT' && e.target?.type === 'range';
         panelTouchStartX = t.clientX;
         panelTouchStartY = t.clientY;
       }, { passive: true });
 
-      sidepanelLeft?.addEventListener('touchend', (e) => {
+      sidepanelBottom?.addEventListener('touchend', (e) => {
+        if (panelSwipeIgnored) return;
         const t = e.changedTouches && e.changedTouches[0];
         if (!t) return;
         const dx = t.clientX - panelTouchStartX;
         const dy = t.clientY - panelTouchStartY;
-        const isLeftSwipe = dx < -45 && Math.abs(dx) > Math.abs(dy);
-        if (isLeftSwipe) setPanelOpen(false);
+        const isDownSwipe = dy > 45 && Math.abs(dy) > Math.abs(dx);
+        if (isDownSwipe) setPanelOpen(false);
       }, { passive: true });
 
-      window.addEventListener('resize', () => {
-        if (currentMode === 'image') {
-          renderPage().catch(() => {});
-        }
-      });
-
       updateTextControlsUi();
-      setMode('text');
       await loadPdf();
     })();
   </script>

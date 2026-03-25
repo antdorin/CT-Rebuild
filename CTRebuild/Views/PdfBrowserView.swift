@@ -448,7 +448,7 @@ struct PdfBrowserView: View {
 
 // MARK: - View Mode Enum
 
-private enum ViewMode { case pdf, reflow, reader }
+private enum ViewMode: String { case pdf, reflow, reader }
 
 // MARK: - PDF Detail View
 
@@ -463,9 +463,9 @@ private struct PdfDetailView: View {
     @State private var showSortSheet = false
     @State private var displayDoc: PDFDocument
     @State private var soTitle: String = ""
-    @State private var singlePageMode = false
+    @AppStorage("pdfSinglePageMode") private var singlePageMode = false
     @State private var autoCropEnabled = true
-    @State private var viewMode: ViewMode = .pdf
+    @AppStorage("pdfViewMode") private var viewMode: ViewMode = .pdf
     @State private var reflowFontPercent = 100
 
     init(document: PDFDocument, title: String, safeArea: EdgeInsets,

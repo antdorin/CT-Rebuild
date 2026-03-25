@@ -211,6 +211,12 @@
                         <Button Style="{StaticResource ToolbarButton}"
                                 Content="📂  Browse…"
                                 Click="PdfFolder_Browse"/>
+                        <Button Style="{StaticResource ToolbarButton}"
+                                Content="⚖  Scale Selected…"
+                                Click="PdfScale_Click"/>
+                        <Button Style="{StaticResource DeleteButton}"
+                                Content="🗑  Delete Selected"
+                                Click="PdfDelete_Click"/>
                         <Separator/>
                         <TextBlock x:Name="PdfFolderPathText"
                                    Text="No folder selected"

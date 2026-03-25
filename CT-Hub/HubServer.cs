@@ -297,7 +297,8 @@ public sealed class HubServer
                     if (string.IsNullOrWhiteSpace(folder)
                         || filename.Contains('/') || filename.Contains('\\')
                         || filename.Contains("..")
-                        || !filename.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                        || (!filename.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)
+                            && !filename.EndsWith(".nl", StringComparison.OrdinalIgnoreCase)))
                     {
                         res.StatusCode = 400; break;
                     }

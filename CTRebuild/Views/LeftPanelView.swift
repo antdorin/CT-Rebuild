@@ -6,20 +6,22 @@ struct LeftPanelView: View {
     let safeArea: EdgeInsets
 
     // Virtual index — can grow negative/positive without clamping (infinite)
-    @State private var columnPage: Int = 0
+    @AppStorage("leftPanelColumnPage") private var columnPage: Int = 0
     @State private var occupiedBins: Set<String> = []
     // true = Panel Page Picker is open; false = full-page content shown
     @State private var isPPOpen = false
 
     @ObservedObject private var binStore = BinDataStore.shared
+    @AppStorage("panel_autoPickerLeft") private var autoPickerLeft = false
+    @AppStorage("panel_leftColumns")    private var storedColumns: Int = 3
 
     private let levelLabels = ["A", "B", "C", "D", "E", "F"]
-    private let totalColumns = 3  // 1, 2, 3 — wraps infinitely
 
-    // Real column number 1–3, wraps circularly
+    // Real column number 1–N, wraps circularly
     private func colNum(for page: Int) -> Int {
-        let m = page % totalColumns
-        return m < 0 ? m + totalColumns + 1 : m + 1
+        let cols = max(1, storedColumns)
+        let m = page % cols
+        return m < 0 ? m + cols + 1 : m + 1
     }
 
     var body: some View {
@@ -37,7 +39,7 @@ struct LeftPanelView: View {
                         isPPOpen: $isPPOpen,
                         panelSize: geo.size,
                         safeArea: safeArea,
-                        totalColumns: totalColumns,
+                        totalColumns: max(1, storedColumns),
                         colNum: colNum
                     )
                     .transition(.opacity.animation(.easeInOut(duration: 0.2)))
@@ -48,6 +50,12 @@ struct LeftPanelView: View {
             }
         }
         .ignoresSafeArea()
+        .onAppear {
+            if autoPickerLeft { isPPOpen = true }
+        }
+        .onDisappear {
+            isPPOpen = false
+        }
         .onReceive(NotificationCenter.default.publisher(for: .gestureActionFired)) { note in
             guard let raw = note.userInfo?["action"] as? String,
                   raw == GestureAction.openPagePicker.rawValue else { return }
@@ -59,11 +67,12 @@ struct LeftPanelView: View {
 
     @ViewBuilder
     func leftPageContent(geo: GeometryProxy) -> some View {
+            let totalColumns = max(1, storedColumns)
         let headerH = safeArea.top + 42
         let dotsH   = safeArea.bottom + 26
         let pageH   = geo.size.height - headerH - dotsH
         let cellH   = (pageH - 16 - 12 - 10 * 4) / 12
-        let cellW   = (geo.size.width - 16 - 5 * 4) / 6
+        let cellW   = (geo.size.width - 16 - (CGFloat(totalColumns - 1) * 4)) / CGFloat(totalColumns * 2)
         let cellSize = max(min(cellW, cellH), 28)
         let col     = colNum(for: columnPage)
 

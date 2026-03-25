@@ -6,8 +6,9 @@ struct AppSettingsView: View {
     let safeArea: EdgeInsets
 
     @State private var showGestureSettings = false
-    @State private var showHubSettings = false
-    @State private var showCameraSettings = false
+    @State private var showHubSettings     = false
+    @State private var showCameraSettings  = false
+    @State private var showPanelSettings   = false
 
     var body: some View {
         ZStack {
@@ -15,14 +16,14 @@ struct AppSettingsView: View {
 
             if showGestureSettings {
                 GestureSettingsView(safeArea: safeArea, onBack: {
-                    withAnimation(.easeInOut(duration: 0.22)) {
-                        showGestureSettings = false
-                    }
+                    withAnimation(.easeInOut(duration: 0.22)) { showGestureSettings = false }
                 })
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing),
-                    removal:   .move(edge: .trailing)
-                ))
+                .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .trailing)))
+            } else if showPanelSettings {
+                PanelSettingsView(safeArea: safeArea, onBack: {
+                    withAnimation(.easeInOut(duration: 0.22)) { showPanelSettings = false }
+                })
+                .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .trailing)))
             } else if showHubSettings {
                 HubSettingsView(safeArea: safeArea, onBack: {
                     withAnimation(.easeInOut(duration: 0.22)) {
@@ -52,6 +53,7 @@ struct AppSettingsView: View {
             }
         }
         .animation(.easeInOut(duration: 0.22), value: showGestureSettings)
+        .animation(.easeInOut(duration: 0.22), value: showPanelSettings)
         .animation(.easeInOut(duration: 0.22), value: showHubSettings)
         .animation(.easeInOut(duration: 0.22), value: showCameraSettings)
     }
@@ -70,7 +72,7 @@ struct AppSettingsView: View {
 
             ScrollView {
                 VStack(spacing: 2) {
-                    // ── Gestures ─────────────────────────────────────────
+                    // ── Gestures ───────────────────────────────────────────────────
                     sectionHeader("GESTURES")
 
                     settingsRow(
@@ -83,7 +85,23 @@ struct AppSettingsView: View {
                         }
                     }
 
-                    // ── Divider ───────────────────────────────────────────
+                    Divider()
+                        .background(Color.white.opacity(0.08))
+                        .padding(.vertical, 10)
+
+                    // ── Panels ───────────────────────────────────────────────────
+                    sectionHeader("PANELS")
+
+                    settingsRow(
+                        icon: "rectangle.split.3x1",
+                        label: "Panel Settings",
+                        detail: "Picker mode, haptics, columns & more"
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            showPanelSettings = true
+                        }
+                    }
+
                     Divider()
                         .background(Color.white.opacity(0.08))
                         .padding(.vertical, 10)
