@@ -147,61 +147,6 @@ struct GestureSettingsView: View {
         }
     }
 
-    // MARK: - Panel Picker Section
-
-    private var panelPickerSection: some View {
-        VStack(spacing: 2) {
-            sectionHeader("PANEL PICKER MODE")
-
-            VStack(spacing: 0) {
-                pickerSwipeRow(
-                    label: "Swipe Right",
-                    systemImage: "arrow.right",
-                    action: settings.pickerSwipeRight,
-                    onTap: { editingPickerSwipe = .right }
-                )
-                Divider().opacity(0.1).padding(.leading, 46)
-                pickerSwipeRow(
-                    label: "Swipe Left",
-                    systemImage: "arrow.left",
-                    action: settings.pickerSwipeLeft,
-                    onTap: { editingPickerSwipe = .left }
-                )
-            }
-            .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
-            .padding(.bottom, 14)
-        }
-    }
-
-    private func pickerSwipeRow(label: String, systemImage: String, action: GestureAction, onTap: @escaping () -> Void) -> some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.7))
-                    .frame(width: 28)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(label)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white.opacity(0.88))
-                    Text(action.rawValue)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundColor(action == .none ? .white.opacity(0.2) : .blue.opacity(0.9))
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.18))
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 11)
-        }
-        .buttonStyle(.plain)
-    }
-
     // MARK: - Gesture Group
 
     private func gestureGroup(title: String, triggers: [GestureTrigger]) -> some View {
