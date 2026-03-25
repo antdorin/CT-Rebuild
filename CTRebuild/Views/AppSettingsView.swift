@@ -9,11 +9,15 @@ struct AppSettingsView: View {
     @State private var showHubSettings     = false
     @State private var showCameraSettings  = false
     @State private var showPanelSettings   = false
-    @AppStorage("panel_showMaterial") private var showMaterial = true
+    @AppStorage("panel_showMaterial")  private var showMaterial    = true
+    @AppStorage("panel_materialStyle") private var materialStyleRaw = "ultraThin"
+    @State private var showAppearance = false
 
     var body: some View {
         ZStack {
-            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+            if showMaterial {
+                (PanelMaterialStyle(rawValue: materialStyleRaw) ?? .ultraThin).background()
+            }
 
             if showGestureSettings {
                 GestureSettingsView(safeArea: safeArea, onBack: {
@@ -45,6 +49,11 @@ struct AppSettingsView: View {
                     insertion: .move(edge: .trailing),
                     removal:   .move(edge: .trailing)
                 ))
+            } else if showAppearance {
+                AppearanceSettingsView(safeArea: safeArea, onBack: {
+                    withAnimation(.easeInOut(duration: 0.22)) { showAppearance = false }
+                })
+                .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .trailing)))
             } else {
                 settingsList
                     .transition(.asymmetric(
@@ -57,6 +66,7 @@ struct AppSettingsView: View {
         .animation(.easeInOut(duration: 0.22), value: showPanelSettings)
         .animation(.easeInOut(duration: 0.22), value: showHubSettings)
         .animation(.easeInOut(duration: 0.22), value: showCameraSettings)
+        .animation(.easeInOut(duration: 0.22), value: showAppearance)
     }
 
     // MARK: - Settings List
@@ -127,17 +137,11 @@ struct AppSettingsView: View {
                     // ── Display ───────────────────────────────────────────
                     sectionHeader("DISPLAY")
 
-                    settingsRow(icon: "moon", label: "Appearance", detail: "System (auto)") {}
-                        .opacity(0.4)
+                    settingsRow(icon: "paintbrush.pointed", label: "Appearance", detail: "Material style & panel tint colors") {
+                        withAnimation(.easeInOut(duration: 0.22)) { showAppearance = true }
+                    }
                     settingsRow(icon: "textformat.size", label: "Text Size", detail: "Default") {}
                         .opacity(0.4)
-
-                    toggleRow(
-                        icon: "square.stack.3d.up",
-                        label: "Panel Material",
-                        detail: "Frosted glass background on all panels",
-                        value: $showMaterial
-                    )
 
                     Divider()
                         .background(Color.white.opacity(0.08))

@@ -10,13 +10,23 @@ struct RightPanelView: View {
     @AppStorage("rightPanelSelectedIndex") private var selectedIndex = 0
     @AppStorage("panel_autoPickerRight") private var autoPickerRight = false
     @AppStorage("panel_rightStartPage")  private var rightStartPage: Int = 0
-    @AppStorage("panel_showMaterial")    private var showMaterial = true
+    @AppStorage("panel_showMaterial")    private var showMaterial    = true
+    @AppStorage("panel_materialStyle")   private var materialStyleRaw = "ultraThin"
+    @AppStorage("panel_tintRightR")      private var panelTintR: Double = 0
+    @AppStorage("panel_tintRightG")      private var panelTintG: Double = 0
+    @AppStorage("panel_tintRightB")      private var panelTintB: Double = 0
+    @AppStorage("panel_tintRightA")      private var panelTintA: Double = 0
 
     var body: some View {
         GeometryReader { geo in
             ZStack {
                 if !isPPOpen && showMaterial {
-                    Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+                    (PanelMaterialStyle(rawValue: materialStyleRaw) ?? .ultraThin).background()
+                }
+                if !isPPOpen && panelTintA > 0.001 {
+                    Rectangle()
+                        .fill(Color(red: panelTintR, green: panelTintG, blue: panelTintB, opacity: panelTintA))
+                        .ignoresSafeArea()
                 }
 
                 if isPPOpen {
@@ -70,6 +80,7 @@ struct RightPanelView: View {
 struct RightPageContent: View {
     let index: Int
     let safeArea: EdgeInsets
+    @AppStorage("panel_showMaterial") private var showMaterial = true
 
     private let shades: [Color] = [
         Color(white: 0.18), Color(white: 0.26), Color(white: 0.34),
@@ -86,7 +97,9 @@ struct RightPageContent: View {
             AppSettingsView(safeArea: safeArea)
         default: // Pages 2–6 — placeholders
             ZStack {
-                Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+                if showMaterial {
+                    Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+                }
                 VStack(spacing: 16) {
                     Text("Page \(index + 1)")
                         .font(.system(size: 40, weight: .bold, design: .rounded))
@@ -229,10 +242,13 @@ private struct RightWheelSelector: View {
 struct BinLocationsView: View {
     let safeArea: EdgeInsets
     @ObservedObject private var binStore = BinDataStore.shared
+    @AppStorage("panel_showMaterial") private var showMaterial = true
 
     var body: some View {
         ZStack {
-            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+            if showMaterial {
+                Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+            }
             VStack(spacing: 0) {
                 // Header
                 Text("BIN LOCATIONS")

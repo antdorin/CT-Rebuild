@@ -20,9 +20,13 @@ struct PanelSettingsView: View {
     // ── Right panel ────────────────────────────────────────────────────────
     @AppStorage("panel_rightStartPage")  private var rightStartPage: Int = 0
 
+    @AppStorage("panel_showMaterial")    private var showMaterial = true
+
     var body: some View {
         ZStack {
-            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+            if showMaterial {
+                Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+            }
 
             VStack(spacing: 0) {
                 header

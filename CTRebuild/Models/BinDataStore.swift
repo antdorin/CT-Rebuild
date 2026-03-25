@@ -48,54 +48,58 @@ final class BinDataStore: ObservableObject {
 
     // MARK: - Extraction
 
-    // Regex for bin location: digit + letter + dash + digit + letter
-    // e.g. "1A-1A", "2B-3C", "3A-4F"
+    // Matches picking-ticket bin codes: "1-A-4D", "2-B-1E", "10-A-3F"
     private static let binRegex = try! NSRegularExpression(
-        pattern: #"\b(\d[A-Fa-f]-\d[A-Fa-f])\b"#
+        pattern: #"\b(\d+-[A-F]-\d+[A-F])\b"#,
+        options: .caseInsensitive
     )
 
-    // Regex for committed number — looks for "Committed" header/label
-    // followed by a number (possibly on the next line).
-    private static let committedRegex = try! NSRegularExpression(
-        pattern: #"[Cc]ommitted[\s:]*(\d+)"#
-    )
+    /// Converts PDF format "1-A-4D" → grid format "1A-4D"
+    private func toGridCode(_ raw: String) -> String {
+        raw.uppercased().replacingOccurrences(
+            of: #"^(\d+)-([A-F])-"#,
+            with: "$1$2-",
+            options: .regularExpression
+        )
+    }
 
-    /// Extracts (binCode, committedQty) pairs from a single PDF page's text.
-    /// Each bin code is paired with the nearest committed quantity that follows it.
-    /// If no committed number appears after a bin, that bin is skipped.
+    /// Extracts (gridCode, committedQty) pairs from a single PDF page's text.
+    /// Primary strategy: line-by-line — bin code + last integer on same line = committed qty.
+    /// Fallback: scan for first integer after each bin code in the full text.
     private func extractBinCommitted(from text: String) -> [(String, Int)] {
-        let ns = text as NSString
-        let fullRange = NSRange(location: 0, length: ns.length)
-
-        // Find all bin codes with their positions
-        let binMatches = Self.binRegex.matches(in: text, range: fullRange)
-        // Find all committed quantities with their positions
-        let commitMatches = Self.committedRegex.matches(in: text, range: fullRange)
-
-        guard !binMatches.isEmpty, !commitMatches.isEmpty else { return [] }
-
         var results: [(String, Int)] = []
 
-        for binMatch in binMatches {
-            let binCode = ns.substring(with: binMatch.range(at: 1)).uppercased()
-            let binPos = binMatch.range.location
+        // ── Primary: line-by-line ────────────────────────────────────────────
+        for line in text.components(separatedBy: .newlines) {
+            let ns = line as NSString
+            let lineRange = NSRange(location: 0, length: ns.length)
+            let binMatches = Self.binRegex.matches(in: line, range: lineRange)
+            guard !binMatches.isEmpty else { continue }
 
-            // Find the closest committed qty by absolute distance to this bin
-            var bestQty: Int? = nil
-            var bestDist = Int.max
+            // Split by whitespace, parse integers — item codes (e.g. PIG.754D-0008) won't parse
+            let nums = line.components(separatedBy: .whitespaces).compactMap { Int($0) }.filter { $0 > 0 }
+            guard let qty = nums.last else { continue }
 
-            for cm in commitMatches {
-                guard let qty = Int(ns.substring(with: cm.range(at: 1))) else { continue }
-                let cmPos = cm.range.location
-                let dist = abs(cmPos - binPos)
-                if dist < bestDist {
-                    bestDist = dist
-                    bestQty = qty
-                }
+            for bm in binMatches {
+                results.append((toGridCode(ns.substring(with: bm.range(at: 1))), qty))
             }
+        }
 
-            if let qty = bestQty, qty > 0 {
-                results.append((binCode, qty))
+        // ── Fallback: proximity scan (when PDF has no line breaks) ───────────
+        if results.isEmpty {
+            let ns = text as NSString
+            let fullRange = NSRange(location: 0, length: ns.length)
+            let binMatches = Self.binRegex.matches(in: text, range: fullRange)
+            let numRegex = try! NSRegularExpression(pattern: #"\b(\d+)\b"#)
+            let numMatches = numRegex.matches(in: text, range: fullRange)
+
+            for bm in binMatches {
+                let binEnd = bm.range.location + bm.range.length
+                // First integer that appears after the bin code
+                if let nm = numMatches.first(where: { $0.range.location > binEnd }),
+                   let qty = Int(ns.substring(with: nm.range(at: 1))), qty > 0 {
+                    results.append((toGridCode(ns.substring(with: bm.range(at: 1))), qty))
+                }
             }
         }
 

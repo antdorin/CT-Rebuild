@@ -9,6 +9,7 @@ struct GestureSettingsView: View {
     @ObservedObject private var settings = GestureSettings.shared
     @State private var editingTrigger: GestureTrigger? = nil
     @State private var showResetConfirm = false
+    @AppStorage("panel_showMaterial") private var showMaterial = true
 
     // Groups in the order we want to show them
     private let groupOrder = [
@@ -31,7 +32,9 @@ struct GestureSettingsView: View {
 
     var body: some View {
         ZStack {
-            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+            if showMaterial {
+                Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+            }
 
             VStack(spacing: 0) {
                 header

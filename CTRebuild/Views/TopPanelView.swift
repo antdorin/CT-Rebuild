@@ -6,7 +6,12 @@ struct TopPanelView: View {
     let safeArea: EdgeInsets
 
     @State private var selectedTab: Int? = 1
-    @AppStorage("panel_showMaterial") private var showMaterial = true
+    @AppStorage("panel_showMaterial")  private var showMaterial    = true
+    @AppStorage("panel_materialStyle") private var materialStyleRaw = "ultraThin"
+    @AppStorage("panel_tintTopR")      private var panelTintR: Double = 0
+    @AppStorage("panel_tintTopG")      private var panelTintG: Double = 0
+    @AppStorage("panel_tintTopB")      private var panelTintB: Double = 0
+    @AppStorage("panel_tintTopA")      private var panelTintA: Double = 0
 
     // Read directly from UIKit — reliable even when parent ignores safe area
     private var topInset: CGFloat {
@@ -18,8 +23,12 @@ struct TopPanelView: View {
     var body: some View {
         ZStack {
             if selectedTab != nil && showMaterial {
+                (PanelMaterialStyle(rawValue: materialStyleRaw) ?? .ultraThin).background()
+                    .transition(.opacity)
+            }
+            if selectedTab != nil && panelTintA > 0.001 {
                 Rectangle()
-                    .fill(.ultraThinMaterial)
+                    .fill(Color(red: panelTintR, green: panelTintG, blue: panelTintB, opacity: panelTintA))
                     .ignoresSafeArea()
                     .transition(.opacity)
             }

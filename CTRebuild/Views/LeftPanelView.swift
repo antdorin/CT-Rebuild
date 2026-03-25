@@ -14,7 +14,12 @@ struct LeftPanelView: View {
     @ObservedObject private var binStore = BinDataStore.shared
     @AppStorage("panel_autoPickerLeft") private var autoPickerLeft = false
     @AppStorage("panel_leftColumns")    private var storedColumns: Int = 3
-    @AppStorage("panel_showMaterial")   private var showMaterial = true
+    @AppStorage("panel_showMaterial")   private var showMaterial    = true
+    @AppStorage("panel_materialStyle")  private var materialStyleRaw = "ultraThin"
+    @AppStorage("panel_tintLeftR")      private var panelTintR: Double = 0
+    @AppStorage("panel_tintLeftG")      private var panelTintG: Double = 0
+    @AppStorage("panel_tintLeftB")      private var panelTintB: Double = 0
+    @AppStorage("panel_tintLeftA")      private var panelTintA: Double = 0
 
     private let levelLabels = ["A", "B", "C", "D", "E", "F"]
 
@@ -30,8 +35,11 @@ struct LeftPanelView: View {
             ZStack {
                 // Background — only when content is visible
                 if !isPPOpen && showMaterial {
+                    (PanelMaterialStyle(rawValue: materialStyleRaw) ?? .ultraThin).background()
+                }
+                if !isPPOpen && panelTintA > 0.001 {
                     Rectangle()
-                        .fill(.ultraThinMaterial)
+                        .fill(Color(red: panelTintR, green: panelTintG, blue: panelTintB, opacity: panelTintA))
                         .ignoresSafeArea()
                 }
 

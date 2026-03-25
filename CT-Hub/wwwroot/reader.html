@@ -69,8 +69,6 @@
       border:none;
       border-radius:0;
       padding:0;
-      padding-top:max(8px, env(safe-area-inset-top));
-      padding-bottom:max(50px, env(safe-area-inset-bottom));
       min-height:100vh;
       display:flex;
       align-items:center;
@@ -440,6 +438,10 @@
       cursor:pointer;
     }
     body.run-edit-mode .text-run{ pointer-events:auto; cursor:crosshair; }
+    @keyframes pageSlideUp   { from{ transform:translateY(100%); opacity:.4 } to{ transform:translateY(0); opacity:1 } }
+    @keyframes pageSlideDown { from{ transform:translateY(-100%); opacity:.4 } to{ transform:translateY(0); opacity:1 } }
+    .page-enter-next{ animation:pageSlideUp   .32s cubic-bezier(0.25,0.46,0.45,0.94) both; }
+    .page-enter-prev{ animation:pageSlideDown .32s cubic-bezier(0.25,0.46,0.45,0.94) both; }
   </style>
 </head>
 <body>
@@ -576,6 +578,19 @@
   </div>
 
 
+
+  <!-- Hidden status elements (used by JS for state tracking) -->
+  <button id="pageIndicator" style="display:none" type="button" aria-label="Open controls"></button>
+  <div style="display:none">
+    <button id="pickedToggle" type="button" aria-pressed="false">
+      <span id="pickedChkBox"></span>
+      <span id="pickedLabel">Picked</span>
+    </button>
+    <button id="shippedToggle" type="button" aria-pressed="false">
+      <span id="shippedChkBox"></span>
+      <span id="shippedLabel">Shipped</span>
+    </button>
+  </div>
 
   <!-- Center stamp overlay -->
   <div id="docStamp" class="doc-stamp hidden"></div>
@@ -1522,19 +1537,27 @@
         if (dy < 0 && currentPage < pdfDoc.numPages) {
           if (searchPages.length) {
             const pos = searchPages.indexOf(currentPage);
-            if (pos < searchPages.length - 1) { currentPage = searchPages[pos + 1]; await renderPage(); }
+            if (pos < searchPages.length - 1) { currentPage = searchPages[pos + 1]; await renderPage(); animatePage('next'); }
           } else {
-            currentPage += 1; await renderPage();
+            currentPage += 1; await renderPage(); animatePage('next');
           }
         } else if (dy > 0 && currentPage > 1) {
           if (searchPages.length) {
             const pos = searchPages.indexOf(currentPage);
-            if (pos > 0) { currentPage = searchPages[pos - 1]; await renderPage(); }
+            if (pos > 0) { currentPage = searchPages[pos - 1]; await renderPage(); animatePage('prev'); }
           } else {
-            currentPage -= 1; await renderPage();
+            currentPage -= 1; await renderPage(); animatePage('prev');
           }
         }
       }, { passive: true });
+
+      function animatePage(dir) {
+        textView.classList.remove('page-enter-next', 'page-enter-prev');
+        void textView.offsetWidth; // force reflow
+        const cls = dir === 'next' ? 'page-enter-next' : 'page-enter-prev';
+        textView.classList.add(cls);
+        textView.addEventListener('animationend', () => textView.classList.remove(cls), { once: true });
+      }
 
       sidepanelBackdrop?.addEventListener('click', () => setPanelOpen(false));
       pageIndicator?.addEventListener('click', () => setPanelOpen(true));

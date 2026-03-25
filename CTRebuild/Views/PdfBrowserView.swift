@@ -154,12 +154,15 @@ struct PdfBrowserView: View {
 
     // persists which group was open when the panel closed
     @AppStorage("pdfOpenedGroupId") private var openedGroupId: String = ""
+    @AppStorage("panel_showMaterial") private var showMaterial = true
 
     @ObservedObject private var binStore = BinDataStore.shared
 
     var body: some View {
         ZStack {
-            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+            if showMaterial {
+                Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+            }
 
             if let group = openedGroup, let doc = mergedDoc {
                 PdfDetailView(
@@ -413,6 +416,7 @@ private struct PdfDetailView: View {
     @AppStorage("pdfViewMode") private var viewMode: ViewMode = .pdf
     @State private var isPicked: Bool = false
     @State private var isShipped: Bool = false
+    @AppStorage("panel_showMaterial") private var showMaterial = true
 
     init(document: PDFDocument, title: String, safeArea: EdgeInsets,
          filenames: [String] = [],
@@ -428,7 +432,9 @@ private struct PdfDetailView: View {
 
     var body: some View {
         ZStack {
-            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+            if showMaterial {
+                Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+            }
             VStack(spacing: 0) {
 
                 // ── Title bar ─────────────────────────────────────────────

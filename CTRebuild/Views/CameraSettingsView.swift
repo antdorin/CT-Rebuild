@@ -20,10 +20,13 @@ struct CameraSettingsView: View {
     @AppStorage("cam_coremlEnabled") private var coremlEnabled = false
     @AppStorage("cam_dragZoomSensitivity") private var dragZoomSensitivity: Double = 80
     @AppStorage("cam_maxZoomLevel") private var maxZoomLevel: Double = 10
+    @AppStorage("panel_showMaterial") private var showMaterial = true
 
     var body: some View {
         ZStack {
-            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+            if showMaterial {
+                Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+            }
 
             VStack(spacing: 0) {
                 header

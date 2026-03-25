@@ -12,7 +12,12 @@ struct BottomPanelView: View {
     // Drag zoom settings
     @AppStorage("cam_dragZoomSensitivity") private var dragZoomSensitivity: Double = 80
     @AppStorage("cam_maxZoomLevel") private var maxZoomLevel: Double = 10
-    @AppStorage("panel_showMaterial") private var showMaterial = true
+    @AppStorage("panel_showMaterial")   private var showMaterial    = true
+    @AppStorage("panel_materialStyle")  private var materialStyleRaw = "ultraThin"
+    @AppStorage("panel_tintBottomR")    private var panelTintR: Double = 0
+    @AppStorage("panel_tintBottomG")    private var panelTintG: Double = 0
+    @AppStorage("panel_tintBottomB")    private var panelTintB: Double = 0
+    @AppStorage("panel_tintBottomA")    private var panelTintA: Double = 0
     // Modal routing
     @State private var pendingScan: ScanResult? = nil
     @State private var recentScans: [ScanResult] = []
@@ -22,8 +27,11 @@ struct BottomPanelView: View {
         ZStack {
             // ── Translucent background ────────────────────────────────────────
             if showMaterial {
+                (PanelMaterialStyle(rawValue: materialStyleRaw) ?? .ultraThin).background()
+            }
+            if panelTintA > 0.001 {
                 Rectangle()
-                    .fill(.ultraThinMaterial)
+                    .fill(Color(red: panelTintR, green: panelTintG, blue: panelTintB, opacity: panelTintA))
                     .ignoresSafeArea()
             }
 

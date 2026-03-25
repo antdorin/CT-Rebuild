@@ -12,10 +12,13 @@ struct HubSettingsView: View {
     @State private var newUrlText: String = ""
     @State private var discovering: Bool = false
     @State private var discoverStatus: String = ""
+    @AppStorage("panel_showMaterial") private var showMaterial = true
 
     var body: some View {
         ZStack {
-            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+            if showMaterial {
+                Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+            }
 
             VStack(spacing: 0) {
                 // Header
