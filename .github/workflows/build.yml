@@ -1,10 +1,10 @@
-name: iOS Build
+name: iOS Build & Release
 
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
+    paths-ignore:
+      - 'apps.json'
   workflow_dispatch:
 
 env:
@@ -12,8 +12,10 @@ env:
 
 jobs:
   build:
-    name: Build & Archive
+    name: Build, Release & Publish
     runs-on: macos-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -36,6 +38,14 @@ jobs:
       - name: Install xcpretty
         run: gem install xcpretty --no-document
 
+      # ── Set version ──────────────────────────────────────────────────────────
+      - name: Set version
+        id: version
+        run: |
+          VERSION="1.0.${{ github.run_number }}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
       # ── Build unsigned .app for real device (AltStore will sign it) ─────────
       - name: Build unsigned app (device)
         run: |
@@ -46,6 +56,8 @@ jobs:
             -configuration Release \
             -destination "generic/platform=iOS" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            MARKETING_VERSION="${{ steps.version.outputs.version }}" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -53,6 +65,7 @@ jobs:
 
       # ── Package .app → .ipa  (unsigned — ready for AltStore sideloading) ────
       - name: Package unsigned IPA
+        id: package
         run: |
           APP_PATH=$(find "$RUNNER_TEMP/DerivedData" -name "*.app" \
             -not -path "*/simulator/*" | head -1)
@@ -61,11 +74,49 @@ jobs:
           cp -r "$APP_PATH" "$RUNNER_TEMP/ipa-payload/Payload/"
           cd "$RUNNER_TEMP/ipa-payload"
           zip -r "$RUNNER_TEMP/CTRebuild.ipa" Payload
-          echo "IPA created at $RUNNER_TEMP/CTRebuild.ipa"
+          SIZE=$(stat -f%z "$RUNNER_TEMP/CTRebuild.ipa")
+          echo "IPA size: $SIZE bytes"
+          echo "ipa_size=$SIZE" >> "$GITHUB_OUTPUT"
 
-      - name: Upload unsigned IPA (sideload via AltStore)
-        uses: actions/upload-artifact@v4
-        with:
-          name: CTRebuild-unsigned-${{ github.sha }}
-          path: ${{ runner.temp }}/CTRebuild.ipa
-          retention-days: 30
+      # ── Create GitHub Release and upload IPA ─────────────────────────────────
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            "$RUNNER_TEMP/CTRebuild.ipa" \
+            --title "CTRebuild ${{ steps.version.outputs.version }}" \
+            --notes "Automated build from commit \`${{ github.sha }}\`"
+
+      # ── Update apps.json for AltStore ────────────────────────────────────────
+      - name: Update apps.json
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+          IPA_SIZE: ${{ steps.package.outputs.ipa_size }}
+          REPO: ${{ github.repository }}
+        run: |
+          export DATE=$(date -u +%Y-%m-%d)
+          export DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/CTRebuild.ipa"
+          python3 -c "
+          import json, os
+          with open('apps.json') as f:
+              data = json.load(f)
+          app = data['apps'][0]
+          app['version']     = os.environ['VERSION']
+          app['versionDate'] = os.environ['DATE']
+          app['downloadURL'] = os.environ['DOWNLOAD_URL']
+          app['size']        = int(os.environ['IPA_SIZE'])
+          with open('apps.json', 'w') as f:
+              json.dump(data, f, indent=2)
+              f.write('\n')
+          "
+
+      - name: Commit updated apps.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apps.json
+          git diff --staged --quiet || \
+            git commit -m "chore: update apps.json for ${{ steps.version.outputs.version }} [skip ci]"
+          git push

@@ -131,6 +131,52 @@ private func mergePDFs(from parts: [Data]) -> PDFDocument {
     return out
 }
 
+// MARK: - Reader WebView Cache
+
+final class ReaderWebViewCache: NSObject, ObservableObject, WKNavigationDelegate {
+    let webView: WKWebView
+    private var loadedFilenames: [String] = []
+    @Published var isReady: Bool = false
+
+    override init() {
+        let config = WKWebViewConfiguration()
+        config.allowsInlineMediaPlayback = true
+        let prefs = WKWebpagePreferences()
+        prefs.allowsContentJavaScript = true
+        config.defaultWebpagePreferences = prefs
+
+        webView = WKWebView(frame: .zero, configuration: config)
+        webView.isOpaque = false
+        webView.backgroundColor = .black
+        webView.scrollView.backgroundColor = .black
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
+        super.init()
+        webView.navigationDelegate = self
+    }
+
+    func load(filenames: [String]) {
+        guard filenames != loadedFilenames else { return }
+        loadedFilenames = filenames
+        isReady = false
+
+        let base = HubClient.shared.activeBaseURL
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard !base.isEmpty, let first = filenames.first else { return }
+
+        let encoded = first.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? first
+        let urlString = "\(base)/reader.html?file=\(encoded)"
+        guard let url = URL(string: urlString) else { return }
+
+        let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
+        webView.load(request)
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        DispatchQueue.main.async { self.isReady = true }
+    }
+}
+
 // MARK: - PDF Browser View
 
 struct PdfBrowserView: View {
@@ -157,6 +203,7 @@ struct PdfBrowserView: View {
     @AppStorage("panel_showMaterial") private var showMaterial = true
 
     @ObservedObject private var binStore = BinDataStore.shared
+    @StateObject private var readerCache = ReaderWebViewCache()
 
     var body: some View {
         ZStack {
@@ -170,6 +217,7 @@ struct PdfBrowserView: View {
                     title: group.soLabel.isEmpty ? group.dateLabel : group.soLabel,
                     safeArea: safeArea,
                     filenames: group.filenames,
+                    readerCache: readerCache,
                     currentPage: Binding(
                         get: { lastPages[group.id] ?? 0 },
                         set: { newPage in
@@ -356,6 +404,7 @@ struct PdfBrowserView: View {
         isLoadingGroup = true; groupError = nil
         do {
             let doc = try await downloadAndMerge(group)
+            readerCache.load(filenames: group.filenames)
             withAnimation(.easeInOut(duration: 0.22)) {
                 mergedDoc = doc
                 openedGroup = group
@@ -406,6 +455,7 @@ private struct PdfDetailView: View {
     let title: String
     let safeArea: EdgeInsets
     let filenames: [String]
+    let readerCache: ReaderWebViewCache
     @Binding var currentPage: Int
     let onBack: () -> Void
 
@@ -420,11 +470,13 @@ private struct PdfDetailView: View {
 
     init(document: PDFDocument, title: String, safeArea: EdgeInsets,
          filenames: [String] = [],
+         readerCache: ReaderWebViewCache,
          currentPage: Binding<Int>, onBack: @escaping () -> Void) {
         self.document    = document
         self.title       = title
         self.safeArea    = safeArea
         self.filenames   = filenames
+        self.readerCache = readerCache
         self._currentPage = currentPage
         self.onBack      = onBack
         self._displayDoc = State(initialValue: document)
@@ -450,12 +502,21 @@ private struct PdfDetailView: View {
                 Divider().opacity(0.12)
 
                 // ── Content ───────────────────────────────────────────────
-                switch viewMode {
-                case .reader:
-                    ReaderWebView(filenames: filenames)
-                case .pdf:
+                ZStack {
                     PdfKitView(document: displayDoc, currentPageIdx: $currentPage,
                                singlePage: singlePageMode, autoCrop: autoCropEnabled)
+                        .opacity(viewMode == .pdf ? 1 : 0)
+
+                    ReaderContainerView(cache: readerCache)
+                        .opacity(viewMode == .reader ? 1 : 0)
+                        .overlay {
+                            if viewMode == .reader && !readerCache.isReady {
+                                ZStack {
+                                    Color.black.ignoresSafeArea()
+                                    ProgressView().tint(.white)
+                                }
+                            }
+                        }
                 }
 
                 Divider().opacity(0.12)
@@ -1047,86 +1108,27 @@ private struct ReflowWebView: UIViewRepresentable {
         }
 }
 
-// MARK: - Reader Web View (loads reader.html from CT-Hub server)
+// MARK: - Reader Container View (hosts the long-lived cached WKWebView)
 
-private struct ReaderWebView: UIViewRepresentable {
-    let filenames: [String]
+private struct ReaderContainerView: UIViewRepresentable {
+    let cache: ReaderWebViewCache
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    func makeUIView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        config.allowsInlineMediaPlayback = true
-        
-        // Allow navigation to any URL and disable restrictions
-        let prefs = WKWebpagePreferences()
-        prefs.allowsContentJavaScript = true
-        config.defaultWebpagePreferences = prefs
-        
-        let view = WKWebView(frame: .zero, configuration: config)
-        view.isOpaque = false
-        view.backgroundColor = .black
-        view.scrollView.backgroundColor = .black
-        view.scrollView.contentInsetAdjustmentBehavior = .never
-        view.navigationDelegate = context.coordinator
-
-        context.coordinator.loadedFilenames = filenames
-        loadReader(into: view, context: context)
-        return view
+    func makeUIView(context: Context) -> UIView {
+        let container = UIView()
+        container.backgroundColor = .black
+        let wv = cache.webView
+        wv.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(wv)
+        NSLayoutConstraint.activate([
+            wv.topAnchor.constraint(equalTo: container.topAnchor),
+            wv.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            wv.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            wv.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+        ])
+        return container
     }
 
-    func updateUIView(_ uiView: WKWebView, context: Context) {
-        guard context.coordinator.loadedFilenames != filenames else { return }
-        context.coordinator.loadedFilenames = filenames
-        loadReader(into: uiView, context: context)
-    }
-
-    private func loadReader(into webView: WKWebView, context: Context) {
-        let base = HubClient.shared.activeBaseURL
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        
-        print("🔍 READER DEBUG: base URL = '\(base)'")
-        print("🔍 READER DEBUG: filenames = \(filenames)")
-        
-        guard !base.isEmpty else {
-            print("❌ READER ERROR: base URL is empty")
-            return
-        }
-        
-        guard let first = filenames.first else {
-            print("❌ READER ERROR: no filenames provided")
-            return
-        }
-
-        let encoded = first.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? first
-        let urlString = "\(base)/reader.html?file=\(encoded)"
-        
-        print("🔍 READER DEBUG: loading URL = '\(urlString)'")
-        
-        if let url = URL(string: urlString) {
-            let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
-            webView.load(request)
-        } else {
-            print("❌ READER ERROR: failed to create URL from string '\(urlString)'")
-        }
-    }
-
-    final class Coordinator: NSObject, WKNavigationDelegate {
-        var loadedFilenames: [String] = []
-        
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            print("✅ READER: page loaded successfully")
-        }
-        
-        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-            print("❌ READER ERROR: navigation failed - \(error.localizedDescription)")
-        }
-        
-        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-            print("❌ READER ERROR: provisional navigation failed - \(error.localizedDescription)")
-        }
-    }
+    func updateUIView(_ uiView: UIView, context: Context) {}
 }
 
 // MARK: - PDFKit View

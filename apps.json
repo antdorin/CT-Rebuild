@@ -1,0 +1,19 @@
+{
+  "name": "CT Rebuild",
+  "identifier": "com.ctrebuild.source",
+  "sourceURL": "https://antdorin.github.io/CT-Rebuild/apps.json",
+  "apps": [
+    {
+      "name": "CTRebuild",
+      "bundleIdentifier": "com.ctrebuild.app",
+      "developerName": "Chase Tactical",
+      "localizedDescription": "Chase Tactical warehouse management app.",
+      "tintColor": "7AC0F8",
+      "version": "1.0.0",
+      "versionDate": "2026-03-25",
+      "versionDescription": "Initial release.",
+      "downloadURL": "",
+      "size": 0
+    }
+  ]
+}
