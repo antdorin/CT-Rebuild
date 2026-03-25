@@ -8,6 +8,7 @@ struct BottomPanelView: View {
     @State private var zoomAtDragStart: CGFloat? = nil   // nil = not dragging
     @State private var showZoomBadge: Bool = false
     @State private var zoomBadgeTask: DispatchWorkItem? = nil
+    @State private var isCamOverlayOpen = false
     // Drag zoom settings
     @AppStorage("cam_dragZoomSensitivity") private var dragZoomSensitivity: Double = 80
     @AppStorage("cam_maxZoomLevel") private var maxZoomLevel: Double = 10
@@ -59,9 +60,38 @@ struct BottomPanelView: View {
                                 .transition(.opacity)
                                 .allowsHitTesting(false)
                         }
+
+                        // ── Camera side overlay (30% wide, full camera height) ────
+                        if isCamOverlayOpen {
+                            HStack(spacing: 0) {
+                                Spacer()
+                                Rectangle()
+                                    .fill(.ultraThinMaterial)
+                                    .overlay(alignment: .leading) {
+                                        Rectangle()
+                                            .fill(Color.white.opacity(0.10))
+                                            .frame(width: 0.5)
+                                    }
+                                    .frame(width: geo.size.width * 0.30)
+                                    .contentShape(Rectangle())
+                                    .gesture(
+                                        DragGesture(minimumDistance: 10)
+                                            .onEnded { value in
+                                                let adx = abs(value.translation.width)
+                                                let ady = abs(value.translation.height)
+                                                guard adx > ady, value.translation.width > 50 else { return }
+                                                withAnimation(.easeInOut(duration: 0.07)) {
+                                                    isCamOverlayOpen = false
+                                                }
+                                            }
+                                    )
+                            }
+                            .transition(.move(edge: .trailing))
+                        }
                     }
                     .animation(.easeOut(duration: 0.12), value: viewModel.scanTrackingRect != nil)
                     .animation(.easeOut(duration: 0.2), value: showZoomBadge)
+                    .animation(.easeInOut(duration: 0.07), value: isCamOverlayOpen)
                     .frame(height: geo.size.height * 0.70)
                     .clipped()
                     // Vertical drag to zoom (simultaneous so horizontal close still works)
@@ -89,6 +119,19 @@ struct BottomPanelView: View {
                                 let task = DispatchWorkItem { showZoomBadge = false }
                                 zoomBadgeTask = task
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: task)
+                            }
+                    )
+                    // Swipe left to open the camera side overlay
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 10)
+                            .onEnded { value in
+                                let adx = abs(value.translation.width)
+                                let ady = abs(value.translation.height)
+                                guard adx > ady, !isCamOverlayOpen,
+                                      value.translation.width < -50 else { return }
+                                withAnimation(.easeInOut(duration: 0.07)) {
+                                    isCamOverlayOpen = true
+                                }
                             }
                     )
 

@@ -94,20 +94,6 @@ struct LeftPanelView: View {
             }
             .frame(width: geo.size.width, height: pageH)
             .clipped()
-            .simultaneousGesture(
-                DragGesture()
-                    .onEnded { value in
-                        let adx = abs(value.translation.width)
-                        let ady = abs(value.translation.height)
-                        guard ady > adx else { return }
-                        let threshold = pageH * 0.2
-                        if value.translation.height < -threshold {
-                            withAnimation { columnPage += 1 }
-                        } else if value.translation.height > threshold {
-                            withAnimation { columnPage -= 1 }
-                        }
-                    }
-            )
 
             HStack(spacing: 6) {
                 ForEach(0..<totalColumns, id: \.self) { i in
