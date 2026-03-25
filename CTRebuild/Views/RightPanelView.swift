@@ -29,7 +29,6 @@ struct RightPanelView: View {
                 } else {
                     RightPageContent(index: selectedIndex, safeArea: safeArea)
                         .frame(width: geo.size.width, height: geo.size.height)
-                        .transition(.pageTransition)
                 }
             }
         }
