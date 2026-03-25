@@ -80,6 +80,8 @@ struct RightPageContent: View {
         switch index {
         case 0:  // Page 1 — PDF Browser
             PdfBrowserView(safeArea: safeArea)
+        case 1:  // Page 2 — Bin Locations
+            BinLocationsView(safeArea: safeArea)
         case 6:  // Page 7 — App Settings
             AppSettingsView(safeArea: safeArea)
         default: // Pages 2–6 — placeholders
@@ -102,7 +104,7 @@ struct RightPageContent: View {
 /// Human-readable names for right-panel pages (index 0–6).
 private let rightPageTitles: [String] = [
     "PDF Browser",
-    "Page 2",
+    "Bin Locations",
     "Page 3",
     "Page 4",
     "Page 5",
@@ -220,4 +222,59 @@ private struct RightWheelSelector: View {
         )
     }
 
+}
+
+// MARK: - Bin Locations View
+
+struct BinLocationsView: View {
+    let safeArea: EdgeInsets
+    @ObservedObject private var binStore = BinDataStore.shared
+
+    var body: some View {
+        ZStack {
+            Color(white: 0.07).ignoresSafeArea()
+            VStack(spacing: 0) {
+                // Header
+                Text("BIN LOCATIONS")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.35))
+                    .tracking(4)
+                    .padding(.top, safeArea.top + 16)
+                    .padding(.bottom, 12)
+
+                Divider().opacity(0.12)
+
+                let entries = binStore.binQuantities.sorted { $0.key < $1.key }
+
+                if entries.isEmpty {
+                    Spacer()
+                    Text("NO ACTIVE PDF")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.2))
+                        .tracking(3)
+                    Spacer()
+                } else {
+                    ScrollView(.vertical, showsIndicators: false) {
+                        LazyVStack(spacing: 0) {
+                            ForEach(entries, id: \.key) { bin, qty in
+                                HStack(spacing: 0) {
+                                    Text(bin)
+                                        .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                                        .foregroundColor(.white.opacity(0.9))
+                                    Spacer()
+                                    Text("\(qty)")
+                                        .font(.system(size: 22, weight: .bold, design: .monospaced))
+                                        .foregroundColor(.orange)
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 14)
+                                Divider().opacity(0.1).padding(.horizontal, 20)
+                            }
+                        }
+                        .padding(.bottom, safeArea.bottom + 16)
+                    }
+                }
+            }
+        }
+    }
 }
