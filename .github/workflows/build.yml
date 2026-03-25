@@ -75,8 +75,11 @@ jobs:
           cd "$RUNNER_TEMP/ipa-payload"
           zip -r "$RUNNER_TEMP/CTRebuild.ipa" Payload
           SIZE=$(stat -f%z "$RUNNER_TEMP/CTRebuild.ipa")
+          SHA256=$(shasum -a 256 "$RUNNER_TEMP/CTRebuild.ipa" | awk '{print $1}')
           echo "IPA size: $SIZE bytes"
+          echo "IPA sha256: $SHA256"
           echo "ipa_size=$SIZE" >> "$GITHUB_OUTPUT"
+          echo "ipa_sha256=$SHA256" >> "$GITHUB_OUTPUT"
 
       # ── Create GitHub Release and upload IPA ─────────────────────────────────
       - name: Create GitHub Release
@@ -94,6 +97,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           TAG: ${{ steps.version.outputs.tag }}
           IPA_SIZE: ${{ steps.package.outputs.ipa_size }}
+          IPA_SHA256: ${{ steps.package.outputs.ipa_sha256 }}
           REPO: ${{ github.repository }}
         run: |
           export DATE=$(date -u +%Y-%m-%d)
@@ -107,6 +111,7 @@ jobs:
           app['versionDate'] = os.environ['DATE']
           app['downloadURL'] = os.environ['DOWNLOAD_URL']
           app['size']        = int(os.environ['IPA_SIZE'])
+          app['sha256']      = os.environ['IPA_SHA256']
           with open('apps.json', 'w') as f:
               json.dump(data, f, indent=2)
               f.write('\n')
