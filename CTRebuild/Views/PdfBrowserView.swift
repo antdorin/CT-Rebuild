@@ -131,72 +131,6 @@ private func mergePDFs(from parts: [Data]) -> PDFDocument {
     return out
 }
 
-// MARK: - Sort Field
-
-enum PdfSortField: String, CaseIterable, Identifiable {
-    var id: String { rawValue }
-    case soNumber       = "SO Number"
-    case item           = "Item"
-    case terms          = "Terms"
-    case shippingMethod = "Shipping Method"
-    case companyName    = "Company Name"
-    case binLocation    = "Bin Location"
-
-    var systemImage: String {
-        switch self {
-        case .soNumber:       return "number"
-        case .item:           return "archivebox"
-        case .terms:          return "doc.text"
-        case .shippingMethod: return "shippingbox"
-        case .companyName:    return "building.2"
-        case .binLocation:    return "location"
-        }
-    }
-
-    func extractKey(from text: String) -> String {
-        switch self {
-        case .soNumber:
-            return extractSOs(from: text).first ?? "~~~"
-        case .item:
-            return capture(text, #"(?:Item(?:\s+Number?)?|Part(?:\s+No\.?))[\s:]+([^\n]+)"#) ?? "~~~"
-        case .terms:
-            return capture(text, #"(?:Terms?|Payment\s+Terms?)[\s:]+([^\n]+)"#) ?? "~~~"
-        case .shippingMethod:
-            return capture(text, #"(?:Ship(?:ping)?\s*(?:Method|Via|By|Mode)?)[\s:]+([^\n]+)"#) ?? "~~~"
-        case .companyName:
-            if let c = capture(text, #"(?:Company|Customer|Bill\s+To|Ship\s+To)[\s:]+([^\n]+)"#) { return c }
-            return text.components(separatedBy: .newlines)
-                .map { $0.trimmingCharacters(in: .whitespaces) }
-                .first { !$0.isEmpty } ?? "~~~"
-        case .binLocation:
-            return capture(text, #"(?:Bin(?:\s+Location?)?|Location)[\s:]+([^\n]+)"#) ?? "~~~"
-        }
-    }
-
-    private func capture(_ text: String, _ pattern: String) -> String? {
-        guard let re = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
-              let m  = re.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
-              m.numberOfRanges > 1,
-              let r  = Range(m.range(at: 1), in: text) else { return nil }
-        return String(text[r]).trimmingCharacters(in: .whitespaces)
-    }
-}
-
-private func sortedDoc(_ doc: PDFDocument, by field: PdfSortField) -> PDFDocument {
-    let pages: [(PDFPage, String)] = (0..<doc.pageCount).compactMap { i in
-        guard let p = doc.page(at: i) else { return nil }
-        return (p, field.extractKey(from: p.string ?? ""))
-    }
-    let sorted = pages.sorted { $0.1 < $1.1 }
-    let out = PDFDocument()
-    for (i, (page, _)) in sorted.enumerated() {
-        if let copy = page.copy() as? PDFPage {
-            out.insert(copy, at: i)
-        }
-    }
-    return out
-}
-
 // MARK: - PDF Browser View
 
 struct PdfBrowserView: View {
@@ -480,7 +414,6 @@ private struct PdfDetailView: View {
     @Binding var currentPage: Int
     let onBack: () -> Void
 
-    @State private var showSortSheet = false
     @State private var displayDoc: PDFDocument
     @State private var soTitle: String = ""
     @AppStorage("pdfSinglePageMode") private var singlePageMode = false
@@ -610,33 +543,12 @@ private struct PdfDetailView: View {
                     }
 
                     Spacer()
-
-                    Divider().frame(height: 20).opacity(0.2)
-
-                    // Sort button (right)
-                    Button { showSortSheet = true } label: {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white.opacity(0.55))
-                            .padding(.horizontal, 14).padding(.vertical, 10)
-                    }
-                    .buttonStyle(.plain)
                 }
                 .background(Color.white.opacity(0.05))
                 .padding(.bottom, safeArea.bottom)
             }
         }
         .onAppear { soTitle = soDisplayTitle(from: displayDoc) }
-        .sheet(isPresented: $showSortSheet) {
-            PdfSortSheet(document: displayDoc) { field in
-                let s = sortedDoc(displayDoc, by: field)
-                displayDoc = s
-                currentPage = 0
-                soTitle = soDisplayTitle(from: s)
-            }
-            .presentationDetents([.height(360)])
-            .presentationDragIndicator(.visible)
-        }
     }
 
     private func modeSegment(label: String, active: Bool, action: @escaping () -> Void) -> some View {
@@ -650,165 +562,6 @@ private struct PdfDetailView: View {
                 .padding(.horizontal, 2).padding(.vertical, 4)
         }
         .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Sort Sheet
-
-private struct PdfSortSheet: View {
-    let document: PDFDocument
-    let onSort: (PdfSortField) -> Void
-    @Environment(\.dismiss) private var dismiss
-    @AppStorage("pdfSortSearchText") private var searchText: String = ""
-    @AppStorage("pdfSortSearchHistory") private var historyRaw: String = ""
-    @State private var matchingPages: [Int] = []
-    @State private var showHistory: Bool = false
-    @FocusState private var searchFocused: Bool
-
-    private var history: [String] {
-        historyRaw.isEmpty ? [] : historyRaw.components(separatedBy: "\u{001F}")
-    }
-
-    private func addToHistory(_ query: String) {
-        var list = history.filter { $0 != query }
-        list.insert(query, at: 0)
-        if list.count > 5 { list = Array(list.prefix(5)) }
-        historyRaw = list.joined(separator: "\u{001F}")
-    }
-
-    var body: some View {
-        ZStack {
-            Color(white: 0.10).ignoresSafeArea()
-            VStack(spacing: 0) {
-                Text("SORT PAGES BY")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.35))
-                    .tracking(3)
-                    .padding(.top, 22).padding(.bottom, 12)
-
-                // Search bar — searches PDF text content
-                HStack(spacing: 10) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white.opacity(0.4))
-                    TextField("Search PDF text\u{2026}", text: $searchText)
-                        .font(.system(size: 13, weight: .medium, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.9))
-                        .tint(.orange)
-                        .focused($searchFocused)
-                        .onSubmit { performSearch() }
-                        .submitLabel(.search)
-                    if !searchText.isEmpty {
-                        Button {
-                            searchText = ""
-                            matchingPages = []
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 13))
-                                .foregroundColor(.white.opacity(0.35))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
-                .padding(.horizontal, 16)
-                .padding(.bottom, 0)
-                .onTapGesture { showHistory = true }
-
-                // Recent searches dropdown
-                if showHistory && !history.isEmpty && searchText.isEmpty {
-                    VStack(spacing: 0) {
-                        ForEach(history, id: \.self) { item in
-                            Button {
-                                searchText = item
-                                showHistory = false
-                                performSearch()
-                            } label: {
-                                HStack(spacing: 10) {
-                                    Image(systemName: "clock.arrow.circlepath")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.white.opacity(0.3))
-                                    Text(item)
-                                        .font(.system(size: 13, design: .monospaced))
-                                        .foregroundColor(.white.opacity(0.75))
-                                        .lineLimit(1)
-                                    Spacer()
-                                }
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
-                    .transition(.opacity)
-                }
-
-                // Search results indicator
-                if !searchText.isEmpty && !matchingPages.isEmpty {
-                    Text("\(matchingPages.count) page\(matchingPages.count == 1 ? "" : "s") matched")
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .foregroundColor(.orange.opacity(0.7))
-                        .padding(.top, 8).padding(.bottom, 12)
-                } else if !searchText.isEmpty && matchingPages.isEmpty {
-                    Text("No matches")
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.3))
-                        .padding(.top, 8).padding(.bottom, 12)
-                } else {
-                    Spacer().frame(height: 12)
-                }
-
-                VStack(spacing: 0) {
-                    ForEach(Array(PdfSortField.allCases.enumerated()), id: \.element.id) { idx, field in
-                        if idx > 0 { Divider().opacity(0.1).padding(.leading, 54) }
-                        Button {
-                            onSort(field)
-                            dismiss()
-                        } label: {
-                            HStack(spacing: 14) {
-                                Image(systemName: field.systemImage)
-                                    .font(.system(size: 15))
-                                    .foregroundColor(.white.opacity(0.6))
-                                    .frame(width: 26)
-                                Text(field.rawValue)
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.88))
-                                Spacer()
-                                Image(systemName: "arrow.up.arrow.down")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.white.opacity(0.2))
-                            }
-                            .padding(.horizontal, 20).padding(.vertical, 13)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
-                .padding(.horizontal, 16)
-
-                Spacer()
-            }
-        }
-    }
-
-    private func performSearch() {
-        guard !searchText.isEmpty else { matchingPages = []; return }
-        showHistory = false
-        addToHistory(searchText)
-        let query = searchText.lowercased()
-        var pages: [Int] = []
-        for i in 0..<document.pageCount {
-            if let text = document.page(at: i)?.string?.lowercased(),
-               text.contains(query) {
-                pages.append(i + 1)
-            }
-        }
-        matchingPages = pages
     }
 }
 

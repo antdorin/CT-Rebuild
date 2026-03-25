@@ -69,7 +69,7 @@
       border:none;
       border-radius:0;
       padding:0;
-      padding-top:max(24px, env(safe-area-inset-top));
+      padding-top:max(8px, env(safe-area-inset-top));
       padding-bottom:max(50px, env(safe-area-inset-bottom));
       min-height:100vh;
       display:flex;
@@ -278,23 +278,23 @@
     .search-none{font-size:13px;color:var(--muted);padding:4px 2px}
     .doc-status-bar{
       position:fixed;
-      top:max(12px, env(safe-area-inset-top));
+      bottom:max(16px,env(safe-area-inset-bottom));
       right:12px;
       z-index:1100;
       display:flex;
-      flex-direction:column;
+      flex-direction:row;
       gap:6px;
-      align-items:flex-end;
+      align-items:center;
     }
     .doc-status-btn{
       display:flex;
       align-items:center;
-      gap:7px;
+      gap:5px;
       background:rgba(15,15,15,.82);
-      border:2px solid rgba(255,255,255,.18);
-      border-radius:10px;
-      padding:7px 12px;
-      font-size:14px;
+      border:1.5px solid rgba(255,255,255,.18);
+      border-radius:20px;
+      padding:6px 14px;
+      font-size:13px;
       font-weight:700;
       color:#fff;
       cursor:pointer;
@@ -302,6 +302,7 @@
       -webkit-backdrop-filter:blur(6px);
       transition:border-color .15s, background .15s;
       -webkit-tap-highlight-color:transparent;
+      white-space:nowrap;
     }
     .doc-status-btn.active-picked{
       border-color:#f97316;
@@ -314,14 +315,14 @@
       color:#f97316;
     }
     .doc-status-btn .chk-box{
-      width:18px;
-      height:18px;
-      border:2px solid currentColor;
-      border-radius:4px;
+      width:14px;
+      height:14px;
+      border:1.5px solid currentColor;
+      border-radius:3px;
       display:flex;
       align-items:center;
       justify-content:center;
-      font-size:12px;
+      font-size:10px;
       flex-shrink:0;
     }
     .doc-stamp{
@@ -461,7 +462,7 @@
       </div>
       <button id="fullscreenBtn" class="btn" type="button">Fullscreen</button>
       <div class="panel-row">
-        <button id="lockScrollBtn" class="btn" type="button">&#x1F512; Lock Scroll: Off</button>
+        <button id="lockScrollBtn" class="btn primary" type="button">&#x1F512; Lock Scroll: On</button>
         <button id="runEditModeBtn" class="btn" type="button">&#x270F; Edit Runs: Off</button>
       </div>
       <div class="panel-control">
@@ -1296,7 +1297,8 @@
       });
 
       // Lock scroll
-      let scrollLocked = false;
+      let scrollLocked = true;
+      textView.classList.add('scroll-locked');
       document.getElementById('lockScrollBtn')?.addEventListener('click', () => {
         scrollLocked = !scrollLocked;
         textView.classList.toggle('scroll-locked', scrollLocked);
