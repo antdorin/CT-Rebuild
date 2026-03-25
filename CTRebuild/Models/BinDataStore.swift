@@ -62,6 +62,13 @@ final class BinDataStore: ObservableObject {
         options: .caseInsensitive
     )
 
+    // Matches the Committed column: <qty> <units-abbrev> <committed>
+    // e.g. "1 PR 2", "10 EA 5", "3 PC 3"
+    // Captures the committed value (last number after the units abbreviation).
+    private static let committedRegex = try! NSRegularExpression(
+        pattern: #"\b\d+\s+[A-Z]{1,8}\s+(\d+)\b"#
+    )
+
     /// Converts PDF format "1-A-4D" → grid format "1A-4D"
     private func toGridCode(_ raw: String) -> String {
         raw.uppercased().replacingOccurrences(
@@ -72,8 +79,8 @@ final class BinDataStore: ObservableObject {
     }
 
     /// Extracts (gridCode, committedQty) pairs from a single PDF page's text.
-    /// Primary strategy: line-by-line — bin code + last integer on same line = committed qty.
-    /// Fallback: scan for first integer after each bin code in the full text.
+    /// Finds the Committed column value by matching the pattern: <qty> <units> <committed>
+    /// e.g. a row "1-B-1B  CT-11RDC1-BK  1  PR  2" → bin "1B-1B", committed = 2
     private func extractBinCommitted(from text: String) -> [(String, Int)] {
         var results: [(String, Int)] = []
 
@@ -84,12 +91,21 @@ final class BinDataStore: ObservableObject {
             let binMatches = Self.binRegex.matches(in: line, range: lineRange)
             guard !binMatches.isEmpty else { continue }
 
-            // Split by whitespace, parse integers — item codes (e.g. PIG.754D-0008) won't parse
-            let nums = line.components(separatedBy: .whitespaces).compactMap { Int($0) }.filter { $0 > 0 }
-            guard let qty = nums.last else { continue }
-
-            for bm in binMatches {
-                results.append((toGridCode(ns.substring(with: bm.range(at: 1))), qty))
+            // Look for <qty> <units-abbrev> <committed> pattern — committed is the captured group.
+            // This correctly identifies the Committed column regardless of Quantity value.
+            let commitMatches = Self.committedRegex.matches(in: line, range: lineRange)
+            if let last = commitMatches.last,
+               let committed = Int(ns.substring(with: last.range(at: 1))), committed > 0 {
+                for bm in binMatches {
+                    results.append((toGridCode(ns.substring(with: bm.range(at: 1))), committed))
+                }
+            } else {
+                // Fallback: last plain integer on the line
+                let nums = line.components(separatedBy: .whitespaces).compactMap { Int($0) }.filter { $0 > 0 }
+                guard let qty = nums.last else { continue }
+                for bm in binMatches {
+                    results.append((toGridCode(ns.substring(with: bm.range(at: 1))), qty))
+                }
             }
         }
 
@@ -98,15 +114,22 @@ final class BinDataStore: ObservableObject {
             let ns = text as NSString
             let fullRange = NSRange(location: 0, length: ns.length)
             let binMatches = Self.binRegex.matches(in: text, range: fullRange)
-            let numRegex = try! NSRegularExpression(pattern: #"\b(\d+)\b"#)
-            let numMatches = numRegex.matches(in: text, range: fullRange)
 
             for bm in binMatches {
                 let binEnd = bm.range.location + bm.range.length
-                // First integer that appears after the bin code
-                if let nm = numMatches.first(where: { $0.range.location > binEnd }),
-                   let qty = Int(ns.substring(with: nm.range(at: 1))), qty > 0 {
-                    results.append((toGridCode(ns.substring(with: bm.range(at: 1))), qty))
+                let remaining = ns.substring(from: binEnd)
+                let remNS = remaining as NSString
+                let remRange = NSRange(location: 0, length: remNS.length)
+                // Use committed pattern first, fallback to first integer
+                if let cm = Self.committedRegex.matches(in: remaining, range: remRange).first,
+                   let committed = Int(remNS.substring(with: cm.range(at: 1))), committed > 0 {
+                    results.append((toGridCode(ns.substring(with: bm.range(at: 1))), committed))
+                } else {
+                    let numRegex = try! NSRegularExpression(pattern: #"\b(\d+)\b"#)
+                    if let nm = numRegex.firstMatch(in: remaining, range: remRange),
+                       let qty = Int(remNS.substring(with: nm.range(at: 1))), qty > 0 {
+                        results.append((toGridCode(ns.substring(with: bm.range(at: 1))), qty))
+                    }
                 }
             }
         }
