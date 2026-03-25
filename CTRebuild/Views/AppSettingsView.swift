@@ -12,7 +12,7 @@ struct AppSettingsView: View {
 
     var body: some View {
         ZStack {
-            Color(white: 0.10).ignoresSafeArea()
+            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
 
             if showGestureSettings {
                 GestureSettingsView(safeArea: safeArea, onBack: {

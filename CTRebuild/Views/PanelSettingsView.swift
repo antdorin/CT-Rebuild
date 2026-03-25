@@ -22,7 +22,7 @@ struct PanelSettingsView: View {
 
     var body: some View {
         ZStack {
-            Color(white: 0.08).ignoresSafeArea()
+            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
 
             VStack(spacing: 0) {
                 header

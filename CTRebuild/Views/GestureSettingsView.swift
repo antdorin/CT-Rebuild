@@ -31,13 +31,7 @@ struct GestureSettingsView: View {
 
     var body: some View {
         ZStack {
-            Color(white: 0.08).ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                // ── Header ────────────────────────────────────────────────
-                header
-
-                // ── Calibration ───────────────────────────────────────────
+            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 2) {
                         calibrationSection
@@ -271,7 +265,7 @@ private struct ActionPickerView: View {
 
     var body: some View {
         ZStack {
-            Color(white: 0.10).ignoresSafeArea()
+            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // ── Sheet handle + title ───────────────────────────────────

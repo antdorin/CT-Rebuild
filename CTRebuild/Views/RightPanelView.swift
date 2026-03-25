@@ -14,9 +14,7 @@ struct RightPanelView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                if !isPPOpen {
-                    Color.black.ignoresSafeArea()
-                }
+                Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
 
                 if isPPOpen {
                     RightWheelSelector(
@@ -85,7 +83,7 @@ struct RightPageContent: View {
             AppSettingsView(safeArea: safeArea)
         default: // Pages 2–6 — placeholders
             ZStack {
-                shades[index % shades.count].ignoresSafeArea()
+                Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
                 VStack(spacing: 16) {
                     Text("Page \(index + 1)")
                         .font(.system(size: 40, weight: .bold, design: .rounded))
@@ -231,7 +229,7 @@ struct BinLocationsView: View {
 
     var body: some View {
         ZStack {
-            Color(white: 0.07).ignoresSafeArea()
+            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
             VStack(spacing: 0) {
                 // Header
                 Text("BIN LOCATIONS")

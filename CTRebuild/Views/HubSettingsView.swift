@@ -15,7 +15,7 @@ struct HubSettingsView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Header
