@@ -57,7 +57,8 @@ struct LeftPanelView: View {
                         panelSize: geo.size,
                         safeArea: safeArea,
                         totalColumns: max(1, storedColumns),
-                        colNum: colNum
+                        colNum: colNum,
+                        binQuantities: binStore.binQuantities
                     )
                     .transition(.opacity.animation(.easeInOut(duration: 0.2)))
                 }
@@ -219,6 +220,7 @@ private struct LeftWheelSelector: View {
     let safeArea: EdgeInsets
     let totalColumns: Int
     let colNum: (Int) -> Int
+    var binQuantities: [String: Int] = [:]
 
     private let cardW: CGFloat = 320
     private let spacing: CGFloat = 580
@@ -318,8 +320,8 @@ private struct LeftWheelSelector: View {
                     .padding(.bottom, 12)
                 let cs = cellSize()
                 VStack(spacing: 12) {
-                    sectionSnapshot(col: col, section: "A", positions: 4, blanks: 2, cs: cs)
-                    sectionSnapshot(col: col, section: "B", positions: 6, blanks: 0, cs: cs)
+                    sectionSnapshot(col: col, section: "A", positions: 4, blanks: 2, cs: cs, binQuantities: binQuantities)
+                    sectionSnapshot(col: col, section: "B", positions: 6, blanks: 0, cs: cs, binQuantities: binQuantities)
                 }
                 .padding(.horizontal, 8)
                 Spacer(minLength: 0)
@@ -337,7 +339,7 @@ private struct LeftWheelSelector: View {
     }
 
     @ViewBuilder
-    private func sectionSnapshot(col: Int, section: String, positions: Int, blanks: Int, cs: CGFloat) -> some View {
+    private func sectionSnapshot(col: Int, section: String, positions: Int, blanks: Int, cs: CGFloat, binQuantities: [String: Int]) -> some View {
         let levels = ["A","B","C","D","E","F"]
         let code   = "\(col)\(section)"
         let fs     = max(cs * 0.17, 8)
@@ -345,12 +347,16 @@ private struct LeftWheelSelector: View {
             ForEach(levels, id: \.self) { level in
                 HStack(spacing: 4) {
                     ForEach(1...positions, id: \.self) { pos in
+                        let cellCode = "\(code)-\(pos)\(level)"
+                        let hasQty = (binQuantities[cellCode] ?? 0) > 0
                         ZStack(alignment: .top) {
-                            RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.06))
-                            RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.12), lineWidth: 0.5)
-                            Text("\(code)-\(pos)\(level)")
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(hasQty ? Color.green.opacity(0.15) : Color.white.opacity(0.06))
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(hasQty ? Color.green.opacity(0.5) : Color.white.opacity(0.12), lineWidth: hasQty ? 1 : 0.5)
+                            Text(cellCode)
                                 .font(.system(size: fs, weight: .regular, design: .monospaced))
-                                .foregroundColor(.white)
+                                .foregroundColor(hasQty ? .green : .white)
                                 .padding(.top, 5).padding(.horizontal, 2)
                         }
                         .frame(width: cs, height: cs)
