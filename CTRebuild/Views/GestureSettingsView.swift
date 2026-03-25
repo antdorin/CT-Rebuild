@@ -32,6 +32,10 @@ struct GestureSettingsView: View {
     var body: some View {
         ZStack {
             Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                header
+
                 ScrollView {
                     VStack(spacing: 2) {
                         calibrationSection
