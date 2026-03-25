@@ -209,6 +209,8 @@ private struct LeftWheelSelector: View {
     private let cardW: CGFloat = 320
     private let spacing: CGFloat = 580
 
+    @State private var virtualPage: Int = 0
+
     private var cardH: CGFloat {
         guard panelSize.width > 0 else { return 560 }
         return cardW * (panelSize.height / panelSize.width)
@@ -233,9 +235,9 @@ private struct LeftWheelSelector: View {
 
     var body: some View {
         ZStack {
-            ForEach((columnPage - 2)...(columnPage + 2), id: \.self) { vp in
+            ForEach((virtualPage - 2)...(virtualPage + 2), id: \.self) { vp in
                 let col            = colNum(vp)
-                let totalOffset    = CGFloat(vp - columnPage) * spacing + dragOffset
+                let totalOffset    = CGFloat(vp - virtualPage) * spacing + dragOffset
                 let distCenter     = totalOffset / spacing
 
                 leftPageSnapshot(col: col)
@@ -250,9 +252,9 @@ private struct LeftWheelSelector: View {
                         Color.clear
                             .contentShape(RoundedRectangle(cornerRadius: 18))
                             .onTapGesture {
-                                withAnimation(colNum(columnPage) == col ? .slideFwd : .spring(response: 0.3, dampingFraction: 0.85)) {
-                                    if colNum(columnPage) == col { isPPOpen = false }
-                                    else { columnPage = vp }
+                                withAnimation(colNum(virtualPage) == col ? .slideFwd : .spring(response: 0.3, dampingFraction: 0.85)) {
+                                    if colNum(virtualPage) == col { isPPOpen = false }
+                                    else { virtualPage = vp; columnPage = vp }
                                 }
                             }
                     )
@@ -280,11 +282,13 @@ private struct LeftWheelSelector: View {
                     let velocityDelta = value.predictedEndTranslation.height - value.translation.height
                     let flickBoost: Int = velocityDelta > 250 ? -1 : velocityDelta < -250 ? 1 : 0
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                        columnPage += dragMoves + flickBoost
+                        virtualPage += dragMoves + flickBoost
+                        columnPage = virtualPage
                         dragOffset = 0
                     }
                 }
         )
+        .onAppear { virtualPage = columnPage }
     }
 
     // Lightweight visual snapshot of a column page for the thumbnail

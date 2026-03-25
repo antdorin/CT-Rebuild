@@ -14,7 +14,9 @@ struct RightPanelView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+                if !isPPOpen {
+                    Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+                }
 
                 if isPPOpen {
                     RightWheelSelector(

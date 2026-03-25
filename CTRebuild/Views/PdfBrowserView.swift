@@ -184,19 +184,10 @@ struct PdfBrowserView: View {
                         }
                     }
                 )
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing),
-                    removal:   .move(edge: .trailing)
-                ))
             } else {
                 fileListContent
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .leading),
-                        removal:   .move(edge: .leading)
-                    ))
             }
         }
-        .animation(.easeInOut(duration: 0.22), value: openedGroup != nil)
         .task {
             if let stored = UserDefaults.standard.dictionary(forKey: "pdfLastPages") as? [String: Int] {
                 lastPages = stored
@@ -403,7 +394,7 @@ struct PdfBrowserView: View {
 
 // MARK: - View Mode Enum
 
-private enum ViewMode: String { case pdf, reflow, reader }
+private enum ViewMode: String { case pdf, reader }
 
 // MARK: - PDF Detail View
 
@@ -420,7 +411,8 @@ private struct PdfDetailView: View {
     @AppStorage("pdfSinglePageMode") private var singlePageMode = false
     @State private var autoCropEnabled = true
     @AppStorage("pdfViewMode") private var viewMode: ViewMode = .pdf
-    @State private var reflowFontPercent = 100
+    @State private var isPicked: Bool = false
+    @State private var isShipped: Bool = false
 
     init(document: PDFDocument, title: String, safeArea: EdgeInsets,
          filenames: [String] = [],
@@ -453,8 +445,6 @@ private struct PdfDetailView: View {
 
                 // ── Content ───────────────────────────────────────────────
                 switch viewMode {
-                case .reflow:
-                    ReflowWebView(document: displayDoc, fontPercent: reflowFontPercent)
                 case .reader:
                     ReaderWebView(filenames: filenames)
                 case .pdf:
@@ -486,41 +476,25 @@ private struct PdfDetailView: View {
                         viewMode = .pdf
                     }
 
-                    modeSegment(label: "REFLOW", active: viewMode == .reflow) {
-                        viewMode = .reflow
-                    }
-
                     modeSegment(label: "READER", active: viewMode == .reader) {
                         viewMode = .reader
                     }
 
                     Divider().frame(height: 20).opacity(0.2)
 
+                    statusToggle(label: "PICKED", active: isPicked, activeColor: .orange) {
+                        isPicked.toggle()
+                        UserDefaults.standard.set(isPicked, forKey: "docpicked:\(title)")
+                    }
+
+                    statusToggle(label: "SHIPPED", active: isShipped, activeColor: .green) {
+                        isShipped.toggle()
+                        UserDefaults.standard.set(isShipped, forKey: "docshipped:\(title)")
+                    }
+
+                    Divider().frame(height: 20).opacity(0.2)
+
                     switch viewMode {
-                    case .reflow:
-                        Button { reflowFontPercent = max(70, reflowFontPercent - 10) } label: {
-                            Image(systemName: "minus.circle")
-                                .font(.system(size: 13))
-                                .foregroundColor(reflowFontPercent <= 70 ? .white.opacity(0.2) : .white.opacity(0.55))
-                                .padding(.horizontal, 6).padding(.vertical, 10)
-                        }
-                        .buttonStyle(.plain)
-
-                        Button { reflowFontPercent = min(220, reflowFontPercent + 10) } label: {
-                            Image(systemName: "plus.circle")
-                                .font(.system(size: 13))
-                                .foregroundColor(reflowFontPercent >= 220 ? .white.opacity(0.2) : .white.opacity(0.55))
-                                .padding(.horizontal, 6).padding(.vertical, 10)
-                        }
-                        .buttonStyle(.plain)
-
-                        Button { reflowFontPercent = 100 } label: {
-                            Text("\(reflowFontPercent)%")
-                                .font(.system(size: 9, weight: .medium, design: .monospaced))
-                                .foregroundColor(.orange.opacity(0.7))
-                                .padding(.horizontal, 4).padding(.vertical, 10)
-                        }
-                        .buttonStyle(.plain)
                     case .pdf:
                         // Auto-crop toggle
                         Button { autoCropEnabled.toggle() } label: {
@@ -549,7 +523,11 @@ private struct PdfDetailView: View {
                 .padding(.bottom, safeArea.bottom)
             }
         }
-        .onAppear { soTitle = soDisplayTitle(from: displayDoc) }
+        .onAppear {
+            soTitle = soDisplayTitle(from: displayDoc)
+            isPicked  = UserDefaults.standard.bool(forKey: "docpicked:\(title)")
+            isShipped = UserDefaults.standard.bool(forKey: "docshipped:\(title)")
+        }
     }
 
     private func modeSegment(label: String, active: Bool, action: @escaping () -> Void) -> some View {
@@ -559,6 +537,19 @@ private struct PdfDetailView: View {
                 .foregroundColor(active ? .black : .white.opacity(0.45))
                 .padding(.horizontal, 10).padding(.vertical, 6)
                 .background(active ? Color.white.opacity(0.88) : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 5))
+                .padding(.horizontal, 2).padding(.vertical, 4)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func statusToggle(label: String, active: Bool, activeColor: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundColor(active ? activeColor : .white.opacity(0.45))
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(active ? activeColor.opacity(0.18) : Color.clear,
                             in: RoundedRectangle(cornerRadius: 5))
                 .padding(.horizontal, 2).padding(.vertical, 4)
         }
