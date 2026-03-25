@@ -267,10 +267,11 @@ private struct LeftWheelSelector: View {
                     .zIndex(1.0 - abs(distCenter) * 0.5)
             }
         }
+        .drawingGroup()
         .frame(width: panelSize.width, height: panelSize.height)
         .contentShape(Rectangle())
-        .gesture(
-            DragGesture()
+        .highPriorityGesture(
+            DragGesture(minimumDistance: 8)
                 .onChanged { value in
                     dragOffset = value.translation.height
                 }
