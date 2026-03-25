@@ -50,6 +50,7 @@ struct TopPanelView: View {
                             Spacer()
                         }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .transition(.opacity)
                 } else {
                     Spacer()
@@ -78,7 +79,7 @@ private struct TopTabBar: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 44)
                         .background(
-                            Capsule().fill(selected == i ? Color.orange : Color(white: 0.2))
+                            Capsule().fill(selected == i ? Color.orange : Color.black)
                         )
                 }
                 .buttonStyle(.plain)
