@@ -5,6 +5,7 @@ struct BottomPanelView: View {
     let safeArea: EdgeInsets
 
     @StateObject private var viewModel = CameraViewModel()
+    @ObservedObject private var binStore = BinDataStore.shared
     @State private var zoomAtDragStart: CGFloat? = nil   // nil = not dragging
     @State private var showZoomBadge: Bool = false
     @State private var zoomBadgeTask: DispatchWorkItem? = nil
@@ -137,7 +138,9 @@ struct BottomPanelView: View {
 
                     // ── Results area — bottom 30% ─────────────────────────────
                     Group {
-                        if recentScans.isEmpty {
+                        let binEntries = binStore.binQuantities.sorted { $0.key < $1.key }
+
+                        if binEntries.isEmpty && recentScans.isEmpty {
                             VStack {
                                 Spacer()
                                 Text("AWAITING SCAN")
@@ -151,8 +154,49 @@ struct BottomPanelView: View {
                         } else {
                             ScrollView(.vertical, showsIndicators: false) {
                                 LazyVStack(spacing: 0) {
-                                    ForEach(recentScans.reversed()) { scan in
-                                        recentScanRow(scan: scan)
+                                    // ── Bin list from active PDF ──────────────
+                                    if !binEntries.isEmpty {
+                                        HStack {
+                                            Text("BIN LOCATIONS")
+                                                .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                                                .foregroundColor(.secondary.opacity(0.4))
+                                                .tracking(3)
+                                            Spacer()
+                                        }
+                                        .padding(.horizontal, 14)
+                                        .padding(.top, 8).padding(.bottom, 4)
+
+                                        ForEach(binEntries, id: \.key) { bin, qty in
+                                            HStack(spacing: 10) {
+                                                Text(bin)
+                                                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                                                    .foregroundColor(.primary)
+                                                Spacer()
+                                                Text("QTY \(qty)")
+                                                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                                    .foregroundColor(.orange.opacity(0.85))
+                                            }
+                                            .padding(.horizontal, 14).padding(.vertical, 7)
+                                            Divider().opacity(0.15).padding(.horizontal, 14)
+                                        }
+                                    }
+
+                                    // ── Recent scans ─────────────────────────
+                                    if !recentScans.isEmpty {
+                                        if !binEntries.isEmpty {
+                                            HStack {
+                                                Text("RECENT SCANS")
+                                                    .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                                                    .foregroundColor(.secondary.opacity(0.4))
+                                                    .tracking(3)
+                                                Spacer()
+                                            }
+                                            .padding(.horizontal, 14)
+                                            .padding(.top, 10).padding(.bottom, 4)
+                                        }
+                                        ForEach(recentScans.reversed()) { scan in
+                                            recentScanRow(scan: scan)
+                                        }
                                     }
                                 }
                                 .padding(.vertical, 6)

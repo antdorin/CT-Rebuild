@@ -286,8 +286,9 @@ struct PdfBrowserView: View {
                 Circle()
                     .fill(isActive ? Color.green : Color.orange)
                     .frame(width: 10, height: 10)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 14)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 18)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
