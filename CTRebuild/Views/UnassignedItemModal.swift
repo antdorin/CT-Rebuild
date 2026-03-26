@@ -176,14 +176,14 @@ struct UnassignedItemModal: View {
                     } else {
                         Menu {
                             ForEach(scanStore.records) { record in
-                                Button("\(record.id) \u00b7 \(record.itemName)") {
+                                Button("\(record.id) \u{00B7} \(record.itemName)") {
                                     selectedExistingId = record.id
                                 }
                             }
                         } label: {
                             HStack {
                                 if selectedExistingId.isEmpty {
-                                    Text("\u2014 Select Item \u2014")
+                                    Text("\u{2014} Select Item \u{2014}")
                                         .foregroundColor(Color(.placeholderText))
                                 } else if let rec = scanStore.records.first(where: { $0.id == selectedExistingId }) {
                                     VStack(alignment: .leading, spacing: 2) {
