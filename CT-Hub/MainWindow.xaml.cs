@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Media;
 using CTHub.Models;
@@ -19,6 +20,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private ICollectionView? _shippingSupplysView;
     private ICollectionView? _qrMappingsView;
     private ICollectionView? _pdfFilesView;
+    private DataGridColumnHeader? _activeHeader;
+    private DataGrid? _activeGrid;
 
     // ── Bindable properties ───────────────────────────────────────────────────
 
@@ -388,6 +391,152 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         return ContainsText(row.Name, term)
             || ContainsText(row.SalesOrders, term)
             || row.ImportDateTime.ToString("yyyy-MM-dd HH:mm:ss").Contains(term, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // ── Column header context menu handlers ──────────────────────────────────
+
+    private void ColumnHeader_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        if (sender is not DataGridColumnHeader header)
+            return;
+
+        _activeHeader = header;
+        _activeGrid = FindParentDataGrid(header);
+
+        if (header.ContextMenu is null)
+        {
+            var menu = new ContextMenu();
+
+            var editItem = new MenuItem { Header = "Edit Header" };
+            editItem.Click += ColumnHeader_Edit_Click;
+
+            var addItem = new MenuItem { Header = "Add Header (after)" };
+            addItem.Click += ColumnHeader_Add_Click;
+
+            var deleteItem = new MenuItem { Header = "Delete Header" };
+            deleteItem.Click += ColumnHeader_Delete_Click;
+
+            menu.Items.Add(editItem);
+            menu.Items.Add(addItem);
+            menu.Items.Add(deleteItem);
+
+            header.ContextMenu = menu;
+        }
+    }
+
+    private void ColumnHeader_Edit_Click(object sender, RoutedEventArgs e)
+    {
+        if (_activeHeader?.Column is null)
+            return;
+
+        var currentHeader = _activeHeader.Column.Header?.ToString() ?? string.Empty;
+        var updatedHeader = PromptForText("Edit Header", "Header text:", currentHeader);
+
+        if (string.IsNullOrWhiteSpace(updatedHeader))
+            return;
+
+        _activeHeader.Column.Header = updatedHeader.Trim();
+    }
+
+    private void ColumnHeader_Add_Click(object sender, RoutedEventArgs e)
+    {
+        if (_activeGrid is null || _activeHeader?.Column is null)
+            return;
+
+        var header = PromptForText("Add Header", "New header text:", "New Column");
+        if (string.IsNullOrWhiteSpace(header))
+            return;
+
+        var insertIndex = _activeGrid.Columns.IndexOf(_activeHeader.Column) + 1;
+        var placeholderColumn = new DataGridTextColumn
+        {
+            Header = header.Trim(),
+            Binding = new Binding { Source = string.Empty },
+            Width = new DataGridLength(140),
+            IsReadOnly = true
+        };
+
+        _activeGrid.Columns.Insert(insertIndex, placeholderColumn);
+    }
+
+    private void ColumnHeader_Delete_Click(object sender, RoutedEventArgs e)
+    {
+        if (_activeGrid is null || _activeHeader?.Column is null)
+            return;
+
+        if (_activeGrid.Columns.Count <= 1)
+            return;
+
+        _activeGrid.Columns.Remove(_activeHeader.Column);
+    }
+
+    private static DataGrid? FindParentDataGrid(DependencyObject start)
+    {
+        var current = start;
+        while (current is not null)
+        {
+            if (current is DataGrid grid)
+                return grid;
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return null;
+    }
+
+    private string? PromptForText(string title, string prompt, string initialValue)
+    {
+        var input = new TextBox
+        {
+            Text = initialValue,
+            MinWidth = 280,
+            Margin = new Thickness(0, 8, 0, 12)
+        };
+
+        var okButton = new Button
+        {
+            Content = "OK",
+            Width = 80,
+            Margin = new Thickness(0, 0, 8, 0),
+            IsDefault = true
+        };
+
+        var cancelButton = new Button
+        {
+            Content = "Cancel",
+            Width = 80,
+            IsCancel = true
+        };
+
+        var dialog = new Window
+        {
+            Title = title,
+            Owner = this,
+            ResizeMode = ResizeMode.NoResize,
+            ShowInTaskbar = false,
+            SizeToContent = SizeToContent.WidthAndHeight,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            WindowStyle = WindowStyle.ToolWindow,
+            Content = new StackPanel
+            {
+                Margin = new Thickness(16),
+                Children =
+                {
+                    new TextBlock { Text = prompt },
+                    input,
+                    new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        Children = { okButton, cancelButton }
+                    }
+                }
+            }
+        };
+
+        okButton.Click += (_, _) => dialog.DialogResult = true;
+
+        return dialog.ShowDialog() == true ? input.Text : null;
     }
 
     // ── Chase Tactical handlers ───────────────────────────────────────────────

@@ -33,6 +33,7 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="BorderBrush" Value="#3C3C3C"/>
             <Setter Property="BorderThickness" Value="0,0,1,1"/>
+            <EventSetter Event="ContextMenuOpening" Handler="ColumnHeader_ContextMenuOpening"/>
         </Style>
         <Style TargetType="DataGridRow">
             <Setter Property="Background" Value="Transparent"/>
