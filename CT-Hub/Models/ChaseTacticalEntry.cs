@@ -10,6 +10,15 @@ public class ChaseTacticalEntry
     [JsonPropertyName("bin")]
     public string Bin { get; set; } = string.Empty;
 
+    [JsonPropertyName("className")]
+    public string ClassName { get; set; } = string.Empty;
+
+    [JsonPropertyName("classLetter")]
+    public string ClassLetter { get; set; } = string.Empty;
+
+    [JsonPropertyName("class")]
+    public string ClassId { get; set; } = string.Empty;
+
     [JsonPropertyName("label")]
     public string Label { get; set; } = string.Empty;
 

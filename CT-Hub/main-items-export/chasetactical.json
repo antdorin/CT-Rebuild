@@ -1,0 +1,1782 @@
+[
+  {
+    "id": "6a67e735-d331-4ceb-8c04-5f398401c577",
+    "bin": "1-A-1A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20K5PMP3-MC",
+    "qty": 57,
+    "notes": ""
+  },
+  {
+    "id": "ccbf3ddb-8333-4596-a978-3442d6fbed3f",
+    "bin": "1-A-1B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "30-0001",
+    "qty": 94,
+    "notes": ""
+  },
+  {
+    "id": "d0619136-d059-4959-9eef-a7be8dd218d9",
+    "bin": "1-A-1C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11JOEY-MC",
+    "qty": 49,
+    "notes": ""
+  },
+  {
+    "id": "4502fef1-6a79-4eb4-852d-a39987ba1f37",
+    "bin": "1-A-1D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, MULTICAM, Large",
+    "qty": 18,
+    "notes": "PIG.754D-0023"
+  },
+  {
+    "id": "12bb3588-585a-45cb-9df9-3440920d0538",
+    "bin": "1-A-1E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, BLACK, X-Large",
+    "qty": 68,
+    "notes": "PIG.754D-0004"
+  },
+  {
+    "id": "32685733-61b5-4a59-bb65-9b2733239528",
+    "bin": "1-A-1F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20K5PMP3-CT",
+    "qty": 70,
+    "notes": ""
+  },
+  {
+    "id": "8a715f2c-db45-4784-828b-1279fd074d06",
+    "bin": "1-A-2A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, COYOTE, Small",
+    "qty": 8,
+    "notes": "PIG.700D-0006"
+  },
+  {
+    "id": "4835831e-6f25-4d57-a31d-00074f39fc55",
+    "bin": "1-A-2B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11T556VMP-BK",
+    "qty": 60,
+    "notes": ""
+  },
+  {
+    "id": "3bd6619e-7f73-428d-a660-594f6b6f5e75",
+    "bin": "1-A-2C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-41MTS1-BK",
+    "qty": 73,
+    "notes": ""
+  },
+  {
+    "id": "d5fe68f3-becc-4eef-87ec-9e2b24fa2fc6",
+    "bin": "1-A-2D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20K5PMP1-RG",
+    "qty": 97,
+    "notes": ""
+  },
+  {
+    "id": "0250d60e-416f-4558-9035-66ef31068ba5",
+    "bin": "1-A-2E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20RUDP1-MC",
+    "qty": 29,
+    "notes": ""
+  },
+  {
+    "id": "ea3cd7f6-0134-4fd0-bedf-072978a05a96",
+    "bin": "1-A-2F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, MULTICAM BLACK, Medium",
+    "qty": 5,
+    "notes": "PIG.754D-0027"
+  },
+  {
+    "id": "18d5fc55-471d-4c93-b949-b885f88e7ec4",
+    "bin": "1-A-3A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-35PRL2-BK",
+    "qty": 30,
+    "notes": ""
+  },
+  {
+    "id": "91cca321-0596-4e59-9cf5-6791e02d756f",
+    "bin": "1-A-3B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "85-1031-LE",
+    "qty": 4,
+    "notes": ""
+  },
+  {
+    "id": "12673881-6c32-4d5f-af65-b5c97736fef4",
+    "bin": "1-A-3C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-40ETH1-MC",
+    "qty": 34,
+    "notes": ""
+  },
+  {
+    "id": "33c6c91c-8bab-4564-b233-9882f0467875",
+    "bin": "1-A-3D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11MVP1-BK",
+    "qty": 22,
+    "notes": ""
+  },
+  {
+    "id": "c91a9a19-6a24-4dee-8027-dee870803c46",
+    "bin": "1-A-3E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "85-2517",
+    "qty": 4,
+    "notes": ""
+  },
+  {
+    "id": "72930ffe-8fd7-40e4-ae75-eaeba6d80826",
+    "bin": "1-A-3F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30GPVUP2-RG",
+    "qty": 77,
+    "notes": ""
+  },
+  {
+    "id": "0e8d3fd8-0c37-4141-a281-7a69bf8c1b0e",
+    "bin": "1-A-4A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20K5PMP3-BK",
+    "qty": 88,
+    "notes": ""
+  },
+  {
+    "id": "7aa1f8c6-8a90-46a0-ac45-06a0223146e5",
+    "bin": "1-A-4B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20556MP3-MC",
+    "qty": 67,
+    "notes": ""
+  },
+  {
+    "id": "a96a5220-ae46-4266-8abf-80171c082376",
+    "bin": "1-A-4C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11JOEY-CT",
+    "qty": 80,
+    "notes": ""
+  },
+  {
+    "id": "2b161930-06e8-4d17-a400-5c37a80af1da",
+    "bin": "1-A-4D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, COYOTE, Large",
+    "qty": 18,
+    "notes": "PIG.754D-0008"
+  },
+  {
+    "id": "5561f35a-9de8-4875-b0e0-8d6084517c6c",
+    "bin": "1-A-4E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20556MP3-BK",
+    "qty": 59,
+    "notes": ""
+  },
+  {
+    "id": "e1875443-fef1-413f-bc3b-0aaf5104e8b5",
+    "bin": "1-A-4F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, MULTICAM, X-Large",
+    "qty": 14,
+    "notes": "PIG.700D-0024"
+  },
+  {
+    "id": "be11aac2-6d6f-4d0a-93ca-8ef1098d4896",
+    "bin": "1-B-1A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, BLACK, Medium",
+    "qty": 13,
+    "notes": "PIG.700D-0002"
+  },
+  {
+    "id": "e832724e-941b-4f35-8563-98de7eca52d4",
+    "bin": "1-B-1B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11RDC1-BK",
+    "qty": 20,
+    "notes": ""
+  },
+  {
+    "id": "ad3afa9a-cb40-46a1-9c0d-c6ba5d0235c4",
+    "bin": "1-B-1C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11GENESIS-DLT-RG",
+    "qty": 50,
+    "notes": ""
+  },
+  {
+    "id": "fe7cacd3-f33a-49d3-95d1-24546d22d0d6",
+    "bin": "1-B-1D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11ESP1-MC",
+    "qty": 70,
+    "notes": ""
+  },
+  {
+    "id": "efc1bc7f-965c-4ca1-bf28-4e23ebb0820a",
+    "bin": "1-B-1E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, RANGER GREEN, Large",
+    "qty": 2,
+    "notes": "PIG.754D-0013"
+  },
+  {
+    "id": "09fa5545-d988-474d-9d7a-09a80f6540e9",
+    "bin": "1-B-1F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30HPSM-CT",
+    "qty": 86,
+    "notes": ""
+  },
+  {
+    "id": "c9275577-6275-41df-9720-f5900d4616c4",
+    "bin": "1-B-2A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30FLP2-CT",
+    "qty": 55,
+    "notes": ""
+  },
+  {
+    "id": "ab638653-48ca-44b3-82da-456bd0c55505",
+    "bin": "1-B-2B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-40MSP1-MC",
+    "qty": 20,
+    "notes": ""
+  },
+  {
+    "id": "f24be913-0180-41bf-a463-d0bf3d626ff9",
+    "bin": "1-B-2C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-SAI-GENESIS-DLT",
+    "qty": 8,
+    "notes": ""
+  },
+  {
+    "id": "1f66e973-83e2-4158-bc41-ec56ddb2afc5",
+    "bin": "1-B-2D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-40TP01-BK",
+    "qty": 55,
+    "notes": ""
+  },
+  {
+    "id": "ad26e33e-6761-471b-b683-0f5d280d1e1f",
+    "bin": "1-B-2E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30FLP1-RG",
+    "qty": 26,
+    "notes": ""
+  },
+  {
+    "id": "63cae07c-2515-46b1-888a-3fdc6f9b6630",
+    "bin": "1-B-2F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-40IFAKP1-MC",
+    "qty": 85,
+    "notes": ""
+  },
+  {
+    "id": "5307466d-6f31-4f95-9c5b-8333cbf89186",
+    "bin": "1-B-3A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11TK556MP-RG",
+    "qty": 66,
+    "notes": ""
+  },
+  {
+    "id": "0ea59a0f-48a2-430b-b162-6c1134c020fb",
+    "bin": "1-B-3B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20K5PMP1-BK",
+    "qty": 121,
+    "notes": ""
+  },
+  {
+    "id": "13810513-c262-45da-be31-5d0bfcca149e",
+    "bin": "1-B-3C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11MVP1-CT",
+    "qty": 14,
+    "notes": ""
+  },
+  {
+    "id": "5999c5ce-64dd-4cfa-8b7f-defcc98443b5",
+    "bin": "1-B-3D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20556SSP-CT",
+    "qty": 1,
+    "notes": ""
+  },
+  {
+    "id": "efc06218-cf18-4b7d-bea6-2da44dbbc832",
+    "bin": "1-B-3E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-40MSP1-BK",
+    "qty": 0,
+    "notes": ""
+  },
+  {
+    "id": "63b5c306-7245-416c-a38c-edffe7cac494",
+    "bin": "1-B-3F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30FLP1-BK",
+    "qty": 41,
+    "notes": ""
+  },
+  {
+    "id": "f6592d18-6589-4e64-bc60-30cd23307189",
+    "bin": "1-B-4A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-35PRL2-CT",
+    "qty": 35,
+    "notes": ""
+  },
+  {
+    "id": "1bd07121-a47c-4330-9686-7ac4193d314d",
+    "bin": "1-B-4B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30FLP2-MC",
+    "qty": 41,
+    "notes": ""
+  },
+  {
+    "id": "69f18ef4-9643-431f-b0c6-87849648d901",
+    "bin": "1-B-4C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-40ETH1-CT",
+    "qty": 75,
+    "notes": ""
+  },
+  {
+    "id": "5daba100-693d-4c12-9941-7779fc751486",
+    "bin": "1-B-4D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20RUDP1-RG",
+    "qty": 66,
+    "notes": ""
+  },
+  {
+    "id": "3ff3ee1c-f3ff-474e-a306-b7a72318689b",
+    "bin": "1-B-4E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, RANGER GREEN, Small",
+    "qty": 6,
+    "notes": "PIG.700D-0011"
+  },
+  {
+    "id": "2cb5c356-f28c-4ad9-8b9b-4283f2381410",
+    "bin": "1-B-4F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30FLP1-CT",
+    "qty": 24,
+    "notes": ""
+  },
+  {
+    "id": "c244a9aa-1e51-4884-a6d2-77bfd7e7293f",
+    "bin": "1-B-5A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20556MP1-BK",
+    "qty": 99,
+    "notes": ""
+  },
+  {
+    "id": "29c9a3be-d618-4d3e-acd8-07f2fe4f2a85",
+    "bin": "1-B-5B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, MULTICAM BLACK, X-Large",
+    "qty": 5,
+    "notes": "PIG.700D-0029"
+  },
+  {
+    "id": "c89a028a-2da0-46b5-b0ca-65d3006d8019",
+    "bin": "1-B-5C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11MVP1-RG",
+    "qty": 50,
+    "notes": ""
+  },
+  {
+    "id": "ac2e141c-3fd1-4f9f-836e-55e5443085bd",
+    "bin": "1-B-5D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, MULTICAM BLACK, Small",
+    "qty": 5,
+    "notes": "PIG.700D-0026"
+  },
+  {
+    "id": "bfde8b2f-d918-47d4-8fdf-29869f3eda70",
+    "bin": "1-B-5E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-40TP01-MC",
+    "qty": 70,
+    "notes": ""
+  },
+  {
+    "id": "5f471ec6-5431-407a-8611-b92cd714506a",
+    "bin": "1-B-5F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, MULTICAM, 2X-Large",
+    "qty": 9,
+    "notes": "PIG.754D-0025"
+  },
+  {
+    "id": "66898e19-e47e-418d-8229-c20595238a50",
+    "bin": "1-B-6A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20K5PMP3-RG",
+    "qty": 63,
+    "notes": ""
+  },
+  {
+    "id": "291d8150-cecd-4784-b854-b0f77e533ea7",
+    "bin": "1-B-6B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20556MP2-BK",
+    "qty": 164,
+    "notes": ""
+  },
+  {
+    "id": "d37b87a9-81bc-4c33-8eb3-0b5cbf25a270",
+    "bin": "1-B-6C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11RDC1-MC",
+    "qty": 51,
+    "notes": ""
+  },
+  {
+    "id": "ab3af71e-7317-45b6-9373-4aa4a12ae305",
+    "bin": "1-B-6D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-40IFAKP1-CT",
+    "qty": 124,
+    "notes": ""
+  },
+  {
+    "id": "624c1cf9-94eb-481b-8755-b54efc9d8896",
+    "bin": "1-B-6E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11GENESIS-DLT-MC",
+    "qty": 79,
+    "notes": ""
+  },
+  {
+    "id": "1868c507-92f4-4fdc-a3a8-31624a4180aa",
+    "bin": "1-B-6F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30HPLG-RG",
+    "qty": 36,
+    "notes": ""
+  },
+  {
+    "id": "07d121d3-e26f-4329-9e8e-0a85346adda9",
+    "bin": "2-A-1A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, RANGER GREEN, Small",
+    "qty": 31,
+    "notes": "PIG.754D-0011"
+  },
+  {
+    "id": "325f41a9-9e1d-4996-8311-8250c9bbb118",
+    "bin": "2-A-1B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11ESP1-BK",
+    "qty": 48,
+    "notes": ""
+  },
+  {
+    "id": "f4fa6839-bbf4-41c8-9a0b-bf08c2eb8e36",
+    "bin": "2-A-1C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, COYOTE, Medium",
+    "qty": 24,
+    "notes": "PIG.754D-0007"
+  },
+  {
+    "id": "12e5d6fb-937b-4403-9b91-bdd34fc34d62",
+    "bin": "2-A-1D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11JOEY-RG",
+    "qty": 16,
+    "notes": ""
+  },
+  {
+    "id": "bf6bac3f-de2a-4805-a13e-287a46a393bf",
+    "bin": "2-A-1E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, MULTICAM, X-Large",
+    "qty": 17,
+    "notes": "PIG.754D-0024"
+  },
+  {
+    "id": "f70c57a2-33f8-4b94-a38c-a167f449b119",
+    "bin": "2-A-1F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11T556VMP-MC",
+    "qty": 141,
+    "notes": ""
+  },
+  {
+    "id": "9d26ad5c-2a50-453d-9e91-03aaebb77b60",
+    "bin": "2-A-2A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, MULTICAM BLACK, Large",
+    "qty": 5,
+    "notes": "PIG.700D-0028"
+  },
+  {
+    "id": "c0c9b1b5-79f1-491c-ba2d-189f5c7a8a67",
+    "bin": "2-A-2B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-40MSP1-CT",
+    "qty": 79,
+    "notes": ""
+  },
+  {
+    "id": "7c2a8aad-a522-4cd9-b4bf-1bbdb7a257d2",
+    "bin": "2-A-2C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-40ETH1-BK",
+    "qty": 106,
+    "notes": ""
+  },
+  {
+    "id": "95780124-a481-4fa2-ab28-1e23c0cace5a",
+    "bin": "2-A-2D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30GPVUP2-MC",
+    "qty": 17,
+    "notes": ""
+  },
+  {
+    "id": "4399c567-fd76-46af-a7f6-30de3032bb00",
+    "bin": "2-A-2E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20556MP1-RG",
+    "qty": 90,
+    "notes": ""
+  },
+  {
+    "id": "522e27a4-9b37-4364-ad76-ef2cff0b90b0",
+    "bin": "2-A-2F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, RANGER GREEN, 2X-Large",
+    "qty": 58,
+    "notes": "PIG.754D-0015"
+  },
+  {
+    "id": "cb749ed1-5a9d-4258-86d8-d27686117a99",
+    "bin": "2-A-3A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20K5PMP1-MC",
+    "qty": 85,
+    "notes": ""
+  },
+  {
+    "id": "195b7736-2b81-4cc5-b47d-d4421f7d80d9",
+    "bin": "2-A-3B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30HPSM-MC",
+    "qty": 26,
+    "notes": ""
+  },
+  {
+    "id": "6129dd6b-f28c-4dd7-b5f4-031288855453",
+    "bin": "2-A-3C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30RP01-MC",
+    "qty": 80,
+    "notes": ""
+  },
+  {
+    "id": "65ec3ac1-b953-414d-96d6-2b4261686ee2",
+    "bin": "2-A-3D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30GPVUP2-BK",
+    "qty": 103,
+    "notes": ""
+  },
+  {
+    "id": "5915cae4-f561-4ea1-831f-9adae2dfca5a",
+    "bin": "2-A-3E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30GPHUP1-MC",
+    "qty": 39,
+    "notes": ""
+  },
+  {
+    "id": "07dac0a2-4968-42b6-b1ce-d479a7f6197e",
+    "bin": "2-A-3F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-40TP01-CT",
+    "qty": 84,
+    "notes": ""
+  },
+  {
+    "id": "4a2c6424-d479-4eeb-9993-3f78a3b5081d",
+    "bin": "2-A-4A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20556MP3-CT",
+    "qty": 56,
+    "notes": ""
+  },
+  {
+    "id": "2c182f89-9872-4174-bb28-030597217eee",
+    "bin": "2-A-4B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-40IFAKP1-BK",
+    "qty": 100,
+    "notes": ""
+  },
+  {
+    "id": "73286424-62ba-4289-99e1-a44dfa4caba4",
+    "bin": "2-A-4C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, MULTICAM, Medium",
+    "qty": 18,
+    "notes": "PIG.754D-0022"
+  },
+  {
+    "id": "85601dea-3614-42f2-8132-b3dad3c883a9",
+    "bin": "2-A-4D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30MBITR1-MC",
+    "qty": 37,
+    "notes": ""
+  },
+  {
+    "id": "ff2c699a-85b6-4eab-8349-f6847cbbb17f",
+    "bin": "2-A-4E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11JOEY-BK",
+    "qty": 88,
+    "notes": ""
+  },
+  {
+    "id": "02981dce-fbe5-427b-9d5a-c6b3539cc4fb",
+    "bin": "2-A-4F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, COYOTE, Medium",
+    "qty": 11,
+    "notes": "PIG.700D-0007"
+  },
+  {
+    "id": "e44be644-c0af-46a3-aed7-27cc050ba7aa",
+    "bin": "2-B-1A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30HPLG-CT",
+    "qty": 70,
+    "notes": ""
+  },
+  {
+    "id": "319e43bc-7b99-48a1-8637-87a8efe74612",
+    "bin": "2-B-1B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, BLACK, Medium",
+    "qty": 23,
+    "notes": "PIG.754D-0002"
+  },
+  {
+    "id": "a485c368-6f89-4026-8024-4ec4ee14ed4c",
+    "bin": "2-B-1C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11RDC1-RG",
+    "qty": 25,
+    "notes": ""
+  },
+  {
+    "id": "8ff312ca-304d-4659-87b3-d83358049ef0",
+    "bin": "2-B-1D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20RUDP1-BK",
+    "qty": 61,
+    "notes": ""
+  },
+  {
+    "id": "81c59306-2752-401a-b31c-d7ba0361a74d",
+    "bin": "2-B-1E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, BLACK, Large",
+    "qty": 21,
+    "notes": "PIG.754D-0003"
+  },
+  {
+    "id": "aad55272-93c1-4fee-b881-6d0287d177b4",
+    "bin": "2-B-1F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30MBITR1-CT",
+    "qty": 37,
+    "notes": ""
+  },
+  {
+    "id": "4c7868ea-8c3f-4e34-b093-cbae52de2a5d",
+    "bin": "2-B-2A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, COYOTE, 2X-Large",
+    "qty": 10,
+    "notes": "PIG.700D-0010"
+  },
+  {
+    "id": "798996aa-5a1b-4ca5-bbb9-a95dda37930d",
+    "bin": "2-B-2B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20S762P1-BK",
+    "qty": 30,
+    "notes": ""
+  },
+  {
+    "id": "c839acd2-08e9-481f-b9d8-5dfa1d54ca73",
+    "bin": "2-B-2C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30GPVUP1-MC",
+    "qty": 29,
+    "notes": ""
+  },
+  {
+    "id": "00c6d665-b005-408d-b7b9-cd7a713c9714",
+    "bin": "2-B-2D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30GPHUP1-BK",
+    "qty": 63,
+    "notes": ""
+  },
+  {
+    "id": "aeb7a7ae-8984-4766-a9d9-5630c6580223",
+    "bin": "2-B-2E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30GPVUP1-RG",
+    "qty": 68,
+    "notes": ""
+  },
+  {
+    "id": "8dedf474-f1bb-486f-ae78-949d7687f34b",
+    "bin": "2-B-2F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30FLP2-BK",
+    "qty": 42,
+    "notes": ""
+  },
+  {
+    "id": "39dd3933-6805-4de8-b517-485162a5e44a",
+    "bin": "2-B-3A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20556SSP-RG",
+    "qty": 0,
+    "notes": ""
+  },
+  {
+    "id": "eaa10b26-aae9-4249-bbab-914bd1f9f5ad",
+    "bin": "2-B-3B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-40ETH1-RG",
+    "qty": 120,
+    "notes": ""
+  },
+  {
+    "id": "0ade2e5c-2010-4aba-9e40-6c4e82f307b2",
+    "bin": "2-B-3D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, MULTICAM, Small",
+    "qty": 10,
+    "notes": "PIG.700D-0021"
+  },
+  {
+    "id": "d84dc4cc-c580-4a28-91de-34880fee94f3",
+    "bin": "2-B-3E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11MVP1-MC",
+    "qty": 19,
+    "notes": ""
+  },
+  {
+    "id": "919586db-290f-47a8-9bcd-8fced7c316c1",
+    "bin": "2-B-3F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, BLACK, 2X-Large",
+    "qty": 3,
+    "notes": "PIG.700D-0005"
+  },
+  {
+    "id": "dea45889-0780-4ad4-8de6-bd2ad77ee371",
+    "bin": "2-B-4A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, COYOTE, Small",
+    "qty": 9,
+    "notes": "PIG.754D-0006"
+  },
+  {
+    "id": "858e312c-bb0d-4d0e-8c65-4f5e18c5f327",
+    "bin": "2-B-4B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20RUDP1-CT",
+    "qty": 37,
+    "notes": ""
+  },
+  {
+    "id": "c73f3414-9639-420e-9204-dee8f94867e0",
+    "bin": "2-B-4C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20PMP2-BK",
+    "qty": 60,
+    "notes": ""
+  },
+  {
+    "id": "7f04e5d9-f776-48b5-8f31-bd5ff36bf38e",
+    "bin": "2-B-4D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20556SSP-MC",
+    "qty": 0,
+    "notes": ""
+  },
+  {
+    "id": "a17037a6-7ec2-458b-afbe-29d89d87b496",
+    "bin": "2-B-4E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, RANGER GREEN, X-Large",
+    "qty": 5,
+    "notes": "PIG.700D-0014"
+  },
+  {
+    "id": "62f2b5b3-1752-4203-8a32-3abf1a3d19da",
+    "bin": "2-B-4F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30FLP1-MC",
+    "qty": 31,
+    "notes": ""
+  },
+  {
+    "id": "bd3a1c9c-0ed7-47b8-8b3a-f012a05353ce",
+    "bin": "2-B-5A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20S762P1-RG",
+    "qty": 43,
+    "notes": ""
+  },
+  {
+    "id": "5e5ba36d-0449-4680-b090-8825a2face1d",
+    "bin": "2-B-5B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, MULTICAM BLACK, Small",
+    "qty": 5,
+    "notes": "PIG.754D-0026"
+  },
+  {
+    "id": "fb719990-b615-4ae8-9a41-c4fc9ba5c8c4",
+    "bin": "2-B-5C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-40TP01-RG",
+    "qty": 56,
+    "notes": ""
+  },
+  {
+    "id": "7de07b9b-9fd3-4f05-ae1c-ce47963df017",
+    "bin": "2-B-5D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30RP01-CT",
+    "qty": 53,
+    "notes": ""
+  },
+  {
+    "id": "bf7c8c2b-6518-48fb-9816-4e67e11ef937",
+    "bin": "2-B-5E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11TK556MP-BK",
+    "qty": 59,
+    "notes": ""
+  },
+  {
+    "id": "d41b17f8-9ca3-42d3-adad-317dae17e77a",
+    "bin": "2-B-5F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20PMP1-CT",
+    "qty": 58,
+    "notes": ""
+  },
+  {
+    "id": "022c9640-79da-42ab-aa37-7b1d06f008f2",
+    "bin": "2-B-6A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20556MP2-RG",
+    "qty": 138,
+    "notes": ""
+  },
+  {
+    "id": "8ae90d5b-0617-4582-b7f2-cc8468a027c8",
+    "bin": "2-B-6B",
+    "className": "GLOVES",
+    "classLetter": "G",
+    "class": "GLOVES \u002B G = G-000 to G-1000",
+    "label": "ALPHA Gloves GEN 2, RANGER GREEN, Large",
+    "qty": 11,
+    "notes": "PIG.700D-0013"
+  },
+  {
+    "id": "8d9a88d4-db99-4562-8038-de8bdcce5867",
+    "bin": "2-B-6C",
+    "className": "AMMO POUCHES",
+    "classLetter": "A",
+    "class": "AMMO POUCHES \u002B A = A-000 to A-1000",
+    "label": "CT-20K5PMP1-CT",
+    "qty": 110,
+    "notes": ""
+  },
+  {
+    "id": "1e6a8f22-85e1-46e4-b4a3-b21bc653e240",
+    "bin": "2-B-6D",
+    "className": "GLOVES",
+    "classLetter": "G",
+    "class": "GLOVES \u002B G = G-000 to G-1000",
+    "label": "ALPHA Gloves GEN 2, BLACK, Small",
+    "qty": 7,
+    "notes": "PIG.700D-0001"
+  },
+  {
+    "id": "b1fb3f7d-37cb-4822-ae68-a42f7c778872",
+    "bin": "2-B-6E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, COYOTE, Large",
+    "qty": 22,
+    "notes": "PIG.700D-0008"
+  },
+  {
+    "id": "9df7e2d4-443d-42e8-b29d-d59a8effe0aa",
+    "bin": "2-B-6F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11T556VMP-RG",
+    "qty": 74,
+    "notes": ""
+  },
+  {
+    "id": "ab00c787-c2f7-48fd-baf5-ccf8936826e1",
+    "bin": "3-A-1A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11ESP1-RG",
+    "qty": 38,
+    "notes": ""
+  },
+  {
+    "id": "a0d84d65-b553-40b9-8404-28ffbf0dc678",
+    "bin": "3-A-1B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11GENESIS-DLT-BK",
+    "qty": 17,
+    "notes": ""
+  },
+  {
+    "id": "b6d3a96c-d25a-4a2d-a552-7e5623700230",
+    "bin": "3-A-1C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, BLACK, Large",
+    "qty": 13,
+    "notes": "PIG.700D-0003"
+  },
+  {
+    "id": "2290e70e-2ccd-4238-9c9d-70a9a8608814",
+    "bin": "3-A-1D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, COYOTE, X-Large",
+    "qty": 40,
+    "notes": "PIG.754D-0009"
+  },
+  {
+    "id": "5344f6f3-c242-4822-99a3-da52fa198de2",
+    "bin": "3-A-1E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30HPLG-MC",
+    "qty": 71,
+    "notes": ""
+  },
+  {
+    "id": "71c94ae8-ed88-4e0f-8558-8095682ae351",
+    "bin": "3-A-1F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30RP01-BK",
+    "qty": 97,
+    "notes": ""
+  },
+  {
+    "id": "272329fe-6d72-4a0a-8c0e-ddd469d96dfe",
+    "bin": "3-A-2A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11TK556MP-MC",
+    "qty": 58,
+    "notes": ""
+  },
+  {
+    "id": "cc730e63-ebc0-4f0f-bb57-56e4f79c4e22",
+    "bin": "3-A-2B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "85-1031-MIL",
+    "qty": 4,
+    "notes": ""
+  },
+  {
+    "id": "4e24d8e3-869f-4283-bfc4-994a0ced0e6b",
+    "bin": "3-A-2C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, MULTICAM, Small",
+    "qty": 12,
+    "notes": "PIG.754D-0021"
+  },
+  {
+    "id": "b85ce354-b8ca-4436-9f50-f0946997b8d3",
+    "bin": "3-A-2D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30GPVUP1-BK",
+    "qty": 82,
+    "notes": ""
+  },
+  {
+    "id": "b6a260a7-9881-4165-b11d-1bfde80b7a7f",
+    "bin": "3-A-2E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-SAI-10x12-F3A",
+    "qty": 25,
+    "notes": ""
+  },
+  {
+    "id": "85b94fe3-7cc3-4eeb-a2b8-56f743119526",
+    "bin": "3-A-2F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30HPSM-RG",
+    "qty": 67,
+    "notes": ""
+  },
+  {
+    "id": "a846ce07-4ab6-4ff0-b048-76919a0255ee",
+    "bin": "3-A-3A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30RP01-RG",
+    "qty": 19,
+    "notes": ""
+  },
+  {
+    "id": "50ffb1e5-c487-4175-89ba-466bdd0cb8c7",
+    "bin": "3-A-3B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20556MP1-MC",
+    "qty": 109,
+    "notes": ""
+  },
+  {
+    "id": "faa014d1-b0b1-43f6-9b14-a5950e45658e",
+    "bin": "3-A-3C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-3ASAIP-JOEY",
+    "qty": 11,
+    "notes": ""
+  },
+  {
+    "id": "4668eeee-831d-4bae-bf93-857246461402",
+    "bin": "3-A-3D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-40MSP1-RG",
+    "qty": 71,
+    "notes": ""
+  },
+  {
+    "id": "5f6560b1-2289-4c7d-846b-61e8fdbe346c",
+    "bin": "3-A-3E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20556MP3-RG",
+    "qty": 95,
+    "notes": ""
+  },
+  {
+    "id": "0eac2946-9f34-4a75-8b7f-41f79f638b02",
+    "bin": "3-A-3F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20556MP1-CT",
+    "qty": 99,
+    "notes": ""
+  },
+  {
+    "id": "7d8dba66-f2b4-4902-bdbd-1418780a1df9",
+    "bin": "3-A-4A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11RDC1-CT",
+    "qty": 3,
+    "notes": ""
+  },
+  {
+    "id": "6440f378-52eb-4f1b-91ed-13140d53fe82",
+    "bin": "3-A-4B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, BLACK, Small",
+    "qty": 9,
+    "notes": "PIG.754D-0001"
+  },
+  {
+    "id": "b2727f60-9b43-4765-b443-6e767b45b7ff",
+    "bin": "3-A-4C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, RANGER GREEN, Medium",
+    "qty": 1,
+    "notes": "PIG.700D-0012"
+  },
+  {
+    "id": "631b4339-d471-4dbe-89a0-c883d968d7f0",
+    "bin": "3-A-4D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-40IFAKP1-RG",
+    "qty": 52,
+    "notes": ""
+  },
+  {
+    "id": "c6a2bfc8-d9d5-48ac-aef4-cfd05b010572",
+    "bin": "3-A-4E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11GENESIS-DLT-CT",
+    "qty": 64,
+    "notes": ""
+  },
+  {
+    "id": "59669f1d-3fc6-49ba-96ad-11ccdc2ee0e5",
+    "bin": "3-A-4F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30HPLG-BK",
+    "qty": 139,
+    "notes": ""
+  },
+  {
+    "id": "16084f30-1e09-407a-b696-7fe725c11164",
+    "bin": "3-B-1A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, MULTICAM, Large",
+    "qty": 2,
+    "notes": "PIG.700D-0023"
+  },
+  {
+    "id": "ed4920a1-fb2c-41a1-b6d9-63b07d3422d5",
+    "bin": "3-B-1B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, RANGER GREEN, X-Large",
+    "qty": 102,
+    "notes": "PIG.754D-0014"
+  },
+  {
+    "id": "880f0a7d-bcbc-47f0-94b6-2ab6b529ea97",
+    "bin": "3-B-1C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11TK556MP-CT",
+    "qty": 26,
+    "notes": ""
+  },
+  {
+    "id": "8ed042c1-00bc-4e73-acf4-b321e7e36266",
+    "bin": "3-B-1D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, MULTICAM BLACK, X-Large",
+    "qty": 3,
+    "notes": "PIG.754D-0029"
+  },
+  {
+    "id": "3c0d7396-ad2f-430a-8341-e5aad8407fe6",
+    "bin": "3-B-1F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30HPSM-BK",
+    "qty": 90,
+    "notes": ""
+  },
+  {
+    "id": "971ee658-a43f-4710-9394-5c229525ad9d",
+    "bin": "3-B-2A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, RANGER GREEN, 2X-Large",
+    "qty": 5,
+    "notes": "PIG.700D-0015"
+  },
+  {
+    "id": "2c6f89d4-74c1-405d-81e5-e511910174e0",
+    "bin": "3-B-2B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30GPHUP1-RG",
+    "qty": 108,
+    "notes": ""
+  },
+  {
+    "id": "deddeb93-fe1b-4b9f-a64d-a0569f5de38a",
+    "bin": "3-B-2C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, MULTICAM BLACK, Medium",
+    "qty": 5,
+    "notes": "PIG.700D-0027"
+  },
+  {
+    "id": "f202704e-8067-4a47-bee2-1b876a7afe4b",
+    "bin": "3-B-2D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, BLACK, 2X-Large",
+    "qty": 4,
+    "notes": "PIG.754D-0005"
+  },
+  {
+    "id": "b3e514c9-5278-443b-abfa-42a30a19334c",
+    "bin": "3-B-2E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20556MP2-CT",
+    "qty": 83,
+    "notes": ""
+  },
+  {
+    "id": "245fc938-fe5a-4096-a5f2-c1a7fa02703d",
+    "bin": "3-B-2F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30GPHUP2-RG",
+    "qty": 82,
+    "notes": ""
+  },
+  {
+    "id": "5cb6bbd7-2c3a-459c-b479-a1ffe20a706c",
+    "bin": "3-B-3A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20PMP1-MC",
+    "qty": 113,
+    "notes": ""
+  },
+  {
+    "id": "c6f9e152-d29c-4602-8d37-901b55de91d7",
+    "bin": "3-B-3B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, COYOTE, 2X-Large",
+    "qty": 4,
+    "notes": "PIG.754D-0010"
+  },
+  {
+    "id": "5faea1e1-530f-4e68-bcaf-f59e7cc28cd9",
+    "bin": "3-B-3C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, MULTICAM BLACK, Large",
+    "qty": 2,
+    "notes": "PIG.754D-0028"
+  },
+  {
+    "id": "682d7031-e416-487f-ae4f-050d3791370e",
+    "bin": "3-B-3D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30GPHUP1-CT",
+    "qty": 93,
+    "notes": ""
+  },
+  {
+    "id": "b543f3a2-ced4-4de2-a651-060318fe2c81",
+    "bin": "3-B-3E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30FLP2-RG",
+    "qty": 66,
+    "notes": ""
+  },
+  {
+    "id": "61dd3ad2-449b-4481-b8a8-f506098bd28e",
+    "bin": "3-B-3F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30GPVUP2-CT",
+    "qty": 90,
+    "notes": ""
+  },
+  {
+    "id": "a94a2b97-0b4f-4342-9e47-189b90252382",
+    "bin": "3-B-4A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30GPHUP2-MC",
+    "qty": 75,
+    "notes": ""
+  },
+  {
+    "id": "28b3bad2-940d-43b1-bfc1-029e9fab5138",
+    "bin": "3-B-4B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20PMP2-MC",
+    "qty": 37,
+    "notes": ""
+  },
+  {
+    "id": "a51b40d2-b3e7-4dde-9968-310f0e424b9a",
+    "bin": "3-B-4C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, MULTICAM, 2X-Large",
+    "qty": 9,
+    "notes": "PIG.700D-0025"
+  },
+  {
+    "id": "4eb4d408-9fac-455f-a058-8fb72f066fd7",
+    "bin": "3-B-4D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20556MP2-MC",
+    "qty": 53,
+    "notes": ""
+  },
+  {
+    "id": "7d7568f2-137a-40a9-8b5e-c798755eb9b9",
+    "bin": "3-B-4E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30GPHUP2-CT",
+    "qty": 96,
+    "notes": ""
+  },
+  {
+    "id": "d0e837b2-e8e2-4eba-ba05-a76d51c16244",
+    "bin": "3-B-4F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20PMP2-RG",
+    "qty": 35,
+    "notes": ""
+  },
+  {
+    "id": "dab1b2c4-1211-4457-8f8a-4d89bb20e0f2",
+    "bin": "3-B-5A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11T556VMP-CT",
+    "qty": 77,
+    "notes": ""
+  },
+  {
+    "id": "4e1c55ca-073a-42a1-a4aa-56a896cddce1",
+    "bin": "3-B-5B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30GPVUP1-CT",
+    "qty": 84,
+    "notes": ""
+  },
+  {
+    "id": "25209dcc-1964-49b5-b88c-a5a88289f345",
+    "bin": "3-B-5C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-30GPHUP2-BK",
+    "qty": 94,
+    "notes": ""
+  },
+  {
+    "id": "7d329b5b-65ed-4409-87f9-a735955073fa",
+    "bin": "3-B-5D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, MULTICAM BLACK, 2X-Large",
+    "qty": 2,
+    "notes": "PIG.754D-0030"
+  },
+  {
+    "id": "21505a2d-7932-4bbe-9ddd-7c54529d6532",
+    "bin": "3-B-5E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20PMP1-RG",
+    "qty": 52,
+    "notes": ""
+  },
+  {
+    "id": "24c9b791-8053-4879-b7a3-a80bcf9a8408",
+    "bin": "3-B-5F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-20S762P1-MC",
+    "qty": 44,
+    "notes": ""
+  },
+  {
+    "id": "89662392-d8f6-4c77-bc46-cc33b8c216f1",
+    "bin": "3-B-6A",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, BLACK, X-Large",
+    "qty": 8,
+    "notes": "PIG.700D-0004"
+  },
+  {
+    "id": "11fe0fc7-5874-4277-83e4-1fc0b76d6bfb",
+    "bin": "3-B-6B",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-11ESP1-CT",
+    "qty": 115,
+    "notes": ""
+  },
+  {
+    "id": "dc56cb66-c1fd-44d7-a21e-322b187e1379",
+    "bin": "3-B-6C",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "CT-35PRL1-BK",
+    "qty": 15,
+    "notes": ""
+  },
+  {
+    "id": "7f5b98c5-4306-4887-8c91-744c114e215f",
+    "bin": "3-B-6D",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "DELTA Utility Gloves, RANGER GREEN, Medium",
+    "qty": 15,
+    "notes": "PIG.754D-0012"
+  },
+  {
+    "id": "1543c8d2-68e8-438a-a2b7-64727493da4f",
+    "bin": "3-B-6E",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, MULTICAM, Medium",
+    "qty": 5,
+    "notes": "PIG.700D-0022"
+  },
+  {
+    "id": "486cc5d3-6b41-4cfa-83e8-9fc259f594c9",
+    "bin": "3-B-6F",
+    "className": "",
+    "classLetter": "",
+    "class": "",
+    "label": "ALPHA Gloves GEN 2, COYOTE, X-Large",
+    "qty": 32,
+    "notes": "PIG.700D-0009"
+  }
+]

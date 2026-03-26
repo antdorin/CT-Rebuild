@@ -11,30 +11,51 @@ struct UnassignedItemModal: View {
     @State private var binLocation: String = ""
     @State private var quantity: Int = 0
     @State private var itemName: String = ""
-    @State private var speedCellSearch: String = ""
-    @State private var toughHookSearch: String = ""
-    @State private var selectedSpeedCell: String = ""
-    @State private var selectedToughHook: String = ""
+
     @State private var showValidationError = false
+    @State private var selectedExistingId: String = ""
+    @ObservedObject private var scanStore = ScanStore.shared
 
     private let classes = (65...90).map { String(UnicodeScalar($0)!) }  // A–Z
+
+    private let binLocations: [String] = [
+        "1-A-1A","1-A-1B","1-A-1C","1-A-1D","1-A-1E","1-A-1F",
+        "1-A-2A","1-A-2B","1-A-2C","1-A-2D","1-A-2E","1-A-2F",
+        "1-A-3A","1-A-3B","1-A-3C","1-A-3D","1-A-3E","1-A-3F",
+        "1-A-4A","1-A-4B","1-A-4C","1-A-4D","1-A-4E","1-A-4F",
+        "1-B-1A","1-B-1B","1-B-1C","1-B-1D","1-B-1E","1-B-1F",
+        "1-B-2A","1-B-2B","1-B-2C","1-B-2D","1-B-2E","1-B-2F",
+        "1-B-3A","1-B-3B","1-B-3C","1-B-3D","1-B-3E","1-B-3F",
+        "1-B-4A","1-B-4B","1-B-4C","1-B-4D","1-B-4E","1-B-4F",
+        "1-B-5A","1-B-5B","1-B-5C","1-B-5D","1-B-5E","1-B-5F",
+        "1-B-6A","1-B-6B","1-B-6C","1-B-6D","1-B-6E","1-B-6F",
+        "2-A-1A","2-A-1B","2-A-1C","2-A-1D","2-A-1E","2-A-1F",
+        "2-A-2A","2-A-2B","2-A-2C","2-A-2D","2-A-2E","2-A-2F",
+        "2-A-3A","2-A-3B","2-A-3C","2-A-3D","2-A-3E","2-A-3F",
+        "2-A-4A","2-A-4B","2-A-4C","2-A-4D","2-A-4E","2-A-4F",
+        "2-B-1A","2-B-1B","2-B-1C","2-B-1D","2-B-1E","2-B-1F",
+        "2-B-2A","2-B-2B","2-B-2C","2-B-2D","2-B-2E","2-B-2F",
+        "2-B-3A","2-B-3B","2-B-3C","2-B-3D","2-B-3E","2-B-3F",
+        "2-B-4A","2-B-4B","2-B-4C","2-B-4D","2-B-4E","2-B-4F",
+        "2-B-5A","2-B-5B","2-B-5C","2-B-5D","2-B-5E","2-B-5F",
+        "2-B-6A","2-B-6B","2-B-6C","2-B-6D","2-B-6E","2-B-6F",
+        "3-A-1A","3-A-1B","3-A-1C","3-A-1D","3-A-1E","3-A-1F",
+        "3-A-2A","3-A-2B","3-A-2C","3-A-2D","3-A-2E","3-A-2F",
+        "3-A-3A","3-A-3B","3-A-3C","3-A-3D","3-A-3E","3-A-3F",
+        "3-A-4A","3-A-4B","3-A-4C","3-A-4D","3-A-4E","3-A-4F",
+        "3-B-1A","3-B-1B","3-B-1C","3-B-1D","3-B-1E","3-B-1F",
+        "3-B-2A","3-B-2B","3-B-2C","3-B-2D","3-B-2E","3-B-2F",
+        "3-B-3A","3-B-3B","3-B-3C","3-B-3D","3-B-3E","3-B-3F",
+        "3-B-4A","3-B-4B","3-B-4C","3-B-4D","3-B-4E","3-B-4F",
+        "3-B-5A","3-B-5B","3-B-5C","3-B-5D","3-B-5E","3-B-5F",
+        "3-B-6A","3-B-6B","3-B-6C","3-B-6D","3-B-6E","3-B-6F",
+    ]
 
     // Live-generated QR code based on current class selection
     private var generatedQR: String {
         ScanStore.shared.nextQRCode(classCode: classCode)
     }
 
-    // Filtered picker lists (stubs — replaced by CT-Hub feed in a future phase)
-    private var speedCellItems: [String] {
-        let base = ["— Select Item —", "SC-001 · Hook Set A", "SC-002 · Carabiner Pack", "SC-003 · Utility Strap"]
-        guard !speedCellSearch.isEmpty else { return base }
-        return ["— Select Item —"] + base.dropFirst().filter { $0.localizedCaseInsensitiveContains(speedCellSearch) }
-    }
-    private var toughHookItems: [String] {
-        let base = ["— Select Item —", "TH-001 · 1\" Hook", "TH-002 · 2\" Hook", "TH-003 · Heavy Duty 4\""]
-        guard !toughHookSearch.isEmpty else { return base }
-        return ["— Select Item —"] + base.dropFirst().filter { $0.localizedCaseInsensitiveContains(toughHookSearch) }
-    }
 
     var body: some View {
         NavigationView {
@@ -69,12 +90,23 @@ struct UnassignedItemModal: View {
 
                     // ── Bin Location ──────────────────────────────────────────
                     fieldLabel("Bin Location")
-                    TextField("Select Bin Location", text: $binLocation)
-                        .textInputAutocapitalization(.characters)
-                        .textFieldStyle(.plain)
+                    Menu {
+                        ForEach(binLocations, id: \.self) { bin in
+                            Button(bin) { binLocation = bin }
+                        }
+                    } label: {
+                        HStack {
+                            Text(binLocation.isEmpty ? "Select Bin Location" : binLocation)
+                                .foregroundColor(binLocation.isEmpty ? Color(.placeholderText) : .primary)
+                            Spacer()
+                            Image(systemName: "chevron.up.chevron.down")
+                                .foregroundColor(.secondary)
+                                .font(.system(size: 12))
+                        }
                         .padding(.horizontal, 14)
                         .padding(.vertical, 12)
                         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+                    }
 
                     // ── Quantity ──────────────────────────────────────────────
                     fieldLabel("Quantity")
@@ -131,39 +163,47 @@ struct UnassignedItemModal: View {
                         .foregroundColor(.accentColor)
                         .frame(maxWidth: .infinity, alignment: .center)
 
-                    // ── Speed Cell Items ───────────────────────────────────────
-                    fieldLabel("Speed Cell Items")
-                    TextField("Search speed cell...", text: $speedCellSearch)
-                        .textFieldStyle(.plain)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
-
-                    Picker("Speed Cell", selection: $selectedSpeedCell) {
-                        ForEach(speedCellItems, id: \.self) { Text($0).tag($0) }
+                    // ── Existing Item Picker ───────────────────────────────────
+                    fieldLabel("Select Existing Item")
+                    if scanStore.records.isEmpty {
+                        Text("No assigned items yet.")
+                            .font(.system(size: 14))
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+                    } else {
+                        Menu {
+                            ForEach(scanStore.records) { record in
+                                Button("\(record.id) \u00b7 \(record.itemName)") {
+                                    selectedExistingId = record.id
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                if selectedExistingId.isEmpty {
+                                    Text("\u2014 Select Item \u2014")
+                                        .foregroundColor(Color(.placeholderText))
+                                } else if let rec = scanStore.records.first(where: { $0.id == selectedExistingId }) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(rec.id)
+                                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                                        Text(rec.itemName)
+                                            .font(.system(size: 12))
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .foregroundColor(.secondary)
+                                    .font(.system(size: 12))
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
+                            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+                        }
                     }
-                    .pickerStyle(.menu)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
-
-                    // ── Tough Hook Items ───────────────────────────────────────
-                    fieldLabel("Tough Hook Items")
-                    TextField("Search tough hook...", text: $toughHookSearch)
-                        .textFieldStyle(.plain)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
-
-                    Picker("Tough Hook", selection: $selectedToughHook) {
-                        ForEach(toughHookItems, id: \.self) { Text($0).tag($0) }
-                    }
-                    .pickerStyle(.menu)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
 
                     // ── Link to inventory button ───────────────────────────────
                     Button {
@@ -226,20 +266,19 @@ struct UnassignedItemModal: View {
             binLocation: binLocation,
             itemName: itemName.isEmpty ? qr : itemName,
             quantity: quantity,
-            linkedSpeedCell: selectedSpeedCell.starts(with: "—") ? nil : selectedSpeedCell,
-            linkedToughHook: selectedToughHook.starts(with: "—") ? nil : selectedToughHook
+            linkedSpeedCell: nil,
+            linkedToughHook: nil
         )
         ScanStore.shared.assign(record)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         onDismiss()
     }
 
-    /// Copies name + bin from the selected inventory item into the form fields.
+    /// Links the scanned raw barcode to an existing assigned item.
     private func applyInventoryLink() {
-        if !selectedSpeedCell.starts(with: "—") {
-            itemName = selectedSpeedCell
-        } else if !selectedToughHook.starts(with: "—") {
-            itemName = selectedToughHook
-        }
+        guard !selectedExistingId.isEmpty else { return }
+        ScanStore.shared.relink(id: selectedExistingId, to: rawBarcode)
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        onDismiss()
     }
 }

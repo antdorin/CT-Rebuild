@@ -30,6 +30,7 @@ public sealed class HubServer
     public readonly WebSocketManager  WsManager = new();
     public readonly JsonStore<ChaseTacticalEntry> ChaseTactical;
     public readonly JsonStore<ToughHookEntry>     ToughHooks;
+    public readonly JsonStore<ShippingSupplyEntry> ShippingSupplys;
     public readonly JsonStore<QrClassMapping>     QrMappings;
     public readonly PdfFolderService  PdfFolder = new();
 
@@ -51,6 +52,10 @@ public sealed class HubServer
         ToughHooks = new JsonStore<ToughHookEntry>(
             Path.Combine(dataDir, "toughhooks.json"),
             e => e.Id, WsManager, "toughhooks");
+
+        ShippingSupplys = new JsonStore<ShippingSupplyEntry>(
+            Path.Combine(dataDir, "shippingsupplys.json"),
+            e => e.Id, WsManager, "shippingsupplys");
 
         QrMappings = new JsonStore<QrClassMapping>(
             Path.Combine(dataDir, "qr_class_mappings.json"),
@@ -264,6 +269,19 @@ public sealed class HubServer
 
                 case ("DELETE", _) when path.StartsWith("/api/toughhooks/"):
                     await ToughHooks.DeleteAsync(path["/api/toughhooks/".Length..]);
+                    res.StatusCode = 204; break;
+
+                case ("GET", "/api/shippingsupplys"):
+                    await WriteJsonAsync(res, ShippingSupplys.GetAll()); break;
+
+                case ("POST", "/api/shippingsupplys"):
+                    var ssEntry = await ReadJsonAsync<ShippingSupplyEntry>(req);
+                    if (ssEntry is null) { res.StatusCode = 400; break; }
+                    await ShippingSupplys.UpsertAsync(ssEntry);
+                    await WriteJsonAsync(res, ssEntry); break;
+
+                case ("DELETE", _) when path.StartsWith("/api/shippingsupplys/"):
+                    await ShippingSupplys.DeleteAsync(path["/api/shippingsupplys/".Length..]);
                     res.StatusCode = 204; break;
 
                 case ("GET", "/api/qr_class_mappings"):

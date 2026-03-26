@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
 using CTHub.Models;
 using CTHub.Services;
@@ -13,17 +14,148 @@ namespace CTHub;
 public partial class MainWindow : Window, INotifyPropertyChanged
 {
     private readonly HubServer _hub = App.Hub;
+    private ICollectionView? _chaseView;
+    private ICollectionView? _toughHooksView;
+    private ICollectionView? _shippingSupplysView;
+    private ICollectionView? _qrMappingsView;
+    private ICollectionView? _pdfFilesView;
 
     // ── Bindable properties ───────────────────────────────────────────────────
 
     public System.Collections.ObjectModel.ObservableCollection<ChaseTacticalEntry> ChaseTacticalItems
         => _hub.ChaseTactical.Items;
 
+    public static readonly List<string> BinLocations = new()
+    {
+        "1-A-1A","1-A-1B","1-A-1C","1-A-1D","1-A-1E","1-A-1F",
+        "1-A-2A","1-A-2B","1-A-2C","1-A-2D","1-A-2E","1-A-2F",
+        "1-A-3A","1-A-3B","1-A-3C","1-A-3D","1-A-3E","1-A-3F",
+        "1-A-4A","1-A-4B","1-A-4C","1-A-4D","1-A-4E","1-A-4F",
+        "1-B-1A","1-B-1B","1-B-1C","1-B-1D","1-B-1E","1-B-1F",
+        "1-B-2A","1-B-2B","1-B-2C","1-B-2D","1-B-2E","1-B-2F",
+        "1-B-3A","1-B-3B","1-B-3C","1-B-3D","1-B-3E","1-B-3F",
+        "1-B-4A","1-B-4B","1-B-4C","1-B-4D","1-B-4E","1-B-4F",
+        "1-B-5A","1-B-5B","1-B-5C","1-B-5D","1-B-5E","1-B-5F",
+        "1-B-6A","1-B-6B","1-B-6C","1-B-6D","1-B-6E","1-B-6F",
+        "2-A-1A","2-A-1B","2-A-1C","2-A-1D","2-A-1E","2-A-1F",
+        "2-A-2A","2-A-2B","2-A-2C","2-A-2D","2-A-2E","2-A-2F",
+        "2-A-3A","2-A-3B","2-A-3C","2-A-3D","2-A-3E","2-A-3F",
+        "2-A-4A","2-A-4B","2-A-4C","2-A-4D","2-A-4E","2-A-4F",
+        "2-B-1A","2-B-1B","2-B-1C","2-B-1D","2-B-1E","2-B-1F",
+        "2-B-2A","2-B-2B","2-B-2C","2-B-2D","2-B-2E","2-B-2F",
+        "2-B-3A","2-B-3B","2-B-3C","2-B-3D","2-B-3E","2-B-3F",
+        "2-B-4A","2-B-4B","2-B-4C","2-B-4D","2-B-4E","2-B-4F",
+        "2-B-5A","2-B-5B","2-B-5C","2-B-5D","2-B-5E","2-B-5F",
+        "2-B-6A","2-B-6B","2-B-6C","2-B-6D","2-B-6E","2-B-6F",
+        "3-A-1A","3-A-1B","3-A-1C","3-A-1D","3-A-1E","3-A-1F",
+        "3-A-2A","3-A-2B","3-A-2C","3-A-2D","3-A-2E","3-A-2F",
+        "3-A-3A","3-A-3B","3-A-3C","3-A-3D","3-A-3E","3-A-3F",
+        "3-A-4A","3-A-4B","3-A-4C","3-A-4D","3-A-4E","3-A-4F",
+        "3-B-1A","3-B-1B","3-B-1C","3-B-1D","3-B-1E","3-B-1F",
+        "3-B-2A","3-B-2B","3-B-2C","3-B-2D","3-B-2E","3-B-2F",
+        "3-B-3A","3-B-3B","3-B-3C","3-B-3D","3-B-3E","3-B-3F",
+        "3-B-4A","3-B-4B","3-B-4C","3-B-4D","3-B-4E","3-B-4F",
+        "3-B-5A","3-B-5B","3-B-5C","3-B-5D","3-B-5E","3-B-5F",
+        "3-B-6A","3-B-6B","3-B-6C","3-B-6D","3-B-6E","3-B-6F",
+    };
+
+    public static readonly List<string> ClassNames = new()
+    {
+        "AMMO POUCHES",
+        "MEDICAL",
+        "PLATE CARRIER ACCESSORY",
+        "GLOVES",
+        "BELTS & PERSONAL LANYARDS",
+        "GP POUCHES",
+        "SOFT ARMOR",
+        "VEST ACCESSORY",
+        "HARD ARMOR",
+        "PLATE CARRIER",
+        "ACTIVE SHOOTER KIT",
+        "RADIO POUCHES",
+    };
+
+    public static readonly List<string> ClassLetters = Enumerable
+        .Range('A', 26)
+        .Select(c => ((char)c).ToString())
+        .ToList();
+
     public System.Collections.ObjectModel.ObservableCollection<ToughHookEntry> ToughHookItems
         => _hub.ToughHooks.Items;
 
+    public System.Collections.ObjectModel.ObservableCollection<ShippingSupplyEntry> ShippingSupplysItems
+        => _hub.ShippingSupplys.Items;
+
     public System.Collections.ObjectModel.ObservableCollection<QrClassMapping> QrMappingItems
         => _hub.QrMappings.Items;
+
+    public System.Collections.ObjectModel.ObservableCollection<PdfFileRow> PdfFileRows
+        => _hub.PdfFolder.FileRows;
+
+    private string _chaseSearchText = string.Empty;
+    public string ChaseSearchText
+    {
+        get => _chaseSearchText;
+        set
+        {
+            if (_chaseSearchText == value) return;
+            _chaseSearchText = value;
+            OnPropertyChanged();
+            _chaseView?.Refresh();
+        }
+    }
+
+    private string _toughHooksSearchText = string.Empty;
+    public string ToughHooksSearchText
+    {
+        get => _toughHooksSearchText;
+        set
+        {
+            if (_toughHooksSearchText == value) return;
+            _toughHooksSearchText = value;
+            OnPropertyChanged();
+            _toughHooksView?.Refresh();
+        }
+    }
+
+    private string _qrMappingsSearchText = string.Empty;
+    public string QrMappingsSearchText
+    {
+        get => _qrMappingsSearchText;
+        set
+        {
+            if (_qrMappingsSearchText == value) return;
+            _qrMappingsSearchText = value;
+            OnPropertyChanged();
+            _qrMappingsView?.Refresh();
+        }
+    }
+
+    private string _shippingSupplysSearchText = string.Empty;
+    public string ShippingSupplysSearchText
+    {
+        get => _shippingSupplysSearchText;
+        set
+        {
+            if (_shippingSupplysSearchText == value) return;
+            _shippingSupplysSearchText = value;
+            OnPropertyChanged();
+            _shippingSupplysView?.Refresh();
+        }
+    }
+
+    private string _pdfSearchText = string.Empty;
+    public string PdfSearchText
+    {
+        get => _pdfSearchText;
+        set
+        {
+            if (_pdfSearchText == value) return;
+            _pdfSearchText = value;
+            OnPropertyChanged();
+            _pdfFilesView?.Refresh();
+        }
+    }
 
     private string _statusText = $"http://localhost:{HubServer.Port}";
     public string StatusText
@@ -150,9 +282,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         });
 
         // Load PDF folder and bind list
-        PdfFileList.ItemsSource = _hub.PdfFolder.FileNames;
+        PdfFileGrid.ItemsSource = PdfFileRows;
         if (!string.IsNullOrEmpty(_hub.PdfFolder.CurrentFolder))
             PdfFolderPathText.Text = _hub.PdfFolder.CurrentFolder;
+
+        InitializeSearchFilters();
 
         // Populate server info panel
         RefreshServerInfo();
@@ -161,11 +295,113 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     // Updates the last-broadcast timestamp shown in the status bar.
     private void Touch() => LastBroadcast = $"Last write: {DateTime.Now:HH:mm:ss}";
 
+    private void InitializeSearchFilters()
+    {
+        _chaseView = CollectionViewSource.GetDefaultView(ChaseTacticalItems);
+        _chaseView.Filter = item => FilterChase(item as ChaseTacticalEntry);
+
+        _toughHooksView = CollectionViewSource.GetDefaultView(ToughHookItems);
+        _toughHooksView.Filter = item => FilterToughHook(item as ToughHookEntry);
+
+        _shippingSupplysView = CollectionViewSource.GetDefaultView(ShippingSupplysItems);
+        _shippingSupplysView.Filter = item => FilterShippingSupplys(item as ShippingSupplyEntry);
+
+        _qrMappingsView = CollectionViewSource.GetDefaultView(QrMappingItems);
+        _qrMappingsView.Filter = item => FilterQrMapping(item as QrClassMapping);
+
+        _pdfFilesView = CollectionViewSource.GetDefaultView(PdfFileRows);
+        _pdfFilesView.Filter = item => FilterPdfRow(item as PdfFileRow);
+    }
+
+    private bool ContainsText(string? source, string term)
+        => !string.IsNullOrEmpty(source) && source.Contains(term, StringComparison.OrdinalIgnoreCase);
+
+    private bool FilterChase(ChaseTacticalEntry? entry)
+    {
+        if (entry is null) return false;
+        var term = ChaseSearchText.Trim();
+        if (term.Length == 0) return true;
+
+        return ContainsText(entry.Bin, term)
+            || ContainsText(entry.ClassName, term)
+            || ContainsText(entry.ClassLetter, term)
+            || ContainsText(entry.ClassId, term)
+            || ContainsText(entry.Label, term)
+            || ContainsText(entry.Notes, term)
+            || ContainsText(entry.Id, term)
+            || entry.Qty.ToString().Contains(term, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildClassId(ChaseTacticalEntry entry)
+    {
+        if (string.IsNullOrWhiteSpace(entry.ClassLetter))
+            return string.Empty;
+
+        var letter = entry.ClassLetter.Trim().ToUpperInvariant();
+        var number = Random.Shared.Next(0, 1001);
+        return $"{letter}-{number:D3}";
+    }
+
+    private bool FilterToughHook(ToughHookEntry? entry)
+    {
+        if (entry is null) return false;
+        var term = ToughHooksSearchText.Trim();
+        if (term.Length == 0) return true;
+
+        return ContainsText(entry.Bin, term)
+            || ContainsText(entry.Sku, term)
+            || ContainsText(entry.Description, term)
+            || ContainsText(entry.Id, term)
+            || entry.Qty.ToString().Contains(term, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool FilterQrMapping(QrClassMapping? entry)
+    {
+        if (entry is null) return false;
+        var term = QrMappingsSearchText.Trim();
+        if (term.Length == 0) return true;
+
+        return ContainsText(entry.QrValue, term)
+            || ContainsText(entry.Classification, term)
+            || ContainsText(entry.Description, term)
+            || ContainsText(entry.Id, term);
+    }
+
+    private bool FilterShippingSupplys(ShippingSupplyEntry? entry)
+    {
+        if (entry is null) return false;
+        var term = ShippingSupplysSearchText.Trim();
+        if (term.Length == 0) return true;
+
+        return ContainsText(entry.Dimensions, term)
+            || entry.Bundle.ToString().Contains(term, StringComparison.OrdinalIgnoreCase)
+            || entry.Single.ToString().Contains(term, StringComparison.OrdinalIgnoreCase)
+            || ContainsText(entry.Id, term);
+    }
+
+    private bool FilterPdfRow(PdfFileRow? row)
+    {
+        var term = PdfSearchText.Trim();
+        if (term.Length == 0) return true;
+        if (row is null) return false;
+
+        return ContainsText(row.Name, term)
+            || ContainsText(row.SalesOrders, term)
+            || row.ImportDateTime.ToString("yyyy-MM-dd HH:mm:ss").Contains(term, StringComparison.OrdinalIgnoreCase);
+    }
+
     // ── Chase Tactical handlers ───────────────────────────────────────────────
 
     private void ChaseTactical_Add(object sender, RoutedEventArgs e)
     {
-        var entry = new ChaseTacticalEntry { Bin = "—", Label = "New item" };
+        var entry = new ChaseTacticalEntry
+        {
+            Bin = "—",
+            ClassName = ClassNames[0],
+            ClassLetter = "A",
+            Label = "New item"
+        };
+        entry.ClassId = BuildClassId(entry);
         _ = _hub.ChaseTactical.UpsertAsync(entry);
         Touch();
         ChaseTacticalGrid.ScrollIntoView(entry);
@@ -173,11 +409,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void ChaseTactical_Delete(object sender, RoutedEventArgs e)
     {
-        if (ChaseTacticalGrid.SelectedItem is ChaseTacticalEntry item)
+        var selected = ChaseTacticalGrid.SelectedItems
+            .Cast<ChaseTacticalEntry>()
+            .ToList();
+
+        foreach (var item in selected)
         {
             _ = _hub.ChaseTactical.DeleteAsync(item.Id);
-            Touch();
         }
+
+        if (selected.Count > 0) Touch();
     }
 
     private void ChaseTactical_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
@@ -185,9 +426,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (e.EditAction == DataGridEditAction.Commit &&
             e.Row.Item is ChaseTacticalEntry item)
         {
+            var header = e.Column.Header?.ToString() ?? string.Empty;
+            var regenerateClassId = header.Equals("Class", StringComparison.OrdinalIgnoreCase)
+                || header.Equals("Letter", StringComparison.OrdinalIgnoreCase)
+                || string.IsNullOrWhiteSpace(item.ClassId);
+
             // Let the DataGrid commit the binding first, then persist
             Dispatcher.InvokeAsync(() =>
             {
+                if (regenerateClassId)
+                    item.ClassId = BuildClassId(item);
                 _ = _hub.ChaseTactical.UpsertAsync(item);
                 Touch();
             });
@@ -206,11 +454,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void ToughHooks_Delete(object sender, RoutedEventArgs e)
     {
-        if (ToughHooksGrid.SelectedItem is ToughHookEntry item)
+        var selected = ToughHooksGrid.SelectedItems
+            .Cast<ToughHookEntry>()
+            .ToList();
+
+        foreach (var item in selected)
         {
             _ = _hub.ToughHooks.DeleteAsync(item.Id);
-            Touch();
         }
+
+        if (selected.Count > 0) Touch();
     }
 
     private void ToughHooks_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
@@ -238,11 +491,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void QrMappings_Delete(object sender, RoutedEventArgs e)
     {
-        if (QrMappingsGrid.SelectedItem is QrClassMapping item)
+        var selected = QrMappingsGrid.SelectedItems
+            .Cast<QrClassMapping>()
+            .ToList();
+
+        foreach (var item in selected)
         {
             _ = _hub.QrMappings.DeleteAsync(item.Id);
-            Touch();
         }
+
+        if (selected.Count > 0) Touch();
     }
 
     private void QrMappings_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
@@ -253,6 +511,43 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             Dispatcher.InvokeAsync(() =>
             {
                 _ = _hub.QrMappings.UpsertAsync(item);
+                Touch();
+            });
+        }
+    }
+
+    // ── Shipping Supplys handlers ─────────────────────────────────────────────
+
+    private void ShippingSupplys_Add(object sender, RoutedEventArgs e)
+    {
+        var entry = new ShippingSupplyEntry { Dimensions = "New box", Bundle = 0, Single = 0 };
+        _ = _hub.ShippingSupplys.UpsertAsync(entry);
+        Touch();
+        ShippingSupplysGrid.ScrollIntoView(entry);
+    }
+
+    private void ShippingSupplys_Delete(object sender, RoutedEventArgs e)
+    {
+        var selected = ShippingSupplysGrid.SelectedItems
+            .Cast<ShippingSupplyEntry>()
+            .ToList();
+
+        foreach (var item in selected)
+        {
+            _ = _hub.ShippingSupplys.DeleteAsync(item.Id);
+        }
+
+        if (selected.Count > 0) Touch();
+    }
+
+    private void ShippingSupplys_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+    {
+        if (e.EditAction == DataGridEditAction.Commit &&
+            e.Row.Item is ShippingSupplyEntry item)
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                _ = _hub.ShippingSupplys.UpsertAsync(item);
                 Touch();
             });
         }
@@ -315,15 +610,23 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void PdfDelete_Click(object sender, RoutedEventArgs e)
     {
-        if (PdfFileList.SelectedItem is not string selected) return;
+        var selectedFiles = PdfFileGrid.SelectedItems
+            .Cast<PdfFileRow>()
+            .Select(r => r.Name)
+            .ToList();
+
+        if (selectedFiles.Count == 0 && PdfFileGrid.SelectedItem is PdfFileRow one)
+            selectedFiles.Add(one.Name);
+
+        if (selectedFiles.Count == 0) return;
 
         var folder = _hub.PdfFolder.CurrentFolder;
         if (string.IsNullOrEmpty(folder)) return;
 
-        var fullPath = Path.Combine(folder, selected);
-
         var confirm = MessageBox.Show(
-            $"Permanently delete '{selected}'?",
+            selectedFiles.Count == 1
+                ? $"Permanently delete '{selectedFiles[0]}'?"
+                : $"Permanently delete {selectedFiles.Count} selected PDFs?",
             "Delete PDF",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
@@ -332,8 +635,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         try
         {
-            File.Delete(fullPath);
-            StatusText = $"Deleted: {selected}";
+            foreach (var selected in selectedFiles)
+            {
+                var fullPath = Path.Combine(folder, selected);
+                if (File.Exists(fullPath))
+                    File.Delete(fullPath);
+            }
+            StatusText = selectedFiles.Count == 1
+                ? $"Deleted: {selectedFiles[0]}"
+                : $"Deleted {selectedFiles.Count} PDFs";
         }
         catch (Exception ex)
         {
@@ -343,11 +653,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private async void PdfScale_Click(object sender, RoutedEventArgs e)
     {
-        if (PdfFileList.SelectedItem is not string selected)
+        if (PdfFileGrid.SelectedItem is not PdfFileRow selectedRow)
         {
             StatusText = "Select a PDF in the list first.";
             return;
         }
+
+        var selected = selectedRow.Name;
 
         var folder = _hub.PdfFolder.CurrentFolder;
         if (string.IsNullOrEmpty(folder)) return;

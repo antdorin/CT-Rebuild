@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Text.RegularExpressions;
 
 namespace CTHub.Services;
 
@@ -14,6 +15,9 @@ public sealed class PdfFolderService : IDisposable
 
     /// <summary>Filename-only list (not full paths), UI-thread-safe via Dispatcher.</summary>
     public ObservableCollection<string> FileNames { get; } = new();
+
+    /// <summary>Rows for desktop grid: filename + parsed sales order + import timestamp.</summary>
+    public ObservableCollection<PdfFileRow> FileRows { get; } = new();
 
     /// <summary>Raised on the thread-pool when the file list changes.</summary>
     public event Action? FilesChanged;
@@ -50,30 +54,60 @@ public sealed class PdfFolderService : IDisposable
             ? Directory.GetFiles(_folder, "*", SearchOption.TopDirectoryOnly)
                        .Where(f => f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)
                                 || f.EndsWith(".nl",  StringComparison.OrdinalIgnoreCase))
-                       .Select(Path.GetFileName)
-                       .Where(f => f is not null)
-                       .OrderBy(f => f)
+                       .Select(f => new FileInfo(f))
+                       .Where(fi => fi.Exists)
+                       .OrderBy(fi => fi.Name, StringComparer.OrdinalIgnoreCase)
                        .ToList()
-            : new List<string?>();
+            : new List<FileInfo>();
 
         // Update on the UI thread if a dispatcher is available
         var dispatcher = System.Windows.Application.Current?.Dispatcher;
         if (dispatcher != null && !dispatcher.CheckAccess())
         {
-            dispatcher.Invoke(() => SyncList(files!));
+            dispatcher.Invoke(() => SyncList(files));
         }
         else
         {
-            SyncList(files!);
+            SyncList(files);
         }
 
         FilesChanged?.Invoke();
     }
 
-    private void SyncList(IList<string> files)
+    private void SyncList(IList<FileInfo> files)
     {
         FileNames.Clear();
-        foreach (var f in files) FileNames.Add(f);
+        FileRows.Clear();
+
+        foreach (var fi in files)
+        {
+            FileNames.Add(fi.Name);
+            FileRows.Add(new PdfFileRow(
+                fi.Name,
+                ExtractSalesOrders(fi.Name),
+                fi.LastWriteTime));
+        }
+    }
+
+    private static string ExtractSalesOrders(string fileName)
+    {
+        var baseName = Path.GetFileNameWithoutExtension(fileName);
+        if (string.IsNullOrWhiteSpace(baseName)) return string.Empty;
+
+        var soMatches = Regex.Matches(baseName, @"\bSO[-_ ]?\d{4,}\b", RegexOptions.IgnoreCase)
+            .Select(m => m.Value.Replace("_", "-").Replace(" ", "").ToUpperInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (soMatches.Count > 0)
+            return string.Join(", ", soMatches);
+
+        var numeric = Regex.Matches(baseName, @"\b\d{5,}\b")
+            .Select(m => m.Value)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return numeric.Count > 0 ? string.Join(", ", numeric) : string.Empty;
     }
 
     private void SetupWatcher(string folderPath)
@@ -112,6 +146,9 @@ public sealed class PdfFolderService : IDisposable
             .ToList();
     }
 }
+
+/// <summary>Desktop PDF row with metadata extracted from the source folder file.</summary>
+public sealed record PdfFileRow(string Name, string SalesOrders, DateTime ImportDateTime);
 
 /// <summary>Filename + UTC last-modified timestamp for a single PDF.</summary>
 public sealed record PdfFileMeta(string Name, string Modified);
