@@ -246,9 +246,7 @@ struct AssignedItemModal: View {
         if let catalogLink {
             Task {
                 try? await HubClient.shared.deleteCatalogLink(id: catalogLink.id)
-                await MainActor.run {
-                    Task { await ScanStore.shared.refreshLinksFromBackend() }
-                }
+                await ScanStore.shared.refreshLinksFromBackend()
             }
         }
         isHoldingDelete = false

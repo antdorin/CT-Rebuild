@@ -160,8 +160,8 @@ final class ScanStore: ObservableObject {
             upsertLocalLink(from: saved)
         } catch {
             enqueuePending(payload)
-            upsertLocalLink(
-                CatalogLinkRecord(
+            upsertLocalCacheEntry(
+                CatalogLinkCacheEntry(
                     id: payload.id,
                     sourceCatalog: payload.sourceCatalog,
                     sourceItemId: payload.sourceItemId,
@@ -273,8 +273,7 @@ final class ScanStore: ObservableObject {
     }
 
     private func upsertLocalLink(from record: CatalogLinkRecord) {
-        catalogLinks.removeAll { $0.scannedCode == record.scannedCode || $0.id == record.id }
-        catalogLinks.append(
+        upsertLocalCacheEntry(
             CatalogLinkCacheEntry(
                 id: record.id,
                 sourceCatalog: record.sourceCatalog,
@@ -285,6 +284,11 @@ final class ScanStore: ObservableObject {
                 createdAtUtc: record.createdAtUtc
             )
         )
+    }
+
+    private func upsertLocalCacheEntry(_ entry: CatalogLinkCacheEntry) {
+        catalogLinks.removeAll { $0.scannedCode == entry.scannedCode || $0.id == entry.id }
+        catalogLinks.append(entry)
         saveLinkCache()
     }
 

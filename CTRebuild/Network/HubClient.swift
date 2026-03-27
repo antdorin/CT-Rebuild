@@ -164,18 +164,21 @@ final class HubClient: ObservableObject {
             await MainActor.run { self.wsTask = task }
             task.resume()
             self.reconnectDelay = 2
-            task.sendPing { [weak self] error in
-                guard let self else { return }
-                DispatchQueue.main.async {
+            task.sendPing { error in
+                Task { @MainActor in
                     if let error {
-                        self.connectionDiag = "WS ping failed: \(error.localizedDescription)"
-                        self.isConnected = false
+                        HubClient.shared.connectionDiag = "WS ping failed: \(error.localizedDescription)"
+                        HubClient.shared.isConnected = false
                     } else {
-                        self.connectionDiag = "Connected ✓"
-                        self.isConnected = true
+                        HubClient.shared.connectionDiag = "Connected ✓"
+                        HubClient.shared.isConnected = true
                     }
                 }
-                if error != nil { self.scheduleReconnect() }
+                if error != nil {
+                    Task { @MainActor in
+                        HubClient.shared.scheduleReconnect()
+                    }
+                }
             }
             self.receive(task: task)
         }

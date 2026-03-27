@@ -72,7 +72,7 @@ enum HubDiscovery {
             dest.sin_port        = probeTargetPort.bigEndian
             dest.sin_addr.s_addr = UInt32(0xFFFFFFFF).bigEndian // 255.255.255.255
             let probe = Array("CT-DISCOVER".utf8)
-            withUnsafePointer(to: &dest) {
+            _ = withUnsafePointer(to: &dest) {
                 $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { ptr in
                     sendto(sendSock, probe, probe.count, 0,
                            ptr, socklen_t(MemoryLayout<sockaddr_in>.size))
