@@ -68,6 +68,7 @@ struct PdfDateGroup: Identifiable, Equatable {
     let soLabel: String     // e.g. "SO-01-0001 – SO-01-0024" (from filenames)
     let sortDate: Date
     let filenames: [String]
+    let sourceCatalog: SourceCatalog?
     static func == (l: Self, r: Self) -> Bool { l.id == r.id }
 }
 
@@ -112,7 +113,11 @@ private func groupFiles(_ metas: [PdfMeta]) -> [PdfDateGroup] {
                                 dateLabel: v.0 == .distantPast ? "No Date" : df.string(from: v.0),
                                 soLabel: soLabel,
                                 sortDate: v.0,
-                                filenames: filenames)
+                                filenames: filenames,
+                                sourceCatalog: v.1.compactMap { meta in
+                                    guard let raw = meta.sourceCatalog else { return nil }
+                                    return SourceCatalog(rawValue: raw)
+                                }.first)
         }
         .sorted { $0.sortDate > $1.sortDate }
 }
@@ -405,6 +410,18 @@ struct PdfBrowserView: View {
         do {
             let doc = try await downloadAndMerge(group)
             readerCache.load(filenames: group.filenames)
+            if let sourceCatalog = group.sourceCatalog {
+                await MainActor.run { ScanStore.shared.setActiveTicketCatalog(sourceCatalog) }
+            } else {
+                do {
+                    let context = try await HubClient.shared.fetchPdfContext()
+                    if let parsed = SourceCatalog(rawValue: context.sourceCatalog) {
+                        await MainActor.run { ScanStore.shared.setActiveTicketCatalog(parsed) }
+                    }
+                } catch {
+                    // keep current context when context endpoint is unavailable
+                }
+            }
             withAnimation(.easeInOut(duration: 0.22)) {
                 mergedDoc = doc
                 openedGroup = group

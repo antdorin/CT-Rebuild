@@ -1,9 +1,10 @@
 import SwiftUI
 
-// Presented when the scanner sees a barcode the system already has a record for.
+// Presented when a scanned barcode already resolves to an assignment.
 struct AssignedItemModal: View {
 
-    let record: BarcodeRecord
+    let record: BarcodeRecord?
+    let catalogLink: CatalogLinkCacheEntry?
     var onDismiss: () -> Void
 
     // Hold-to-delete state
@@ -15,19 +16,32 @@ struct AssignedItemModal: View {
     @State private var showRelinkEntry = false
     @State private var relinkBarcode: String = ""
 
+    private var titleText: String {
+        record != nil ? "Assigned Item" : "Linked Catalog Item"
+    }
+
+    private var heroCode: String {
+        if let record { return record.id }
+        return catalogLink?.linkCode ?? "LINK"
+    }
+
+    private var scannedBarcode: String {
+        if let record { return record.rawBarcode }
+        return catalogLink?.scannedCode ?? ""
+    }
+
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
 
-                    // ── QR Code hero ──────────────────────────────────────────
                     HStack {
                         Spacer()
                         VStack(spacing: 6) {
-                            Text(record.id)
-                                .font(.system(size: 44, weight: .bold, design: .monospaced))
+                            Text(heroCode)
+                                .font(.system(size: 40, weight: .bold, design: .monospaced))
                                 .foregroundColor(.primary)
-                            Text("System QR Code")
+                            Text(record != nil ? "System QR Code" : "Catalog Link")
                                 .font(.system(size: 11, weight: .regular, design: .monospaced))
                                 .foregroundColor(.secondary)
                         }
@@ -36,30 +50,41 @@ struct AssignedItemModal: View {
                     .padding(.vertical, 16)
                     .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
 
-                    // ── Details grid ──────────────────────────────────────────
                     VStack(spacing: 0) {
-                        detailRow(label: "Item Name",    value: record.itemName)
-                        Divider().padding(.leading, 16)
-                        detailRow(label: "Bin Location", value: record.binLocation)
-                        Divider().padding(.leading, 16)
-                        detailRow(label: "Class",        value: record.classCode)
-                        Divider().padding(.leading, 16)
-                        detailRow(label: "Quantity",     value: "\(record.quantity)")
-                        if let sc = record.linkedSpeedCell {
+                        if let record {
+                            detailRow(label: "Item Name", value: record.itemName)
                             Divider().padding(.leading, 16)
-                            detailRow(label: "Speed Cell", value: sc)
-                        }
-                        if let th = record.linkedToughHook {
+                            detailRow(label: "Bin Location", value: record.binLocation)
                             Divider().padding(.leading, 16)
-                            detailRow(label: "Tough Hook", value: th)
+                            detailRow(label: "Class", value: record.classCode)
+                            Divider().padding(.leading, 16)
+                            detailRow(label: "Quantity", value: "\(record.quantity)")
+                            if let sc = record.linkedSpeedCell {
+                                Divider().padding(.leading, 16)
+                                detailRow(label: "Speed Cell", value: sc)
+                            }
+                            if let th = record.linkedToughHook {
+                                Divider().padding(.leading, 16)
+                                detailRow(label: "Tough Hook", value: th)
+                            }
                         }
+
+                        if let link = catalogLink {
+                            detailRow(label: "Source", value: link.sourceCatalog.displayName)
+                            Divider().padding(.leading, 16)
+                            detailRow(label: "Catalog Item", value: link.sourceItemLabelSnapshot)
+                                .lineLimit(2)
+                            Divider().padding(.leading, 16)
+                            detailRow(label: "Source Item ID", value: link.sourceItemId)
+                                .font(.system(size: 11, design: .monospaced))
+                        }
+
                         Divider().padding(.leading, 16)
-                        detailRow(label: "Raw Barcode",  value: record.rawBarcode)
+                        detailRow(label: "Raw Barcode", value: scannedBarcode)
                             .font(.system(size: 11, design: .monospaced))
                     }
                     .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
 
-                    // ── Relink ─────────────────────────────────────────────────
                     Button {
                         withAnimation { showRelinkEntry.toggle() }
                     } label: {
@@ -79,16 +104,15 @@ struct AssignedItemModal: View {
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.secondary)
                             HStack(spacing: 10) {
-                                TextField("Scan or type barcode…", text: $relinkBarcode)
+                                TextField("Scan or type barcode...", text: $relinkBarcode)
                                     .textFieldStyle(.plain)
                                     .padding(.horizontal, 14)
                                     .padding(.vertical, 11)
                                     .background(Color(.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
                                 Button("Save") {
-                                    guard !relinkBarcode.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-                                    ScanStore.shared.relink(id: record.id, to: relinkBarcode)
-                                    UINotificationFeedbackGenerator().notificationOccurred(.success)
-                                    onDismiss()
+                                    Task {
+                                        await saveRelink()
+                                    }
                                 }
                                 .disabled(relinkBarcode.trimmingCharacters(in: .whitespaces).isEmpty)
                                 .fontWeight(.semibold)
@@ -101,23 +125,19 @@ struct AssignedItemModal: View {
                         .transition(.opacity.combined(with: .move(edge: .top)))
                     }
 
-                    // ── Hold-to-delete ─────────────────────────────────────────
                     VStack(spacing: 8) {
                         ZStack(alignment: .leading) {
-                            // Track
                             RoundedRectangle(cornerRadius: 10)
                                 .fill(Color.red.opacity(0.15))
                                 .frame(height: 50)
-                            // Fill bar
                             RoundedRectangle(cornerRadius: 10)
                                 .fill(Color.red.opacity(0.35))
                                 .frame(width: deleteProgress * (UIScreen.main.bounds.width - 40), height: 50)
                                 .animation(.linear(duration: 0.05), value: deleteProgress)
-                            // Label
                             HStack {
                                 Spacer()
                                 Label(
-                                    isHoldingDelete ? "Keep holding…" : "Hold 2s to Delete",
+                                    isHoldingDelete ? "Keep holding..." : "Hold 2s to Delete",
                                     systemImage: "trash"
                                 )
                                 .font(.system(size: 15, weight: .semibold))
@@ -128,7 +148,7 @@ struct AssignedItemModal: View {
                         .gesture(
                             DragGesture(minimumDistance: 0)
                                 .onChanged { _ in startDeleteHold() }
-                                .onEnded   { _ in cancelDeleteHold() }
+                                .onEnded { _ in cancelDeleteHold() }
                         )
 
                         Text("Record will be permanently deleted. This cannot be undone.")
@@ -143,7 +163,7 @@ struct AssignedItemModal: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 20)
             }
-            .navigationTitle("Assigned Item")
+            .navigationTitle(titleText)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -152,8 +172,6 @@ struct AssignedItemModal: View {
             }
         }
     }
-
-    // MARK: - Helpers
 
     private func detailRow(label: String, value: String) -> some View {
         HStack {
@@ -170,12 +188,10 @@ struct AssignedItemModal: View {
         .padding(.vertical, 11)
     }
 
-    // MARK: - Hold-to-delete logic
-
     private func startDeleteHold() {
         guard !isHoldingDelete else { return }
         isHoldingDelete = true
-        deleteProgress  = 0
+        deleteProgress = 0
 
         let start = Date()
         let duration: TimeInterval = 2.0
@@ -198,9 +214,43 @@ struct AssignedItemModal: View {
         isHoldingDelete = false
     }
 
+    @MainActor
+    private func saveRelink() async {
+        let trimmed = relinkBarcode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        if let record {
+            ScanStore.shared.relink(id: record.id, to: trimmed)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            onDismiss()
+            return
+        }
+
+        if let catalogLink {
+            do {
+                try await ScanStore.shared.relinkCatalogEntry(catalogLink, to: trimmed)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                onDismiss()
+            } catch {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                onDismiss()
+            }
+        }
+    }
+
     private func commitDelete() {
         UINotificationFeedbackGenerator().notificationOccurred(.warning)
-        ScanStore.shared.delete(id: record.id)
+        if let record {
+            ScanStore.shared.delete(id: record.id)
+        }
+        if let catalogLink {
+            Task {
+                try? await HubClient.shared.deleteCatalogLink(id: catalogLink.id)
+                await MainActor.run {
+                    Task { await ScanStore.shared.refreshLinksFromBackend() }
+                }
+            }
+        }
         isHoldingDelete = false
         onDismiss()
     }

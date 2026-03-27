@@ -128,6 +128,20 @@ public sealed class PdfFolderService : IDisposable
 
     public void Dispose() => _watcher?.Dispose();
 
+    public string GetActiveSourceCatalog()
+    {
+        if (string.IsNullOrWhiteSpace(_folder)) return "chase_tactical";
+
+        var folderName = Path.GetFileName(_folder);
+        if (string.IsNullOrWhiteSpace(folderName)) return "chase_tactical";
+
+        if (folderName.Contains("tough hook", StringComparison.OrdinalIgnoreCase)
+            || folderName.Contains("toughhook", StringComparison.OrdinalIgnoreCase))
+            return "tough_hook";
+
+        return "chase_tactical";
+    }
+
     // ── Metadata ──────────────────────────────────────────────────────────────
 
     /// Returns filename + last-modified (UTC ISO 8601) for each PDF in the folder.
@@ -136,13 +150,15 @@ public sealed class PdfFolderService : IDisposable
         if (string.IsNullOrEmpty(_folder) || !Directory.Exists(_folder))
             return Array.Empty<PdfFileMeta>();
 
+        var sourceCatalog = GetActiveSourceCatalog();
+
         return Directory.GetFiles(_folder, "*", SearchOption.TopDirectoryOnly)
             .Where(f => f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)
                      || f.EndsWith(".nl",  StringComparison.OrdinalIgnoreCase))
             .Select(f => new FileInfo(f))
             .Where(fi => fi.Exists)
             .OrderBy(fi => fi.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(fi => new PdfFileMeta(fi.Name, fi.LastWriteTimeUtc.ToString("o")))
+            .Select(fi => new PdfFileMeta(fi.Name, fi.LastWriteTimeUtc.ToString("o"), sourceCatalog))
             .ToList();
     }
 }
@@ -151,4 +167,4 @@ public sealed class PdfFolderService : IDisposable
 public sealed record PdfFileRow(string Name, string SalesOrders, DateTime ImportDateTime);
 
 /// <summary>Filename + UTC last-modified timestamp for a single PDF.</summary>
-public sealed record PdfFileMeta(string Name, string Modified);
+public sealed record PdfFileMeta(string Name, string Modified, string SourceCatalog);

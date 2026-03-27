@@ -13,6 +13,7 @@ struct CTRebuildApp: App {
         // Auto-connect WebSocket if an active URL is already saved
         if !HubClient.shared.activeBaseURL.isEmpty {
             HubClient.shared.connect()
+            Task { await ScanStore.shared.bootstrapLinkSync() }
         }
     }
 

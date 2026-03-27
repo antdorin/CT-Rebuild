@@ -13,6 +13,21 @@ struct BarcodeRecord: Codable, Identifiable, Equatable {
     var linkedToughHook: String?
 }
 
+struct CatalogLinkCacheEntry: Codable, Identifiable, Equatable {
+    var id: String
+    var sourceCatalog: SourceCatalog
+    var sourceItemId: String
+    var sourceItemLabelSnapshot: String
+    var scannedCode: String
+    var linkCode: String
+    var createdAtUtc: String
+}
+
+private struct PendingLinkWrite: Codable, Identifiable {
+    var id: String
+    var payload: CatalogLinkPayload
+}
+
 // MARK: - ScanStore
 
 /// Shared source of truth for all assigned barcodes.
@@ -22,6 +37,8 @@ final class ScanStore: ObservableObject {
     static let shared = ScanStore()
 
     @Published private(set) var records: [BarcodeRecord] = []
+    @Published private(set) var catalogLinks: [CatalogLinkCacheEntry] = []
+    @Published private(set) var activeTicketCatalog: SourceCatalog = .chaseTactical
 
     private let fileURL: URL = {
         FileManager.default
@@ -29,12 +46,44 @@ final class ScanStore: ObservableObject {
             .appendingPathComponent("scan_records.json")
     }()
 
-    private init() { load() }
+    private let linkFileURL: URL = {
+        FileManager.default
+            .urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("catalog_links_cache.json")
+    }()
+
+    private let pendingWritesURL: URL = {
+        FileManager.default
+            .urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("catalog_link_pending_writes.json")
+    }()
+
+    private var pendingWrites: [PendingLinkWrite] = []
+
+    private init() {
+        load()
+        loadLinkCache()
+        loadPendingWrites()
+        loadActiveCatalogPreference()
+    }
 
     // MARK: - Lookup
 
     func record(for barcode: String) -> BarcodeRecord? {
         records.first { $0.rawBarcode == barcode }
+    }
+
+    func catalogLink(for barcode: String) -> CatalogLinkCacheEntry? {
+        catalogLinks.first { $0.scannedCode == barcode }
+    }
+
+    func isAssigned(barcode: String) -> Bool {
+        record(for: barcode) != nil || catalogLink(for: barcode) != nil
+    }
+
+    func setActiveTicketCatalog(_ sourceCatalog: SourceCatalog) {
+        activeTicketCatalog = sourceCatalog
+        UserDefaults.standard.set(sourceCatalog.rawValue, forKey: "activeTicketCatalog")
     }
 
     // MARK: - QR Code Generation
@@ -53,8 +102,10 @@ final class ScanStore: ObservableObject {
 
     func assign(_ record: BarcodeRecord) {
         records.removeAll { $0.rawBarcode == record.rawBarcode }
+        catalogLinks.removeAll { $0.scannedCode == record.rawBarcode }
         records.append(record)
         save()
+        saveLinkCache()
     }
 
     /// Re-points an existing QR code record to a different raw barcode.
@@ -70,6 +121,96 @@ final class ScanStore: ObservableObject {
         save()
     }
 
+    @MainActor
+    func refreshLinksFromBackend() async {
+        do {
+            let remote = try await HubClient.shared.fetchCatalogLinks().map {
+                CatalogLinkCacheEntry(
+                    id: $0.id,
+                    sourceCatalog: $0.sourceCatalog,
+                    sourceItemId: $0.sourceItemId,
+                    sourceItemLabelSnapshot: $0.sourceItemLabelSnapshot,
+                    scannedCode: $0.scannedCode,
+                    linkCode: $0.linkCode,
+                    createdAtUtc: $0.createdAtUtc
+                )
+            }
+            catalogLinks = remote
+            saveLinkCache()
+            await flushPendingWrites()
+        } catch {
+            // keep local cache when offline
+        }
+    }
+
+    @MainActor
+    func linkBarcodeToCatalog(scannedCode: String, item: CatalogSearchItem) async throws {
+        let payload = CatalogLinkPayload(
+            id: UUID().uuidString,
+            sourceCatalog: item.sourceCatalog,
+            sourceItemId: item.sourceItemId,
+            sourceItemLabelSnapshot: "\(item.label) | \(item.subtitle)",
+            scannedCode: scannedCode,
+            linkCode: "",
+            createdAtUtc: ISO8601DateFormatter().string(from: Date())
+        )
+
+        do {
+            let saved = try await HubClient.shared.upsertCatalogLink(payload)
+            upsertLocalLink(from: saved)
+        } catch {
+            enqueuePending(payload)
+            upsertLocalLink(
+                CatalogLinkRecord(
+                    id: payload.id,
+                    sourceCatalog: payload.sourceCatalog,
+                    sourceItemId: payload.sourceItemId,
+                    sourceItemLabelSnapshot: payload.sourceItemLabelSnapshot,
+                    scannedCode: payload.scannedCode,
+                    linkCode: payload.linkCode.isEmpty ? "PENDING" : payload.linkCode,
+                    createdAtUtc: payload.createdAtUtc
+                )
+            )
+            throw error
+        }
+    }
+
+    @MainActor
+    func relinkCatalogEntry(_ link: CatalogLinkCacheEntry, to newBarcode: String) async throws {
+        let payload = CatalogLinkPayload(
+            id: UUID().uuidString,
+            sourceCatalog: link.sourceCatalog,
+            sourceItemId: link.sourceItemId,
+            sourceItemLabelSnapshot: link.sourceItemLabelSnapshot,
+            scannedCode: newBarcode,
+            linkCode: "",
+            createdAtUtc: ISO8601DateFormatter().string(from: Date())
+        )
+
+        do {
+            try await HubClient.shared.deleteCatalogLink(id: link.id)
+            let saved = try await HubClient.shared.upsertCatalogLink(payload)
+            catalogLinks.removeAll { $0.id == link.id }
+            upsertLocalLink(from: saved)
+        } catch {
+            enqueuePending(payload)
+            throw error
+        }
+    }
+
+    @MainActor
+    func bootstrapLinkSync() async {
+        await refreshLinksFromBackend()
+        do {
+            let context = try await HubClient.shared.fetchPdfContext()
+            if let parsed = SourceCatalog(rawValue: context.sourceCatalog) {
+                setActiveTicketCatalog(parsed)
+            }
+        } catch {
+            // keep prior context if context fetch fails
+        }
+    }
+
     // MARK: - Persistence
 
     private func load() {
@@ -82,5 +223,75 @@ final class ScanStore: ObservableObject {
     private func save() {
         guard let data = try? JSONEncoder().encode(records) else { return }
         try? data.write(to: fileURL, options: .atomic)
+    }
+
+    private func loadLinkCache() {
+        guard let data = try? Data(contentsOf: linkFileURL),
+              let decoded = try? JSONDecoder().decode([CatalogLinkCacheEntry].self, from: data)
+        else { return }
+        catalogLinks = decoded
+    }
+
+    private func saveLinkCache() {
+        guard let data = try? JSONEncoder().encode(catalogLinks) else { return }
+        try? data.write(to: linkFileURL, options: .atomic)
+    }
+
+    private func loadPendingWrites() {
+        guard let data = try? Data(contentsOf: pendingWritesURL),
+              let decoded = try? JSONDecoder().decode([PendingLinkWrite].self, from: data)
+        else { return }
+        pendingWrites = decoded
+    }
+
+    private func savePendingWrites() {
+        guard let data = try? JSONEncoder().encode(pendingWrites) else { return }
+        try? data.write(to: pendingWritesURL, options: .atomic)
+    }
+
+    private func enqueuePending(_ payload: CatalogLinkPayload) {
+        pendingWrites.append(PendingLinkWrite(id: UUID().uuidString, payload: payload))
+        savePendingWrites()
+    }
+
+    @MainActor
+    private func flushPendingWrites() async {
+        guard !pendingWrites.isEmpty else { return }
+
+        var remaining: [PendingLinkWrite] = []
+        for pending in pendingWrites {
+            do {
+                let saved = try await HubClient.shared.upsertCatalogLink(pending.payload)
+                upsertLocalLink(from: saved)
+            } catch {
+                remaining.append(pending)
+            }
+        }
+
+        pendingWrites = remaining
+        savePendingWrites()
+    }
+
+    private func upsertLocalLink(from record: CatalogLinkRecord) {
+        catalogLinks.removeAll { $0.scannedCode == record.scannedCode || $0.id == record.id }
+        catalogLinks.append(
+            CatalogLinkCacheEntry(
+                id: record.id,
+                sourceCatalog: record.sourceCatalog,
+                sourceItemId: record.sourceItemId,
+                sourceItemLabelSnapshot: record.sourceItemLabelSnapshot,
+                scannedCode: record.scannedCode,
+                linkCode: record.linkCode,
+                createdAtUtc: record.createdAtUtc
+            )
+        )
+        saveLinkCache()
+    }
+
+    private func loadActiveCatalogPreference() {
+        guard let raw = UserDefaults.standard.string(forKey: "activeTicketCatalog"),
+              let catalog = SourceCatalog(rawValue: raw)
+        else { return }
+        activeTicketCatalog = catalog
     }
 }

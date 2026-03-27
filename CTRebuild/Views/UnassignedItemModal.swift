@@ -13,7 +13,12 @@ struct UnassignedItemModal: View {
     @State private var itemName: String = ""
 
     @State private var showValidationError = false
-    @State private var selectedExistingId: String = ""
+    @State private var catalogSearchText: String = ""
+    @State private var selectedCatalogItem: CatalogSearchItem? = nil
+    @State private var allCatalogItems: [CatalogSearchItem] = []
+    @State private var isLoadingCatalog = false
+    @State private var catalogError: String? = nil
+    @State private var showAllCatalogs = false
     @ObservedObject private var scanStore = ScanStore.shared
 
     private let classes = (65...90).map { String(UnicodeScalar($0)!) }  // A–Z
@@ -158,58 +163,126 @@ struct UnassignedItemModal: View {
 
                     // ── Divider ────────────────────────────────────────────────
                     Divider().padding(.vertical, 4)
-                    Text("— Or Link to Existing Inventory Item —")
+                    Text("Or Link Existing Catalog Item")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.accentColor)
                         .frame(maxWidth: .infinity, alignment: .center)
 
-                    // ── Existing Item Picker ───────────────────────────────────
-                    fieldLabel("Select Existing Item")
-                    if scanStore.records.isEmpty {
-                        Text("No assigned items yet.")
-                            .font(.system(size: 14))
+                    fieldLabel("Active Catalog Context")
+                    HStack(spacing: 8) {
+                        Text(scanStore.activeTicketCatalog.displayName)
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .foregroundColor(.primary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(Color(.secondarySystemBackground), in: Capsule())
+
+                        Spacer()
+
+                        Toggle("All", isOn: $showAllCatalogs)
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                        Text("Search all catalogs")
+                            .font(.system(size: 11))
                             .foregroundColor(.secondary)
+                    }
+
+                    fieldLabel("Catalog Search")
+                    TextField("Search by label, ID, SKU, or bin", text: $catalogSearchText)
+                        .textFieldStyle(.plain)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+
+                    if isLoadingCatalog {
+                        HStack {
+                            ProgressView()
+                            Text("Loading catalog items...")
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+                    } else if let catalogError {
+                        Text(catalogError)
+                            .font(.system(size: 12))
+                            .foregroundColor(.red)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 12)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
                     } else {
-                        Menu {
-                            ForEach(scanStore.records) { record in
-                                Button("\(record.id) \u{00B7} \(record.itemName)") {
-                                    selectedExistingId = record.id
-                                }
-                            }
-                        } label: {
-                            HStack {
-                                if selectedExistingId.isEmpty {
-                                    Text("\u{2014} Select Item \u{2014}")
-                                        .foregroundColor(Color(.placeholderText))
-                                } else if let rec = scanStore.records.first(where: { $0.id == selectedExistingId }) {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(rec.id)
-                                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                                        Text(rec.itemName)
-                                            .font(.system(size: 12))
-                                            .foregroundColor(.secondary)
+                        let options = filteredCatalogItems.prefix(40)
+                        if options.isEmpty {
+                            Text("No matching catalog items in the selected context.")
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+                        } else {
+                            ScrollView {
+                                VStack(spacing: 8) {
+                                    ForEach(options) { item in
+                                        Button {
+                                            selectedCatalogItem = item
+                                        } label: {
+                                            HStack(spacing: 10) {
+                                                Circle()
+                                                    .fill(selectedCatalogItem?.id == item.id ? Color.accentColor : Color.secondary.opacity(0.4))
+                                                    .frame(width: 8, height: 8)
+
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text(item.label)
+                                                        .font(.system(size: 13, weight: .semibold))
+                                                        .foregroundColor(.primary)
+                                                        .lineLimit(1)
+
+                                                    Text(item.subtitle)
+                                                        .font(.system(size: 11, design: .monospaced))
+                                                        .foregroundColor(.secondary)
+                                                        .lineLimit(1)
+                                                }
+                                                Spacer()
+                                            }
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 10)
+                                            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+                                        }
+                                        .buttonStyle(.plain)
                                     }
                                 }
-                                Spacer()
-                                Image(systemName: "chevron.up.chevron.down")
-                                    .foregroundColor(.secondary)
-                                    .font(.system(size: 12))
                             }
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 12)
-                            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+                            .frame(maxHeight: 220)
                         }
                     }
 
-                    // ── Link to inventory button ───────────────────────────────
+                    if let selectedCatalogItem {
+                        HStack {
+                            Text("Selected")
+                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                .foregroundColor(.accentColor)
+                            Text(selectedCatalogItem.subtitle)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+                    }
+
                     Button {
-                        applyInventoryLink()
+                        Task {
+                            await applyCatalogLink()
+                        }
                     } label: {
-                        Text("Link Barcode to Selected Item")
+                        Text("Link Barcode to Selected Catalog Item")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.accentColor)
                             .frame(maxWidth: .infinity)
@@ -217,9 +290,16 @@ struct UnassignedItemModal: View {
                             .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor.opacity(0.5), lineWidth: 1))
                     }
+                    .disabled(selectedCatalogItem == nil)
 
                     if showValidationError {
                         Text("Class and Bin Location are required.")
+                            .font(.system(size: 12))
+                            .foregroundColor(.red)
+                    }
+
+                    if let catalogError {
+                        Text(catalogError)
                             .font(.system(size: 12))
                             .foregroundColor(.red)
                     }
@@ -228,6 +308,12 @@ struct UnassignedItemModal: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 20)
+            }
+            .onAppear {
+                Task {
+                    await scanStore.refreshLinksFromBackend()
+                    await loadCatalogData()
+                }
             }
             .navigationTitle("Unassigned Item")
             .navigationBarTitleDisplayMode(.inline)
@@ -242,6 +328,23 @@ struct UnassignedItemModal: View {
                     Button("Cancel") { onDismiss() }
                 }
             }
+        }
+    }
+
+    private var filteredCatalogItems: [CatalogSearchItem] {
+        var base = allCatalogItems
+        if !showAllCatalogs {
+            base = base.filter { $0.sourceCatalog == scanStore.activeTicketCatalog }
+        }
+
+        let q = catalogSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return base }
+
+        return base.filter {
+            $0.label.localizedCaseInsensitiveContains(q)
+            || $0.sourceItemId.localizedCaseInsensitiveContains(q)
+            || $0.subtitle.localizedCaseInsensitiveContains(q)
+            || $0.bin.localizedCaseInsensitiveContains(q)
         }
     }
 
@@ -274,11 +377,59 @@ struct UnassignedItemModal: View {
         onDismiss()
     }
 
-    /// Links the scanned raw barcode to an existing assigned item.
-    private func applyInventoryLink() {
-        guard !selectedExistingId.isEmpty else { return }
-        ScanStore.shared.relink(id: selectedExistingId, to: rawBarcode)
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        onDismiss()
+    @MainActor
+    private func loadCatalogData() async {
+        isLoadingCatalog = true
+        catalogError = nil
+
+        do {
+            async let chaseItems = HubClient.shared.fetchChaseTactical()
+            async let toughHookItems = HubClient.shared.fetchToughHooks()
+
+            let chaseData = try await chaseItems
+            let toughData = try await toughHookItems
+
+            let chase = chaseData.map {
+                CatalogSearchItem(
+                    sourceCatalog: .chaseTactical,
+                    sourceItemId: $0.id,
+                    label: $0.label,
+                    subtitle: "\(SourceCatalog.chaseTactical.displayName) | Bin \($0.bin) | Class \($0.classLetter)",
+                    bin: $0.bin
+                )
+            }
+
+            let tough = toughData.map {
+                CatalogSearchItem(
+                    sourceCatalog: .toughHook,
+                    sourceItemId: $0.id,
+                    label: $0.description,
+                    subtitle: "\(SourceCatalog.toughHook.displayName) | Bin \($0.bin) | SKU \($0.sku)",
+                    bin: $0.bin
+                )
+            }
+
+            allCatalogItems = (chase + tough)
+                .sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
+        } catch {
+            catalogError = "Unable to load catalog data from CT-Hub."
+        }
+
+        isLoadingCatalog = false
+    }
+
+    @MainActor
+    private func applyCatalogLink() async {
+        guard let selectedCatalogItem else { return }
+
+        do {
+            try await scanStore.linkBarcodeToCatalog(scannedCode: rawBarcode, item: selectedCatalogItem)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            onDismiss()
+        } catch {
+            // Link was cached locally and queued when offline.
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            onDismiss()
+        }
     }
 }

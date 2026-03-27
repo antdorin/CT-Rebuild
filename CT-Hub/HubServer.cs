@@ -32,6 +32,7 @@ public sealed class HubServer
     public readonly JsonStore<ToughHookEntry>     ToughHooks;
     public readonly JsonStore<ShippingSupplyEntry> ShippingSupplys;
     public readonly JsonStore<QrClassMapping>     QrMappings;
+    public readonly JsonStore<CatalogLinkEntry>   CatalogLinks;
     public readonly PdfFolderService  PdfFolder = new();
 
     private static readonly JsonSerializerOptions _jsonOpts = new()
@@ -60,6 +61,10 @@ public sealed class HubServer
         QrMappings = new JsonStore<QrClassMapping>(
             Path.Combine(dataDir, "qr_class_mappings.json"),
             e => e.Id, WsManager, "qr_class_mappings");
+
+        CatalogLinks = new JsonStore<CatalogLinkEntry>(
+            Path.Combine(dataDir, "catalog_links.json"),
+            e => e.Id, WsManager, "catalog_links");
 
         PdfFolder.LoadSavedFolder();
     }
@@ -297,6 +302,52 @@ public sealed class HubServer
                     await QrMappings.DeleteAsync(path["/api/qr_class_mappings/".Length..]);
                     res.StatusCode = 204; break;
 
+                case ("GET", "/api/links"):
+                    await WriteJsonAsync(res, CatalogLinks.GetAll()); break;
+
+                case ("POST", "/api/links"):
+                {
+                    var linkEntry = await ReadJsonAsync<CatalogLinkEntry>(req);
+                    if (linkEntry is null || !IsValidSourceCatalog(linkEntry.SourceCatalog)
+                        || string.IsNullOrWhiteSpace(linkEntry.SourceItemId)
+                        || string.IsNullOrWhiteSpace(linkEntry.ScannedCode))
+                    {
+                        res.StatusCode = 400;
+                        break;
+                    }
+
+                    linkEntry.SourceCatalog = NormalizeSourceCatalog(linkEntry.SourceCatalog);
+                    linkEntry.SourceItemLabelSnapshot = linkEntry.SourceItemLabelSnapshot?.Trim() ?? string.Empty;
+                    linkEntry.SourceItemId = linkEntry.SourceItemId.Trim();
+                    linkEntry.ScannedCode = linkEntry.ScannedCode.Trim();
+                    linkEntry.LinkCode = string.IsNullOrWhiteSpace(linkEntry.LinkCode)
+                        ? BuildLinkCode(linkEntry.SourceCatalog)
+                        : linkEntry.LinkCode.Trim();
+                    linkEntry.CreatedAtUtc = string.IsNullOrWhiteSpace(linkEntry.CreatedAtUtc)
+                        ? DateTime.UtcNow.ToString("o")
+                        : linkEntry.CreatedAtUtc;
+
+                    // enforce one active link per scanned code while still allowing many scanned codes per source item
+                    var existing = CatalogLinks.GetAll()
+                        .Where(x => x.ScannedCode.Equals(linkEntry.ScannedCode, StringComparison.OrdinalIgnoreCase))
+                        .Select(x => x.Id)
+                        .ToList();
+
+                    foreach (var existingId in existing)
+                        await CatalogLinks.DeleteAsync(existingId);
+
+                    await CatalogLinks.UpsertAsync(linkEntry);
+                    await WriteJsonAsync(res, linkEntry);
+                    break;
+                }
+
+                case ("DELETE", _) when path.StartsWith("/api/links/"):
+                    await CatalogLinks.DeleteAsync(path["/api/links/".Length..]);
+                    res.StatusCode = 204; break;
+
+                case ("GET", "/api/pdfs/context"):
+                    await WriteJsonAsync(res, new { sourceCatalog = PdfFolder.GetActiveSourceCatalog() }); break;
+
                 // ── PDF folder listing ────────────────────────────────────
                 case ("GET", "/api/pdfs"):
                     await WriteJsonAsync(res, PdfFolder.FileNames.ToList()); break;
@@ -405,6 +456,27 @@ public sealed class HubServer
     {
         try { return await JsonSerializer.DeserializeAsync<T>(req.InputStream, _jsonOpts); }
         catch { return default; }
+    }
+
+    private static bool IsValidSourceCatalog(string? sourceCatalog)
+    {
+        if (string.IsNullOrWhiteSpace(sourceCatalog)) return false;
+        return sourceCatalog.Equals("chase_tactical", StringComparison.OrdinalIgnoreCase)
+            || sourceCatalog.Equals("tough_hook", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeSourceCatalog(string sourceCatalog)
+    {
+        return sourceCatalog.Equals("tough_hook", StringComparison.OrdinalIgnoreCase)
+            ? "tough_hook"
+            : "chase_tactical";
+    }
+
+    private static string BuildLinkCode(string sourceCatalog)
+    {
+        var prefix = sourceCatalog.Equals("tough_hook", StringComparison.OrdinalIgnoreCase) ? "T" : "C";
+        var value = Random.Shared.Next(1, 1000);
+        return $"{prefix}-{value:000}";
     }
 }
 

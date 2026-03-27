@@ -25,6 +25,7 @@ struct BottomPanelView: View {
     private let maxRecent = 20
     // Active PDF sheet
     @ObservedObject private var binStore = BinDataStore.shared
+    @ObservedObject private var scanStore = ScanStore.shared
     @State private var activePdfSheetDoc: PDFDocument? = nil
     @State private var activePdfSheetTitle: String = ""
 
@@ -226,12 +227,29 @@ struct BottomPanelView: View {
                     }
                     .frame(height: geo.size.height * 0.30)
                     .frame(maxWidth: .infinity)
+
+                    HStack(spacing: 8) {
+                        Text("CONTEXT")
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .foregroundColor(.secondary.opacity(0.6))
+                            .tracking(2)
+                        Text(scanStore.activeTicketCatalog.displayName)
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundColor(.primary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color(.secondarySystemBackground), in: Capsule())
+                        Spacer()
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, max(safeArea.bottom, 8))
                 }
             }
         }
         .onAppear {
             viewModel.requestPermission()
             viewModel.startSession()
+            Task { await scanStore.bootstrapLinkSync() }
         }
         .onDisappear {
             viewModel.stopSession()
@@ -249,8 +267,10 @@ struct BottomPanelView: View {
             // Modal only opens when the user taps a row — not automatically on scan
         }
         .sheet(item: $pendingScan) { scan in
-            if let record = ScanStore.shared.record(for: scan.value) {
-                AssignedItemModal(record: record) { pendingScan = nil }
+            if let record = scanStore.record(for: scan.value) {
+                AssignedItemModal(record: record, catalogLink: nil) { pendingScan = nil }
+            } else if let link = scanStore.catalogLink(for: scan.value) {
+                AssignedItemModal(record: nil, catalogLink: link) { pendingScan = nil }
             } else {
                 UnassignedItemModal(rawBarcode: scan.value) { pendingScan = nil }
             }
@@ -319,7 +339,7 @@ struct BottomPanelView: View {
 
     @ViewBuilder
     private func recentScanRow(scan: ScanResult) -> some View {
-        let isAssigned = ScanStore.shared.record(for: scan.value) != nil
+        let isAssigned = scanStore.isAssigned(barcode: scan.value)
         Button {
             pendingScan = scan
         } label: {

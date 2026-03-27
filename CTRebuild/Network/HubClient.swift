@@ -7,6 +7,91 @@ import Combine
 struct PdfMeta: Decodable {
     let name: String
     let modified: String   // UTC ISO 8601, e.g. "2024-01-15T10:30:00.0000000Z"
+    let sourceCatalog: String?
+
+    init(name: String, modified: String, sourceCatalog: String? = nil) {
+        self.name = name
+        self.modified = modified
+        self.sourceCatalog = sourceCatalog
+    }
+}
+
+struct PdfContext: Decodable {
+    let sourceCatalog: String
+}
+
+enum SourceCatalog: String, Codable, CaseIterable, Identifiable {
+    case chaseTactical = "chase_tactical"
+    case toughHook = "tough_hook"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .chaseTactical: return "Chase Tactical"
+        case .toughHook: return "Tough Hook"
+        }
+    }
+}
+
+struct CatalogLinkRecord: Codable, Identifiable {
+    let id: String
+    let sourceCatalog: SourceCatalog
+    let sourceItemId: String
+    let sourceItemLabelSnapshot: String
+    let scannedCode: String
+    let linkCode: String
+    let createdAtUtc: String
+}
+
+struct CatalogLinkPayload: Codable {
+    let id: String
+    let sourceCatalog: SourceCatalog
+    let sourceItemId: String
+    let sourceItemLabelSnapshot: String
+    let scannedCode: String
+    let linkCode: String
+    let createdAtUtc: String
+}
+
+struct ChaseCatalogItem: Decodable, Identifiable {
+    let id: String
+    let bin: String
+    let className: String
+    let classLetter: String
+    let classId: String
+    let label: String
+    let qty: Int
+    let notes: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case bin
+        case className
+        case classLetter
+        case classId = "class"
+        case label
+        case qty
+        case notes
+    }
+}
+
+struct ToughHookCatalogItem: Decodable, Identifiable {
+    let id: String
+    let bin: String
+    let sku: String
+    let description: String
+    let qty: Int
+}
+
+struct CatalogSearchItem: Identifiable {
+    let sourceCatalog: SourceCatalog
+    let sourceItemId: String
+    let label: String
+    let subtitle: String
+    let bin: String
+
+    var id: String { "\(sourceCatalog.rawValue):\(sourceItemId)" }
 }
 
 // MARK: - Hub Client
@@ -166,6 +251,53 @@ final class HubClient: ObservableObject {
         guard let http = response as? HTTPURLResponse, http.statusCode == 200
         else { throw HubError.serverError }
         return data
+    }
+
+    func fetchPdfContext() async throws -> PdfContext {
+        let url = try endpoint("/api/pdfs/context")
+        let (data, _) = try await URLSession.shared.data(from: url)
+        return try JSONDecoder().decode(PdfContext.self, from: data)
+    }
+
+    func fetchChaseTactical() async throws -> [ChaseCatalogItem] {
+        let url = try endpoint("/api/chasetactical")
+        let (data, _) = try await URLSession.shared.data(from: url)
+        return try JSONDecoder().decode([ChaseCatalogItem].self, from: data)
+    }
+
+    func fetchToughHooks() async throws -> [ToughHookCatalogItem] {
+        let url = try endpoint("/api/toughhooks")
+        let (data, _) = try await URLSession.shared.data(from: url)
+        return try JSONDecoder().decode([ToughHookCatalogItem].self, from: data)
+    }
+
+    func fetchCatalogLinks() async throws -> [CatalogLinkRecord] {
+        let url = try endpoint("/api/links")
+        let (data, _) = try await URLSession.shared.data(from: url)
+        return try JSONDecoder().decode([CatalogLinkRecord].self, from: data)
+    }
+
+    func upsertCatalogLink(_ payload: CatalogLinkPayload) async throws -> CatalogLinkRecord {
+        let url = try endpoint("/api/links")
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(payload)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode)
+        else { throw HubError.serverError }
+        return try JSONDecoder().decode(CatalogLinkRecord.self, from: data)
+    }
+
+    func deleteCatalogLink(id: String) async throws {
+        guard let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
+        else { throw HubError.invalidFilename }
+        let url = try endpoint("/api/links/\(encoded)")
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        let (_, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode)
+        else { throw HubError.serverError }
     }
 
     // MARK: - Helpers
