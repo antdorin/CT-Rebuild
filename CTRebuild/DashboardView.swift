@@ -11,10 +11,13 @@ enum Panel: Equatable {
 struct DashboardView: View {
     @State private var activePanel: Panel = .none
     @State private var longPressActive: Bool = false
-    private let screen = UIScreen.main.bounds
     @ObservedObject private var gestureSettings = GestureSettings.shared
     @AppStorage("panel_hapticOnChange") private var panelHapticOnChange = false
     @AppStorage("panel_dimOnOpen")       private var panelDimOnOpen = true
+    @AppStorage("panel_leftSizePercent")   private var leftSizePercent: Int = 97
+    @AppStorage("panel_rightSizePercent")  private var rightSizePercent: Int = 97
+    @AppStorage("panel_topSizePercent")    private var topSizePercent: Int = 97
+    @AppStorage("panel_bottomSizePercent") private var bottomSizePercent: Int = 97
 
     var body: some View {
         // GeometryReader ignores safe area so panels slide in from the true
@@ -50,7 +53,7 @@ struct DashboardView: View {
                 // ── Left Panel (swipe RIGHT to open) ──────────────────────────
                 if activePanel == .left {
                     panelContent(for: .left, safeArea: safe)
-                        .frame(width: screen.width * 0.97, height: screen.height)
+                        .frame(width: geo.size.width * panelFraction(leftSizePercent), height: geo.size.height)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                         .zIndex(11)
                         .transition(.move(edge: .leading))
@@ -59,7 +62,7 @@ struct DashboardView: View {
                 // ── Right Panel (swipe LEFT to open) ──────────────────────────
                 if activePanel == .right {
                     panelContent(for: .right, safeArea: safe)
-                        .frame(width: screen.width * 0.97, height: screen.height)
+                        .frame(width: geo.size.width * panelFraction(rightSizePercent), height: geo.size.height)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                         .zIndex(11)
                         .transition(.move(edge: .trailing))
@@ -68,7 +71,7 @@ struct DashboardView: View {
                 // ── Top Panel (swipe DOWN to open) ────────────────────────────
                 if activePanel == .top {
                     panelContent(for: .top, safeArea: safe)
-                        .frame(width: screen.width, height: screen.height * 0.97)
+                        .frame(width: geo.size.width, height: geo.size.height * panelFraction(topSizePercent))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         .zIndex(11)
                         .transition(.move(edge: .top))
@@ -77,7 +80,7 @@ struct DashboardView: View {
                 // ── Bottom Panel (swipe UP to open) ───────────────────────────
                 if activePanel == .bottom {
                     panelContent(for: .bottom, safeArea: safe)
-                        .frame(width: screen.width, height: screen.height * 0.97)
+                        .frame(width: geo.size.width, height: geo.size.height * panelFraction(bottomSizePercent))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                         .zIndex(11)
                         .transition(.move(edge: .bottom))
@@ -88,7 +91,7 @@ struct DashboardView: View {
             // Drag reads longPressActive to decide threshold + switch behaviour.
             // simultaneousGesture ensures close swipe fires even when child views
             // (e.g. left-panel grid) have their own DragGestures active.
-            .simultaneousGesture(dragGesture)
+            .simultaneousGesture(dragGesture(surfaceSize: geo.size))
             .simultaneousGesture(longPressHapticGesture)
             // ── Double / triple tap ───────────────────────────────────────
             .simultaneousGesture(TapGesture(count: 3).onEnded { handleTrigger(.tripleTap) })
@@ -109,6 +112,11 @@ struct DashboardView: View {
     }
 
     // MARK: - Placeholder Content
+
+    private func panelFraction(_ percent: Int) -> CGFloat {
+        let clamped = min(max(percent, 60), 100)
+        return CGFloat(clamped) / 100
+    }
 
     private func placeholderContent(safeArea: EdgeInsets) -> some View {
         VStack {
@@ -149,12 +157,12 @@ struct DashboardView: View {
     // minimumDistance: 10 — the 40 pt threshold for plain swipes is enforced
     // inside resolveSwipe so long-press+drag stays responsive at low distances.
 
-    private var dragGesture: some Gesture {
+    private func dragGesture(surfaceSize: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 10)
             .onEnded { value in
                 let wasLongPress = longPressActive
                 longPressActive = false
-                resolveSwipe(value: value, allowSwitch: wasLongPress)
+                resolveSwipe(value: value, allowSwitch: wasLongPress, surfaceSize: surfaceSize)
             }
     }
 
@@ -174,7 +182,7 @@ struct DashboardView: View {
 
     // MARK: - Shared Resolution
 
-    private func resolveSwipe(value: DragGesture.Value, allowSwitch: Bool) {
+    private func resolveSwipe(value: DragGesture.Value, allowSwitch: Bool, surfaceSize: CGSize) {
         let dx = value.translation.width
         let dy = value.translation.height
         let adx = abs(dx)
@@ -212,10 +220,10 @@ struct DashboardView: View {
             let startX = value.startLocation.x
             let startY = value.startLocation.y
             let edge   = CGFloat(gestureSettings.edgeZoneWidth)
-            if      isHorizontal && dx > 0 && startX < edge                       { trigger = .edgeSwipeRight  }
-            else if isHorizontal && dx < 0 && startX > screen.width  - edge       { trigger = .edgeSwipeLeft   }
-            else if !isHorizontal && dy > 0 && startY < edge                      { trigger = .edgeSwipeDown   }
-            else if !isHorizontal && dy < 0 && startY > screen.height - edge      { trigger = .edgeSwipeUp     }
+                if      isHorizontal && dx > 0 && startX <= edge                         { trigger = .edgeSwipeRight  }
+                else if isHorizontal && dx < 0 && startX >= surfaceSize.width - edge     { trigger = .edgeSwipeLeft   }
+                else if !isHorizontal && dy > 0 && startY <= edge                        { trigger = .edgeSwipeDown   }
+                else if !isHorizontal && dy < 0 && startY >= surfaceSize.height - edge   { trigger = .edgeSwipeUp     }
             else { trigger = isHorizontal
                     ? (dx > 0 ? .swipeRight : .swipeLeft)
                     : (dy > 0 ? .swipeDown  : .swipeUp) }

@@ -18,6 +18,14 @@ public sealed class AppSettings
     // ── Persisted data ────────────────────────────────────────────────────────
 
     public string SelectedPdfFolder { get; set; } = string.Empty;
+    public string DevChromeEndpoint { get; set; } = "http://127.0.0.1:9222";
+    public string DevBrowserKind { get; set; } = "Chrome";
+    public string DevBrowserExecutablePath { get; set; } = string.Empty;
+    public bool DevUseLocalBrowserData { get; set; } = false;
+    public string DevBrowserUserDataDir { get; set; } = string.Empty;
+    public string DevBrowserProfileDirectory { get; set; } = "Default";
+    public bool DevAutoConnectFirstTab { get; set; } = true;
+    public bool DevUseProfileSnapshot { get; set; } = true;
 
     // ── Singleton ─────────────────────────────────────────────────────────────
 

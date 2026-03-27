@@ -91,7 +91,7 @@
                    Background="#007ACC" Foreground="White"
                    FontFamily="Consolas" FontSize="12">
             <StatusBarItem>
-                <TextBlock Text="{Binding StatusText}"/>
+                <TextBlock Text="{Binding StatusTextDisplay}"/>
             </StatusBarItem>
             <Separator/>
             <StatusBarItem>
@@ -100,6 +100,13 @@
             <Separator/>
             <StatusBarItem>
                 <TextBlock Text="{Binding LastBroadcast}"/>
+            </StatusBarItem>
+            <Separator/>
+            <StatusBarItem>
+                <CheckBox Content="Privacy Mode"
+                          IsChecked="{Binding IsPrivacyModeOn, UpdateSourceTrigger=PropertyChanged}"
+                          Foreground="White"
+                          VerticalAlignment="Center"/>
             </StatusBarItem>
         </StatusBar>
 
@@ -129,6 +136,9 @@
                         <Button Style="{StaticResource ToolbarButton}"
                                 Content="＋  Add Row"
                                 Click="ChaseTactical_Add"/>
+                        <Button Style="{StaticResource ToolbarButton}"
+                            Content="⇪  Import Bulk"
+                            Click="ChaseTactical_ImportBulk"/>
                         <Button Style="{StaticResource DeleteButton}"
                                 Content="✕  Delete"
                                 Click="ChaseTactical_Delete"/>
@@ -144,6 +154,7 @@
                         <DataGrid.ContextMenu>
                             <ContextMenu>
                                 <MenuItem Header="Add Row" Click="ChaseTactical_Add"/>
+                                <MenuItem Header="Import Bulk" Click="ChaseTactical_ImportBulk"/>
                                 <MenuItem Header="Delete Selected" Click="ChaseTactical_Delete"/>
                             </ContextMenu>
                         </DataGrid.ContextMenu>
@@ -184,6 +195,9 @@
                         <Button Style="{StaticResource ToolbarButton}"
                                 Content="＋  Add Row"
                                 Click="ToughHooks_Add"/>
+                        <Button Style="{StaticResource ToolbarButton}"
+                            Content="⇪  Import Bulk"
+                            Click="ToughHooks_ImportBulk"/>
                         <Button Style="{StaticResource DeleteButton}"
                                 Content="✕  Delete"
                                 Click="ToughHooks_Delete"/>
@@ -199,6 +213,7 @@
                         <DataGrid.ContextMenu>
                             <ContextMenu>
                                 <MenuItem Header="Add Row" Click="ToughHooks_Add"/>
+                                <MenuItem Header="Import Bulk" Click="ToughHooks_ImportBulk"/>
                                 <MenuItem Header="Delete Selected" Click="ToughHooks_Delete"/>
                             </ContextMenu>
                         </DataGrid.ContextMenu>
@@ -376,13 +391,13 @@
 
                                 <TextBlock Grid.Row="1" Grid.Column="0" Text="HTTP / WebSocket Port"
                                            VerticalAlignment="Center" FontFamily="Consolas" FontSize="12" Foreground="#858585"/>
-                                <TextBlock Grid.Row="1" Grid.Column="1" Text="5050"
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding HttpPortDisplay}"
                                            VerticalAlignment="Center" FontFamily="Consolas" FontSize="12" Foreground="#D4D4D4"/>
 
                                 <TextBlock Grid.Row="2" Grid.Column="0" Text="WebSocket URL"
                                            VerticalAlignment="Top" Margin="0,6,0,0"
                                            FontFamily="Consolas" FontSize="12" Foreground="#858585"/>
-                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding HubUrl}"
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding HubUrlDisplay}"
                                            VerticalAlignment="Top" Margin="0,6,0,6"
                                            FontFamily="Consolas" FontSize="12" Foreground="#9CDCFE"
                                            TextWrapping="Wrap"/>
@@ -409,7 +424,7 @@
                                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Local IP(s)"
                                            VerticalAlignment="Top" Margin="0,6,0,0"
                                            FontFamily="Consolas" FontSize="12" Foreground="#858585"/>
-                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding LocalAddresses}"
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding LocalAddressesDisplay}"
                                            VerticalAlignment="Top" Margin="0,6,0,6"
                                            FontFamily="Consolas" FontSize="12" Foreground="#D4D4D4"
                                            TextWrapping="Wrap"/>
@@ -421,7 +436,7 @@
 
                                 <TextBlock Grid.Row="2" Grid.Column="0" Text="Last Device"
                                            VerticalAlignment="Center" FontFamily="Consolas" FontSize="12" Foreground="#858585"/>
-                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding LastConnectedDevice}"
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding LastConnectedDeviceDisplay}"
                                            VerticalAlignment="Center" FontFamily="Consolas" FontSize="12" Foreground="#D4D4D4"/>
                             </Grid>
                         </Border>
@@ -456,7 +471,7 @@
 
                                     <TextBlock Grid.Row="1" Grid.Column="0" Text="Beacon Destination"
                                                VerticalAlignment="Center" FontFamily="Consolas" FontSize="12" Foreground="#858585"/>
-                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="255.255.255.255 : UDP 5051"
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding BeaconDestinationDisplay}"
                                                VerticalAlignment="Center" FontFamily="Consolas" FontSize="12" Foreground="#D4D4D4"/>
 
                                     <TextBlock Grid.Row="2" Grid.Column="0" Text="Beacon Interval"
@@ -493,6 +508,143 @@
 
                     </StackPanel>
                 </ScrollViewer>
+            </TabItem>
+
+            <!-- ── Dev Tools ─────────────────────────────────────────────── -->
+            <TabItem Header="Dev Tools" x:Name="DevToolsTab">
+                <DockPanel>
+                    <ToolBar DockPanel.Dock="Top" Background="#252526">
+                        <TextBlock Text="Browser"
+                                   Foreground="#D4D4D4"
+                                   VerticalAlignment="Center"
+                                   Margin="4,0,8,0"/>
+                        <ComboBox Width="120"
+                                  ItemsSource="{Binding DevBrowserOptions}"
+                                  SelectedItem="{Binding DevBrowserKind, UpdateSourceTrigger=PropertyChanged}"
+                                  Background="#1E1E1E"
+                                  Foreground="#D4D4D4"
+                                  BorderBrush="#3C3C3C"
+                                  BorderThickness="1"
+                                  Margin="0,0,8,0"/>
+                        <TextBox Width="260"
+                                 Text="{Binding DevBrowserExecutablePath, UpdateSourceTrigger=PropertyChanged}"
+                                 ToolTip="Optional custom browser path (used when Browser = Custom)"
+                                 Background="#1E1E1E"
+                                 Foreground="#D4D4D4"
+                                 BorderBrush="#3C3C3C"
+                                 BorderThickness="1"
+                                 Padding="6,3"
+                                 Margin="0,0,8,0"/>
+                        <Button Style="{StaticResource ToolbarButton}" Content="Browse..." Click="DevCdp_BrowseBrowserExe" Margin="0,0,8,0"/>
+                        <TextBlock Text="CDP Endpoint"
+                                   Foreground="#D4D4D4"
+                                   VerticalAlignment="Center"
+                                   Margin="4,0,8,0"/>
+                        <Grid Width="220" Margin="0,0,8,0">
+                            <TextBox Text="{Binding DevChromeEndpoint, UpdateSourceTrigger=PropertyChanged}"
+                                     Background="#1E1E1E"
+                                     Foreground="#D4D4D4"
+                                     BorderBrush="#3C3C3C"
+                                     BorderThickness="1"
+                                     Padding="6,3"
+                                     Visibility="{Binding EndpointEditorVisibility}"/>
+                            <Border Background="#1E1E1E"
+                                    BorderBrush="#3C3C3C"
+                                    BorderThickness="1"
+                                    Padding="6,3"
+                                    Visibility="{Binding EndpointMaskedVisibility}">
+                                <TextBlock Text="{Binding DevChromeEndpointMasked}"
+                                           Foreground="#D4D4D4"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                        </Grid>
+                        <Button Style="{StaticResource ToolbarButton}" Content="Launch Debug Chrome" Click="DevCdp_LaunchChrome"/>
+                        <Button Style="{StaticResource ToolbarButton}" Content="Refresh Tabs" Click="DevCdp_RefreshTabs"/>
+                        <Button Style="{StaticResource ToolbarButton}" Content="Connect" Click="DevCdp_Connect"/>
+                        <Button Style="{StaticResource ToolbarButton}" Content="Disconnect" Click="DevCdp_Disconnect"/>
+                        <Button Style="{StaticResource DeleteButton}" Content="Clear Log" Click="DevCdp_ClearLog"/>
+                    </ToolBar>
+
+                    <Border DockPanel.Dock="Top" Background="#252526" BorderBrush="#3C3C3C" BorderThickness="0,0,0,1" Padding="8,6">
+                        <StackPanel Orientation="Horizontal">
+                            <CheckBox Content="Use local browser data"
+                                      IsChecked="{Binding DevUseLocalBrowserData, UpdateSourceTrigger=PropertyChanged}"
+                                      Foreground="#D4D4D4"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,12,0"/>
+                            <CheckBox Content="Direct local profile (no snapshot)"
+                                      IsChecked="{Binding DevUseDirectLocalProfile, UpdateSourceTrigger=PropertyChanged}"
+                                      Foreground="#D4D4D4"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,12,0"/>
+                            <CheckBox Content="Auto-connect first tab"
+                                      IsChecked="{Binding DevAutoConnectFirstTab, UpdateSourceTrigger=PropertyChanged}"
+                                      Foreground="#D4D4D4"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,12,0"/>
+                            <TextBlock Text="User Data Dir"
+                                       Foreground="#858585"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <TextBox Width="420"
+                                     Text="{Binding DevBrowserUserDataDir, UpdateSourceTrigger=PropertyChanged}"
+                                     Background="#1E1E1E"
+                                     Foreground="#D4D4D4"
+                                     BorderBrush="#3C3C3C"
+                                     BorderThickness="1"
+                                     Padding="6,3"
+                                     Margin="0,0,8,0"/>
+                            <TextBlock Text="Profile"
+                                       Foreground="#858585"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <ComboBox Width="160"
+                                      IsEditable="True"
+                                      ItemsSource="{Binding DevDetectedBrowserProfiles}"
+                                      Text="{Binding DevBrowserProfileDirectory, UpdateSourceTrigger=PropertyChanged}"
+                                      Background="#1E1E1E"
+                                      Foreground="#D4D4D4"
+                                      BorderBrush="#3C3C3C"
+                                      BorderThickness="1"
+                                      Margin="0,0,8,0"/>
+                            <Button Style="{StaticResource ToolbarButton}" Content="Detect Profiles" Click="DevCdp_DetectProfiles" Margin="0,0,8,0"/>
+                            <Button Style="{StaticResource ToolbarButton}" Content="Use Local Chrome Data" Click="DevCdp_UseLocalChromeData"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border DockPanel.Dock="Top" Background="#252526" BorderBrush="#3C3C3C" BorderThickness="0,0,0,1" Padding="8,6">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Chrome Tab"
+                                       Foreground="#858585"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <ComboBox x:Name="DevCdpTabsCombo"
+                                      Width="760"
+                                      ItemsSource="{Binding DevCdpTabs}"
+                                      SelectedItem="{Binding DevSelectedCdpTab}"
+                                      Background="#1E1E1E"
+                                      Foreground="#D4D4D4"
+                                      BorderBrush="#3C3C3C"
+                                      BorderThickness="1"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border DockPanel.Dock="Top" Background="#252526" BorderBrush="#3C3C3C" BorderThickness="0,0,0,1" Padding="8,6">
+                        <TextBlock Text="{Binding DevCdpStatusDisplay}"
+                                   Foreground="#9CDCFE"
+                                   FontFamily="Consolas"
+                                   FontSize="12"/>
+                    </Border>
+
+                    <ListBox x:Name="DevCdpEventsList"
+                             ItemsSource="{Binding DevCdpEvents}"
+                             Background="#1E1E1E"
+                             Foreground="#D4D4D4"
+                             BorderBrush="#3C3C3C"
+                             BorderThickness="0"
+                             FontFamily="Consolas"
+                             FontSize="12"/>
+                </DockPanel>
             </TabItem>
 
         </TabControl>

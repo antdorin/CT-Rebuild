@@ -1,10 +1,14 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
+using System.Net.Sockets;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Media;
 using CTHub.Models;
 using CTHub.Services;
@@ -15,6 +19,8 @@ namespace CTHub;
 public partial class MainWindow : Window, INotifyPropertyChanged
 {
     private readonly HubServer _hub = App.Hub;
+    private readonly CdpDevToolsService _cdp = new();
+    private readonly AppSettings _settings = AppSettings.Instance;
     private ICollectionView? _chaseView;
     private ICollectionView? _toughHooksView;
     private ICollectionView? _shippingSupplysView;
@@ -22,6 +28,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private ICollectionView? _pdfFilesView;
     private DataGridColumnHeader? _activeHeader;
     private DataGrid? _activeGrid;
+    private readonly List<string> _devCdpRawEvents = [];
+    private readonly HashSet<char> _devHotkeyBuffer = [];
+    private DateTime _devHotkeyLastInputUtc = DateTime.MinValue;
+    private bool _isDevToolsVisible = true;
 
     // ── Bindable properties ───────────────────────────────────────────────────
 
@@ -164,8 +174,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string StatusText
     {
         get => _statusText;
-        set { _statusText = value; OnPropertyChanged(); }
+        set
+        {
+            _statusText = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(StatusTextDisplay));
+        }
     }
+
+    public string StatusTextDisplay => IsPrivacyModeOn ? MaskSensitive(StatusText) : StatusText;
 
     private string _clientCountText = "0 connected";
     public string ClientCountText
@@ -185,8 +202,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string LastConnectedDevice
     {
         get => _lastConnectedDevice;
-        set { _lastConnectedDevice = value; OnPropertyChanged(); }
+        set
+        {
+            _lastConnectedDevice = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(LastConnectedDeviceDisplay));
+        }
     }
+
+    public string LastConnectedDeviceDisplay => IsPrivacyModeOn ? MaskSensitive(LastConnectedDevice) : LastConnectedDevice;
 
     private bool _isBroadcastingNow;
     public bool IsBroadcastingNow
@@ -234,14 +258,181 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string LocalAddresses
     {
         get => _localAddresses;
-        set { _localAddresses = value; OnPropertyChanged(); }
+        set
+        {
+            _localAddresses = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(LocalAddressesDisplay));
+        }
     }
+
+    public string LocalAddressesDisplay => IsPrivacyModeOn ? MaskSensitive(LocalAddresses) : LocalAddresses;
 
     private string _hubUrl = "Scanning...";
     public string HubUrl
     {
         get => _hubUrl;
-        set { _hubUrl = value; OnPropertyChanged(); }
+        set
+        {
+            _hubUrl = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HubUrlDisplay));
+        }
+    }
+
+    public string HubUrlDisplay => IsPrivacyModeOn ? MaskSensitive(HubUrl) : HubUrl;
+    public string HttpPortDisplay => IsPrivacyModeOn ? "xxxx" : "5050";
+    public string BeaconDestinationDisplay => IsPrivacyModeOn ? "xxx.xxx.xxx.xxx : UDP xxxx" : "255.255.255.255 : UDP 5051";
+
+    private string _devChromeEndpoint = "http://127.0.0.1:9222";
+    public string DevChromeEndpoint
+    {
+        get => _devChromeEndpoint;
+        set
+        {
+            _devChromeEndpoint = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(DevChromeEndpointMasked));
+            SaveDevToolSettings();
+        }
+    }
+
+    public string DevChromeEndpointMasked => MaskSensitive(DevChromeEndpoint);
+
+    public Visibility EndpointEditorVisibility => IsPrivacyModeOn ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility EndpointMaskedVisibility => IsPrivacyModeOn ? Visibility.Visible : Visibility.Collapsed;
+
+    private bool _isPrivacyModeOn;
+    public bool IsPrivacyModeOn
+    {
+        get => _isPrivacyModeOn;
+        set
+        {
+            _isPrivacyModeOn = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(StatusTextDisplay));
+            OnPropertyChanged(nameof(LastConnectedDeviceDisplay));
+            OnPropertyChanged(nameof(LocalAddressesDisplay));
+            OnPropertyChanged(nameof(HubUrlDisplay));
+            OnPropertyChanged(nameof(HttpPortDisplay));
+            OnPropertyChanged(nameof(BeaconDestinationDisplay));
+            OnPropertyChanged(nameof(DevChromeEndpointMasked));
+            OnPropertyChanged(nameof(EndpointEditorVisibility));
+            OnPropertyChanged(nameof(EndpointMaskedVisibility));
+            OnPropertyChanged(nameof(DevCdpStatusDisplay));
+            RebuildDevCdpEventDisplay();
+        }
+    }
+
+    public List<string> DevBrowserOptions { get; } = ["Chrome", "Edge", "Custom"];
+
+    private string _devBrowserKind = "Chrome";
+    public string DevBrowserKind
+    {
+        get => _devBrowserKind;
+        set
+        {
+            _devBrowserKind = NormalizeBrowserKind(value);
+            OnPropertyChanged();
+            SaveDevToolSettings();
+        }
+    }
+
+    private string _devBrowserExecutablePath = string.Empty;
+    public string DevBrowserExecutablePath
+    {
+        get => _devBrowserExecutablePath;
+        set
+        {
+            _devBrowserExecutablePath = value;
+            OnPropertyChanged();
+            SaveDevToolSettings();
+        }
+    }
+
+    private bool _devUseLocalBrowserData;
+    public bool DevUseLocalBrowserData
+    {
+        get => _devUseLocalBrowserData;
+        set
+        {
+            _devUseLocalBrowserData = value;
+            OnPropertyChanged();
+            SaveDevToolSettings();
+        }
+    }
+
+    private string _devBrowserUserDataDir = string.Empty;
+    public string DevBrowserUserDataDir
+    {
+        get => _devBrowserUserDataDir;
+        set
+        {
+            _devBrowserUserDataDir = value;
+            OnPropertyChanged();
+            SaveDevToolSettings();
+        }
+    }
+
+    private string _devBrowserProfileDirectory = "Default";
+    public string DevBrowserProfileDirectory
+    {
+        get => _devBrowserProfileDirectory;
+        set
+        {
+            _devBrowserProfileDirectory = value;
+            OnPropertyChanged();
+            SaveDevToolSettings();
+        }
+    }
+
+    private bool _devAutoConnectFirstTab = true;
+    public bool DevAutoConnectFirstTab
+    {
+        get => _devAutoConnectFirstTab;
+        set
+        {
+            _devAutoConnectFirstTab = value;
+            OnPropertyChanged();
+            SaveDevToolSettings();
+        }
+    }
+
+    private bool _devUseDirectLocalProfile;
+    public bool DevUseDirectLocalProfile
+    {
+        get => _devUseDirectLocalProfile;
+        set
+        {
+            _devUseDirectLocalProfile = value;
+            OnPropertyChanged();
+            SaveDevToolSettings();
+        }
+    }
+
+    private string _devCdpStatus = "Disconnected";
+    public string DevCdpStatus
+    {
+        get => _devCdpStatus;
+        set
+        {
+            _devCdpStatus = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(DevCdpStatusDisplay));
+        }
+    }
+
+    public string DevCdpStatusDisplay => IsPrivacyModeOn ? MaskSensitive(DevCdpStatus) : DevCdpStatus;
+
+    public System.Collections.ObjectModel.ObservableCollection<CdpTarget> DevCdpTabs { get; } = [];
+    public System.Collections.ObjectModel.ObservableCollection<string> DevCdpEvents { get; } = [];
+    public System.Collections.ObjectModel.ObservableCollection<string> DevDetectedBrowserProfiles { get; } = [];
+
+    private CdpTarget? _devSelectedCdpTab;
+    public CdpTarget? DevSelectedCdpTab
+    {
+        get => _devSelectedCdpTab;
+        set { _devSelectedCdpTab = value; OnPropertyChanged(); }
     }
 
     // ── Constructor ───────────────────────────────────────────────────────────
@@ -249,7 +440,32 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public MainWindow()
     {
         InitializeComponent();
+
+        _devChromeEndpoint = string.IsNullOrWhiteSpace(_settings.DevChromeEndpoint)
+            ? "http://127.0.0.1:9222"
+            : _settings.DevChromeEndpoint;
+        _devBrowserKind = NormalizeBrowserKind(_settings.DevBrowserKind);
+        _devBrowserExecutablePath = _settings.DevBrowserExecutablePath ?? string.Empty;
+        _devUseLocalBrowserData = _settings.DevUseLocalBrowserData;
+        _devBrowserUserDataDir = _settings.DevBrowserUserDataDir ?? string.Empty;
+        _devBrowserProfileDirectory = string.IsNullOrWhiteSpace(_settings.DevBrowserProfileDirectory)
+            ? "Default"
+            : _settings.DevBrowserProfileDirectory;
+        _devAutoConnectFirstTab = _settings.DevAutoConnectFirstTab;
+        _devUseDirectLocalProfile = !_settings.DevUseProfileSnapshot;
+
+        DetectProfilesInCurrentUserDataDir(selectDefaultIfMissing: false);
+
         DataContext = this;
+        PreviewKeyDown += MainWindow_PreviewKeyDown;
+        UpdateDevToolsVisibility();
+
+        _cdp.Log += msg => Dispatcher.InvokeAsync(() => AddDevCdpLog(msg));
+        _cdp.NetworkEventReceived += evt => Dispatcher.InvokeAsync(() =>
+        {
+            var line = $"NET {evt.Status} {evt.Url}";
+            AddDevCdpLog(line);
+        });
 
         // Refresh client count and beacon timestamp every 2 s
         var timer = new System.Windows.Threading.DispatcherTimer
@@ -295,8 +511,83 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         RefreshServerInfo();
     }
 
+    protected override async void OnClosed(EventArgs e)
+    {
+        await _cdp.DisposeAsync();
+        base.OnClosed(e);
+    }
+
     // Updates the last-broadcast timestamp shown in the status bar.
     private void Touch() => LastBroadcast = $"Last write: {DateTime.Now:HH:mm:ss}";
+
+    private void AddDevCdpLog(string line)
+    {
+        var stamped = $"{DateTime.Now:HH:mm:ss}  {line}";
+        _devCdpRawEvents.Insert(0, stamped);
+        while (_devCdpRawEvents.Count > 500)
+            _devCdpRawEvents.RemoveAt(_devCdpRawEvents.Count - 1);
+        RebuildDevCdpEventDisplay();
+    }
+
+    private void RebuildDevCdpEventDisplay()
+    {
+        DevCdpEvents.Clear();
+        foreach (var raw in _devCdpRawEvents)
+            DevCdpEvents.Add(IsPrivacyModeOn ? MaskSensitive(raw) : raw);
+    }
+
+    private static string MaskSensitive(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return string.Empty;
+
+        var sb = new StringBuilder(text.Length);
+        foreach (var ch in text)
+            sb.Append(char.IsDigit(ch) ? 'x' : ch);
+        return sb.ToString();
+    }
+
+    private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        char? pressed = KeyToUpperChar(e.Key);
+        if (pressed is null)
+            return;
+
+        if (DateTime.UtcNow - _devHotkeyLastInputUtc > TimeSpan.FromSeconds(5))
+            _devHotkeyBuffer.Clear();
+
+        _devHotkeyLastInputUtc = DateTime.UtcNow;
+
+        char c = pressed.Value;
+        if (c is 'C' or 'H' or 'A' or 'D')
+        {
+            _devHotkeyBuffer.Add(c);
+            if (_devHotkeyBuffer.Count == 4)
+            {
+                _devHotkeyBuffer.Clear();
+                _isDevToolsVisible = !_isDevToolsVisible;
+                UpdateDevToolsVisibility();
+                AddDevCdpLog(_isDevToolsVisible ? "Dev Tools tab revealed via CHAD combo." : "Dev Tools tab hidden via CHAD combo.");
+            }
+        }
+    }
+
+    private static char? KeyToUpperChar(Key key)
+    {
+        if (key >= Key.A && key <= Key.Z)
+            return (char)('A' + (key - Key.A));
+        return null;
+    }
+
+    private void UpdateDevToolsVisibility()
+    {
+        if (DevToolsTab is null)
+            return;
+
+        DevToolsTab.Visibility = _isDevToolsVisible ? Visibility.Visible : Visibility.Collapsed;
+        if (!_isDevToolsVisible && DevToolsTab.IsSelected && DevToolsTab.Parent is TabControl tc)
+            tc.SelectedIndex = 0;
+    }
 
     private void InitializeSearchFilters()
     {
@@ -343,6 +634,28 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var letter = entry.ClassLetter.Trim().ToUpperInvariant();
         var number = Random.Shared.Next(0, 1001);
         return $"{letter}-{number:D3}";
+    }
+
+    private static bool IsChaseClassFieldColumn(DataGridColumn column)
+    {
+        if (column is DataGridComboBoxColumn combo)
+        {
+            if (combo.SelectedItemBinding is Binding selectedBinding)
+            {
+                var path = selectedBinding.Path?.Path;
+                return string.Equals(path, nameof(ChaseTacticalEntry.ClassName), StringComparison.Ordinal)
+                    || string.Equals(path, nameof(ChaseTacticalEntry.ClassLetter), StringComparison.Ordinal);
+            }
+        }
+
+        if (column is DataGridBoundColumn bound && bound.Binding is Binding binding)
+        {
+            var path = binding.Path?.Path;
+            return string.Equals(path, nameof(ChaseTacticalEntry.ClassName), StringComparison.Ordinal)
+                || string.Equals(path, nameof(ChaseTacticalEntry.ClassLetter), StringComparison.Ordinal);
+        }
+
+        return false;
     }
 
     private bool FilterToughHook(ToughHookEntry? entry)
@@ -539,6 +852,162 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         return dialog.ShowDialog() == true ? input.Text : null;
     }
 
+    private string? PromptForMultilineText(string title, string prompt)
+    {
+        var promptText = new TextBlock
+        {
+            Text = prompt,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+
+        var input = new TextBox
+        {
+            Width = 700,
+            Height = 380,
+            TextWrapping = TextWrapping.Wrap,
+            AcceptsReturn = true,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Margin = new Thickness(0, 0, 0, 12)
+        };
+
+        var okButton = new Button
+        {
+            Content = "OK",
+            Width = 80,
+            Margin = new Thickness(0, 0, 8, 0),
+            IsDefault = true
+        };
+
+        var cancelButton = new Button
+        {
+            Content = "Cancel",
+            Width = 80,
+            IsCancel = true
+        };
+
+        var dialog = new Window
+        {
+            Title = title,
+            Owner = this,
+            ResizeMode = ResizeMode.CanResize,
+            ShowInTaskbar = false,
+            Width = 760,
+            Height = 540,
+            MinWidth = 620,
+            MinHeight = 420,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            WindowStyle = WindowStyle.ToolWindow,
+            Content = new Grid
+            {
+                Margin = new Thickness(16),
+                RowDefinitions =
+                {
+                    new RowDefinition { Height = GridLength.Auto },
+                    new RowDefinition { Height = new GridLength(1, GridUnitType.Star) },
+                    new RowDefinition { Height = GridLength.Auto }
+                }
+            }
+        };
+
+        Grid.SetRow(promptText, 0);
+        Grid.SetRow(input, 1);
+        var buttonsPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { okButton, cancelButton }
+        };
+        Grid.SetRow(buttonsPanel, 2);
+
+        var rootGrid = (Grid)dialog.Content;
+        rootGrid.Children.Add(promptText);
+        rootGrid.Children.Add(input);
+        rootGrid.Children.Add(buttonsPanel);
+
+        okButton.Click += (_, _) => dialog.DialogResult = true;
+
+        return dialog.ShowDialog() == true ? input.Text : null;
+    }
+
+    private string? AcquireChaseBulkImportText()
+    {
+        var sourceChoice = MessageBox.Show(
+            "Choose import source for Chase Tactical TSV.\n\nYes = Load from file\nNo = Paste text\nCancel = Abort",
+            "Import Bulk",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question);
+
+        if (sourceChoice == MessageBoxResult.Cancel)
+            return null;
+
+        if (sourceChoice == MessageBoxResult.Yes)
+        {
+            var dialog = new OpenFileDialog
+            {
+                Title = "Select Chase Tactical import text",
+                Filter = "Text/CSV files|*.txt;*.csv|All files|*.*",
+                Multiselect = false
+            };
+
+            if (dialog.ShowDialog() != true)
+                return null;
+
+            return File.ReadAllText(dialog.FileName);
+        }
+
+        return PromptForMultilineText(
+            "Paste Chase Tactical TSV",
+            "Paste tab-separated rows in Label<TAB>Qty<TAB>Bin format.");
+    }
+
+    private static string BuildChaseDuplicateKey(ChaseTacticalEntry entry)
+        => $"{entry.Bin.Trim().ToUpperInvariant()}|{entry.Label.Trim()}";
+
+    private static void AppendUnknownQtyNote(ChaseTacticalEntry entry)
+    {
+        if (entry.Notes.Contains("Qty ?", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        entry.Notes = string.IsNullOrWhiteSpace(entry.Notes)
+            ? "Qty ?"
+            : $"{entry.Notes.Trim()} | Qty ?";
+    }
+
+    private string? AcquireToughHooksBulkImportText()
+    {
+        var sourceChoice = MessageBox.Show(
+            "Choose import source for Tough Hooks.\n\nYes = Load from file\nNo = Paste text\nCancel = Abort",
+            "Import Bulk",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question);
+
+        if (sourceChoice == MessageBoxResult.Cancel)
+            return null;
+
+        if (sourceChoice == MessageBoxResult.Yes)
+        {
+            var dialog = new OpenFileDialog
+            {
+                Title = "Select Tough Hooks import text",
+                Filter = "Text/CSV files|*.txt;*.csv|All files|*.*",
+                Multiselect = false
+            };
+
+            if (dialog.ShowDialog() != true)
+                return null;
+
+            return File.ReadAllText(dialog.FileName);
+        }
+
+        return PromptForMultilineText(
+            "Paste Tough Hooks import text",
+            "Accepted formats: Description/Qty/Bin/SKU rows, or two blocks of Description lines then SKU lines.");
+    }
+
+    private static string BuildToughHookDuplicateKey(ToughHookEntry entry)
+        => entry.Sku.Trim().ToUpperInvariant();
     // ── Chase Tactical handlers ───────────────────────────────────────────────
 
     private void ChaseTactical_Add(object sender, RoutedEventArgs e)
@@ -570,14 +1039,117 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (selected.Count > 0) Touch();
     }
 
+    private async void ChaseTactical_ImportBulk(object sender, RoutedEventArgs e)
+    {
+        var importText = AcquireChaseBulkImportText();
+        if (string.IsNullOrWhiteSpace(importText))
+            return;
+
+        var parseResult = TextImportParser.ParseChaseTacticalTsv(importText);
+        if (parseResult.Rows.Count == 0)
+        {
+            var errorPreview = parseResult.Errors.Count == 0
+                ? "No importable rows were found."
+                : string.Join(Environment.NewLine, parseResult.Errors.Take(8));
+
+            MessageBox.Show(
+                $"Import aborted.\n\n{errorPreview}",
+                "Import Bulk",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        var existingKeys = new HashSet<string>(
+            _hub.ChaseTactical.Items.Select(BuildChaseDuplicateKey),
+            StringComparer.OrdinalIgnoreCase);
+
+        var incomingKeyCounts = parseResult.Rows
+            .GroupBy(r => BuildChaseDuplicateKey(r.Entry), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+
+        var duplicateAgainstExisting = parseResult.Rows.Count(r => existingKeys.Contains(BuildChaseDuplicateKey(r.Entry)));
+        var duplicateWithinImport = incomingKeyCounts.Values.Sum(c => Math.Max(0, c - 1));
+        var unknownQtyCount = parseResult.Rows.Count(r => r.HadUnknownQty);
+
+        var rowsToImport = parseResult.Rows;
+        if (duplicateAgainstExisting > 0 || duplicateWithinImport > 0)
+        {
+            var duplicateChoice = MessageBox.Show(
+                $"Duplicates detected.\n\nAgainst existing rows: {duplicateAgainstExisting}\nWithin import text: {duplicateWithinImport}\n\nYes = Keep duplicates\nNo = Remove duplicates\nCancel = Abort",
+                "Resolve Duplicates",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Warning);
+
+            if (duplicateChoice == MessageBoxResult.Cancel)
+                return;
+
+            if (duplicateChoice == MessageBoxResult.No)
+            {
+                var seenIncoming = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                rowsToImport = parseResult.Rows
+                    .Where(row =>
+                    {
+                        var key = BuildChaseDuplicateKey(row.Entry);
+                        if (existingKeys.Contains(key))
+                            return false;
+
+                        return seenIncoming.Add(key);
+                    })
+                    .ToList();
+            }
+        }
+
+        if (rowsToImport.Count == 0)
+        {
+            MessageBox.Show(
+                "All parsed rows were filtered out by duplicate rules.",
+                "Import Bulk",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        foreach (var row in rowsToImport)
+        {
+            var entry = row.Entry;
+            if (row.HadUnknownQty)
+                AppendUnknownQtyNote(entry);
+
+            if (string.IsNullOrWhiteSpace(entry.ClassId) && !string.IsNullOrWhiteSpace(entry.ClassLetter))
+                entry.ClassId = BuildClassId(entry);
+
+            await _hub.ChaseTactical.UpsertAsync(entry);
+        }
+
+        Touch();
+
+        var summaryBuilder = new StringBuilder();
+        summaryBuilder.AppendLine($"Imported: {rowsToImport.Count}");
+        summaryBuilder.AppendLine($"Unknown qty mapped to Qty=0: {unknownQtyCount}");
+        summaryBuilder.AppendLine($"Parse errors: {parseResult.Errors.Count}");
+
+        if (parseResult.Errors.Count > 0)
+        {
+            summaryBuilder.AppendLine();
+            summaryBuilder.AppendLine("Sample errors:");
+            foreach (var err in parseResult.Errors.Take(6))
+                summaryBuilder.AppendLine($"- {err}");
+        }
+
+        MessageBox.Show(
+            summaryBuilder.ToString(),
+            "Import Complete",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+    }
+
     private void ChaseTactical_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
     {
         if (e.EditAction == DataGridEditAction.Commit &&
             e.Row.Item is ChaseTacticalEntry item)
         {
-            var header = e.Column.Header?.ToString() ?? string.Empty;
-            var regenerateClassId = header.Equals("Class", StringComparison.OrdinalIgnoreCase)
-                || header.Equals("Letter", StringComparison.OrdinalIgnoreCase)
+            var regenerateClassId = IsChaseClassFieldColumn(e.Column)
                 || string.IsNullOrWhiteSpace(item.ClassId);
 
             // Let the DataGrid commit the binding first, then persist
@@ -613,6 +1185,100 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         if (selected.Count > 0) Touch();
+    }
+
+    private async void ToughHooks_ImportBulk(object sender, RoutedEventArgs e)
+    {
+        var importText = AcquireToughHooksBulkImportText();
+        if (string.IsNullOrWhiteSpace(importText))
+            return;
+
+        var parseResult = TextImportParser.ParseToughHooks(importText);
+        if (parseResult.Rows.Count == 0)
+        {
+            var errorPreview = parseResult.Errors.Count == 0
+                ? "No importable rows were found."
+                : string.Join(Environment.NewLine, parseResult.Errors.Take(8));
+
+            MessageBox.Show(
+                $"Import aborted.\n\n{errorPreview}",
+                "Import Bulk",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        var existingKeys = new HashSet<string>(
+            _hub.ToughHooks.Items.Select(BuildToughHookDuplicateKey),
+            StringComparer.OrdinalIgnoreCase);
+
+        var incomingKeyCounts = parseResult.Rows
+            .GroupBy(r => BuildToughHookDuplicateKey(r.Entry), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+
+        var duplicateAgainstExisting = parseResult.Rows.Count(r => existingKeys.Contains(BuildToughHookDuplicateKey(r.Entry)));
+        var duplicateWithinImport = incomingKeyCounts.Values.Sum(c => Math.Max(0, c - 1));
+
+        var rowsToImport = parseResult.Rows;
+        if (duplicateAgainstExisting > 0 || duplicateWithinImport > 0)
+        {
+            var duplicateChoice = MessageBox.Show(
+                $"Duplicates detected by SKU.\n\nAgainst existing rows: {duplicateAgainstExisting}\nWithin import text: {duplicateWithinImport}\n\nYes = Keep duplicates\nNo = Remove duplicates\nCancel = Abort",
+                "Resolve Duplicates",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Warning);
+
+            if (duplicateChoice == MessageBoxResult.Cancel)
+                return;
+
+            if (duplicateChoice == MessageBoxResult.No)
+            {
+                var seenIncoming = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                rowsToImport = parseResult.Rows
+                    .Where(row =>
+                    {
+                        var key = BuildToughHookDuplicateKey(row.Entry);
+                        if (string.IsNullOrWhiteSpace(key) || existingKeys.Contains(key))
+                            return false;
+
+                        return seenIncoming.Add(key);
+                    })
+                    .ToList();
+            }
+        }
+
+        if (rowsToImport.Count == 0)
+        {
+            MessageBox.Show(
+                "All parsed rows were filtered out by duplicate rules.",
+                "Import Bulk",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        foreach (var row in rowsToImport)
+            await _hub.ToughHooks.UpsertAsync(row.Entry);
+
+        Touch();
+
+        var summaryBuilder = new StringBuilder();
+        summaryBuilder.AppendLine($"Imported: {rowsToImport.Count}");
+        summaryBuilder.AppendLine($"Parse errors: {parseResult.Errors.Count}");
+
+        if (parseResult.Errors.Count > 0)
+        {
+            summaryBuilder.AppendLine();
+            summaryBuilder.AppendLine("Sample errors:");
+            foreach (var err in parseResult.Errors.Take(6))
+                summaryBuilder.AppendLine($"- {err}");
+        }
+
+        MessageBox.Show(
+            summaryBuilder.ToString(),
+            "Import Complete",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
     }
 
     private void ToughHooks_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
@@ -700,6 +1366,410 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 Touch();
             });
         }
+    }
+
+    // ── Dev CDP handlers ─────────────────────────────────────────────────────
+
+    private async void DevCdp_RefreshTabs(object sender, RoutedEventArgs e)
+        => await ReloadDevCdpTabsAsync();
+
+    private async Task ReloadDevCdpTabsAsync(bool autoConnect = false)
+    {
+        try
+        {
+            DevCdpStatus = "Loading Chrome tabs...";
+            var tabs = await CdpDevToolsService.GetTargetsAsync(DevChromeEndpoint);
+
+            DevCdpTabs.Clear();
+            foreach (var tab in tabs)
+                DevCdpTabs.Add(tab);
+
+            DevSelectedCdpTab = DevCdpTabs.FirstOrDefault();
+            DevCdpStatus = $"Tabs found: {DevCdpTabs.Count}";
+            AddDevCdpLog($"Found {DevCdpTabs.Count} debuggable page tab(s).");
+
+            if ((autoConnect || DevAutoConnectFirstTab) && DevSelectedCdpTab is not null)
+            {
+                await ConnectSelectedDevTabAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            DevCdpStatus = "Tab discovery failed";
+            AddDevCdpLog($"Tab discovery failed: {ex.Message}");
+        }
+    }
+
+    private async void DevCdp_Connect(object sender, RoutedEventArgs e)
+        => await ConnectSelectedDevTabAsync();
+
+    private async Task ConnectSelectedDevTabAsync()
+    {
+        if (DevSelectedCdpTab is null)
+        {
+            AddDevCdpLog("Select a Chrome tab first.");
+            return;
+        }
+
+        try
+        {
+            DevCdpStatus = "Connecting...";
+            await _cdp.ConnectAsync(DevSelectedCdpTab.WebSocketDebuggerUrl);
+            DevCdpStatus = $"Connected: {DevSelectedCdpTab.Title}";
+            AddDevCdpLog($"Connected to: {DevSelectedCdpTab.Title}");
+        }
+        catch (Exception ex)
+        {
+            DevCdpStatus = "Connect failed";
+            AddDevCdpLog($"Connect failed: {ex.Message}");
+        }
+    }
+
+    private async void DevCdp_Disconnect(object sender, RoutedEventArgs e)
+    {
+        await _cdp.DisconnectAsync();
+        DevCdpStatus = "Disconnected";
+        AddDevCdpLog("Disconnected.");
+    }
+
+    private void DevCdp_ClearLog(object sender, RoutedEventArgs e)
+    {
+        _devCdpRawEvents.Clear();
+        DevCdpEvents.Clear();
+        AddDevCdpLog("Log cleared.");
+    }
+
+    private async void DevCdp_LaunchChrome(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var browserExe = ResolveBrowserExecutablePath();
+            if (string.IsNullOrWhiteSpace(browserExe))
+            {
+                MessageBox.Show(
+                    "Selected browser executable could not be found. Use Browse... to set a valid path, or switch Browser to Chrome/Edge.",
+                    "CT-Hub",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            string userDataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "CT-Hub",
+                "dev-chrome-profile");
+
+            string browserProcessName = GetBrowserProcessName();
+            if (DevUseLocalBrowserData && !string.IsNullOrWhiteSpace(browserProcessName) && Process.GetProcessesByName(browserProcessName).Length > 0)
+            {
+                DevCdpStatus = "Close all browser windows, then launch again.";
+                AddDevCdpLog($"{DevBrowserKind} is already running. Remote-debug flags are ignored when attaching to an existing process.");
+                MessageBox.Show(
+                    $"{DevBrowserKind} is already running.\n\nClose all {DevBrowserKind} windows first, then click Launch again.\nThis is required when using local browser data/profile.",
+                    "CT-Hub",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            if (DevUseLocalBrowserData)
+            {
+                string sourceUserDataDir = DevBrowserUserDataDir?.Trim() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(sourceUserDataDir) || !Directory.Exists(sourceUserDataDir))
+                {
+                    MessageBox.Show(
+                        "Local user data directory is missing or invalid. Set User Data Dir or click Use Local Chrome Data.",
+                        "CT-Hub",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                string localProfileName = string.IsNullOrWhiteSpace(DevBrowserProfileDirectory)
+                    ? "Default"
+                    : DevBrowserProfileDirectory.Trim();
+
+                if (DevUseDirectLocalProfile)
+                {
+                    userDataDir = sourceUserDataDir;
+                    AddDevCdpLog("Using direct local profile mode.");
+                }
+                else
+                {
+                    DevCdpStatus = "Preparing local browser data snapshot...";
+                    userDataDir = await PrepareSeededDebugUserDataAsync(sourceUserDataDir, localProfileName);
+                }
+            }
+            else
+            {
+                Directory.CreateDirectory(userDataDir);
+            }
+
+            int debugPort = GetChromeDebugPort();
+            string profileName = string.IsNullOrWhiteSpace(DevBrowserProfileDirectory)
+                ? "Default"
+                : DevBrowserProfileDirectory.Trim();
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = browserExe,
+                Arguments = $"--remote-debugging-port={debugPort} --user-data-dir=\"{userDataDir}\" --profile-directory=\"{profileName}\"",
+                UseShellExecute = true
+            };
+
+            Process.Start(psi);
+            DevCdpStatus = $"Launched debug {DevBrowserKind} on port {debugPort}. Refreshing tabs...";
+            AddDevCdpLog($"Launched {DevBrowserKind}: {browserExe}");
+            AddDevCdpLog($"Using browser data: {userDataDir} / {profileName}");
+
+            // Wait until endpoint is up, then refresh tabs.
+            bool endpointUp = await WaitForDebugEndpointAsync(DevChromeEndpoint);
+            if (!endpointUp)
+            {
+                DevCdpStatus = "Browser launched, but debug endpoint is not reachable.";
+                AddDevCdpLog($"Endpoint did not open: {DevChromeEndpoint}");
+                AddDevCdpLog("Tip: close all browser windows and relaunch from CT-Hub.");
+                return;
+            }
+
+            await ReloadDevCdpTabsAsync(autoConnect: true);
+        }
+        catch (Exception ex)
+        {
+            DevCdpStatus = "Failed to launch debug Chrome";
+            AddDevCdpLog($"Launch failed: {ex.Message}");
+            MessageBox.Show(
+                $"Could not launch Chrome. {ex.Message}",
+                "CT-Hub",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private void DevCdp_BrowseBrowserExe(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFileDialog
+        {
+            Title = "Select Browser Executable",
+            Filter = "Executable (*.exe)|*.exe|All files (*.*)|*.*",
+            CheckFileExists = true
+        };
+
+        if (dlg.ShowDialog(this) == true)
+        {
+            DevBrowserExecutablePath = dlg.FileName;
+            if (!string.Equals(DevBrowserKind, "Custom", StringComparison.OrdinalIgnoreCase))
+                DevBrowserKind = "Custom";
+            AddDevCdpLog($"Custom browser set: {DevBrowserExecutablePath}");
+        }
+    }
+
+    private void DevCdp_UseLocalChromeData(object sender, RoutedEventArgs e)
+    {
+        DevBrowserKind = "Chrome";
+        DevUseLocalBrowserData = true;
+        DevBrowserUserDataDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Google",
+            "Chrome",
+            "User Data");
+        DevBrowserProfileDirectory = "Default";
+        DetectProfilesInCurrentUserDataDir(selectDefaultIfMissing: true);
+        AddDevCdpLog($"Local Chrome data selected: {DevBrowserUserDataDir}");
+    }
+
+    private void DevCdp_DetectProfiles(object sender, RoutedEventArgs e)
+    {
+        DetectProfilesInCurrentUserDataDir(selectDefaultIfMissing: true);
+    }
+
+    private void DetectProfilesInCurrentUserDataDir(bool selectDefaultIfMissing)
+    {
+        DevDetectedBrowserProfiles.Clear();
+
+        string dir = DevBrowserUserDataDir?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir))
+        {
+            AddDevCdpLog("Profile detection skipped: User Data Dir is missing or invalid.");
+            return;
+        }
+
+        var profiles = Directory.EnumerateDirectories(dir)
+            .Select(Path.GetFileName)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name!)
+            .Where(name =>
+                string.Equals(name, "Default", StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith("Profile ", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(name => string.Equals(name, "Default", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(name => name)
+            .ToList();
+
+        foreach (var profile in profiles)
+            DevDetectedBrowserProfiles.Add(profile);
+
+        if (selectDefaultIfMissing && DevDetectedBrowserProfiles.Count > 0)
+        {
+            bool currentExists = DevDetectedBrowserProfiles.Any(p =>
+                string.Equals(p, DevBrowserProfileDirectory?.Trim(), StringComparison.OrdinalIgnoreCase));
+
+            if (!currentExists)
+                DevBrowserProfileDirectory = DevDetectedBrowserProfiles[0];
+        }
+
+        AddDevCdpLog($"Detected {DevDetectedBrowserProfiles.Count} profile(s): {string.Join(", ", DevDetectedBrowserProfiles)}");
+    }
+
+    private async Task<string> PrepareSeededDebugUserDataAsync(string sourceUserDataDir, string profileName)
+    {
+        string snapshotsRoot = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "CT-Hub",
+            "dev-chrome-snapshots");
+
+        Directory.CreateDirectory(snapshotsRoot);
+
+        string targetUserDataDir = Path.Combine(
+            snapshotsRoot,
+            DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+
+        string sourceProfileDir = Path.Combine(sourceUserDataDir, profileName);
+        if (!Directory.Exists(sourceProfileDir))
+            throw new InvalidOperationException($"Profile directory not found: {sourceProfileDir}");
+
+        AddDevCdpLog("Seeding debug profile from local browser data...");
+
+        await Task.Run(() =>
+        {
+            Directory.CreateDirectory(targetUserDataDir);
+
+            string sourceLocalState = Path.Combine(sourceUserDataDir, "Local State");
+            if (File.Exists(sourceLocalState))
+                File.Copy(sourceLocalState, Path.Combine(targetUserDataDir, "Local State"), overwrite: true);
+
+            string targetProfileDir = Path.Combine(targetUserDataDir, profileName);
+            CopyDirectoryRecursive(sourceProfileDir, targetProfileDir);
+        });
+
+        AddDevCdpLog($"Seeded snapshot: {targetUserDataDir}");
+        return targetUserDataDir;
+    }
+
+    private static void CopyDirectoryRecursive(string sourceDir, string destinationDir)
+    {
+        Directory.CreateDirectory(destinationDir);
+
+        foreach (var file in Directory.EnumerateFiles(sourceDir))
+        {
+            var name = Path.GetFileName(file);
+            var destinationFile = Path.Combine(destinationDir, name);
+            File.Copy(file, destinationFile, overwrite: true);
+        }
+
+        foreach (var directory in Directory.EnumerateDirectories(sourceDir))
+        {
+            var name = Path.GetFileName(directory);
+            var childDestination = Path.Combine(destinationDir, name);
+            CopyDirectoryRecursive(directory, childDestination);
+        }
+    }
+
+    private string NormalizeBrowserKind(string? value)
+    {
+        if (string.Equals(value, "Edge", StringComparison.OrdinalIgnoreCase)) return "Edge";
+        if (string.Equals(value, "Custom", StringComparison.OrdinalIgnoreCase)) return "Custom";
+        return "Chrome";
+    }
+
+    private string? ResolveBrowserExecutablePath()
+    {
+        if (string.Equals(DevBrowserKind, "Custom", StringComparison.OrdinalIgnoreCase))
+            return File.Exists(DevBrowserExecutablePath) ? DevBrowserExecutablePath : null;
+
+        string[] paths = string.Equals(DevBrowserKind, "Edge", StringComparison.OrdinalIgnoreCase)
+            ?
+            [
+                @"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+                @"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+            ]
+            :
+            [
+                @"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                @"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
+            ];
+
+        return paths.FirstOrDefault(File.Exists);
+    }
+
+    private int GetChromeDebugPort()
+    {
+        try
+        {
+            if (Uri.TryCreate(DevChromeEndpoint, UriKind.Absolute, out var uri) && uri.Port > 0)
+                return uri.Port;
+        }
+        catch
+        {
+            // fall back to default below
+        }
+
+        return 9222;
+    }
+
+    private string GetBrowserProcessName()
+    {
+        if (string.Equals(DevBrowserKind, "Edge", StringComparison.OrdinalIgnoreCase))
+            return "msedge";
+        return "chrome";
+    }
+
+    private async Task<bool> WaitForDebugEndpointAsync(string endpoint, int attempts = 20, int delayMs = 300)
+    {
+        try
+        {
+            if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
+                return false;
+
+            string host = uri.Host;
+            int port = uri.Port;
+
+            for (int i = 0; i < attempts; i++)
+            {
+                try
+                {
+                    using var tcp = new TcpClient();
+                    var connectTask = tcp.ConnectAsync(host, port);
+                    var winner = await Task.WhenAny(connectTask, Task.Delay(250));
+                    if (winner == connectTask && tcp.Connected)
+                        return true;
+                }
+                catch
+                {
+                    // keep retrying
+                }
+
+                await Task.Delay(delayMs);
+            }
+        }
+        catch
+        {
+            // treated as endpoint unavailable
+        }
+
+        return false;
+    }
+
+    private void SaveDevToolSettings()
+    {
+        _settings.DevChromeEndpoint = DevChromeEndpoint?.Trim() ?? "http://127.0.0.1:9222";
+        _settings.DevBrowserKind = NormalizeBrowserKind(DevBrowserKind);
+        _settings.DevBrowserExecutablePath = DevBrowserExecutablePath?.Trim() ?? string.Empty;
+        _settings.DevUseLocalBrowserData = DevUseLocalBrowserData;
+        _settings.DevBrowserUserDataDir = DevBrowserUserDataDir?.Trim() ?? string.Empty;
+        _settings.DevBrowserProfileDirectory = DevBrowserProfileDirectory?.Trim() ?? "Default";
+        _settings.DevAutoConnectFirstTab = DevAutoConnectFirstTab;
+        _settings.DevUseProfileSnapshot = !DevUseDirectLocalProfile;
+        _settings.Save();
     }
 
     // ── Broadcast toggle ──────────────────────────────────────────────────────

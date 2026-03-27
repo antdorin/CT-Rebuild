@@ -22,6 +22,12 @@ struct PanelSettingsView: View {
 
     @AppStorage("panel_showMaterial")    private var showMaterial = true
 
+    // ── Panel size (percent of screen) ───────────────────────────────────
+    @AppStorage("panel_leftSizePercent")   private var leftSizePercent: Int = 97
+    @AppStorage("panel_rightSizePercent")  private var rightSizePercent: Int = 97
+    @AppStorage("panel_topSizePercent")    private var topSizePercent: Int = 97
+    @AppStorage("panel_bottomSizePercent") private var bottomSizePercent: Int = 97
+
     var body: some View {
         ZStack {
             if showMaterial {
@@ -101,6 +107,49 @@ struct PanelSettingsView: View {
                                 detail: "Which page opens first (0 = page 1)",
                                 value: $rightStartPage,
                                 range: 0...6
+                            )
+                        }
+                        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
+                        .padding(.bottom, 14)
+
+                        // ── Panel Size ────────────────────────────────────
+                        sectionHeader("PANEL SIZE")
+
+                        VStack(spacing: 0) {
+                            stepperRow(
+                                icon: "sidebar.left",
+                                label: "Left Panel Width",
+                                detail: "Width as % of screen",
+                                value: $leftSizePercent,
+                                range: 60...100,
+                                suffix: "%"
+                            )
+                            Divider().opacity(0.1).padding(.leading, 46)
+                            stepperRow(
+                                icon: "sidebar.right",
+                                label: "Right Panel Width",
+                                detail: "Width as % of screen",
+                                value: $rightSizePercent,
+                                range: 60...100,
+                                suffix: "%"
+                            )
+                            Divider().opacity(0.1).padding(.leading, 46)
+                            stepperRow(
+                                icon: "rectangle.tophalf.inset.filled",
+                                label: "Top Panel Height",
+                                detail: "Height as % of screen",
+                                value: $topSizePercent,
+                                range: 60...100,
+                                suffix: "%"
+                            )
+                            Divider().opacity(0.1).padding(.leading, 46)
+                            stepperRow(
+                                icon: "rectangle.bottomhalf.inset.filled",
+                                label: "Bottom Panel Height",
+                                detail: "Height as % of screen",
+                                value: $bottomSizePercent,
+                                range: 60...100,
+                                suffix: "%"
                             )
                         }
                         .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
@@ -195,7 +244,8 @@ struct PanelSettingsView: View {
         label: String,
         detail: String,
         value: Binding<Int>,
-        range: ClosedRange<Int>
+        range: ClosedRange<Int>,
+        suffix: String = ""
     ) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
@@ -225,7 +275,7 @@ struct PanelSettingsView: View {
                 }
                 .buttonStyle(.plain)
 
-                Text("\(value.wrappedValue)")
+                Text("\(value.wrappedValue)\(suffix)")
                     .font(.system(size: 14, weight: .semibold, design: .monospaced))
                     .foregroundColor(.blue.opacity(0.9))
                     .frame(minWidth: 24, alignment: .center)
