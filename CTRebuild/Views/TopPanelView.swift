@@ -227,6 +227,7 @@ private struct NotesContentView: View {
     let safeArea: EdgeInsets
     @AppStorage("topPanelNotes") private var notes: String = ""
     @StateObject private var speech = SpeechManager()
+    @FocusState private var notesFocused: Bool
 
     // Show live transcription while recording, saved text otherwise
     private var liveText: String {
@@ -251,8 +252,13 @@ private struct NotesContentView: View {
                 .foregroundColor(speech.isRecording ? .primary.opacity(0.6) : .primary)
                 .font(.system(size: 15))
                 .disabled(speech.isRecording)
+                .focused($notesFocused)
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
+                .onTapGesture {
+                    guard !speech.isRecording else { return }
+                    notesFocused.toggle()
+                }
 
             HStack {
                 Spacer()

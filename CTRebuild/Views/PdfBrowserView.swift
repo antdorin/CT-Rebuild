@@ -409,6 +409,10 @@ struct PdfBrowserView: View {
         isLoadingGroup = true; groupError = nil
         do {
             let doc = try await downloadAndMerge(group)
+            if !binStore.isActive(groupId: group.id) {
+                let label = group.soLabel.isEmpty ? group.dateLabel : group.soLabel
+                binStore.activate(groupId: group.id, label: label, document: doc)
+            }
             readerCache.load(filenames: group.filenames)
             if let sourceCatalog = group.sourceCatalog {
                 await MainActor.run { ScanStore.shared.setActiveTicketCatalog(sourceCatalog) }
@@ -1037,7 +1041,7 @@ private func buildReflowHTML(from doc: PDFDocument, fontPercent: Int) -> String 
           margin-bottom: 14px;
         }
         .band-table th {
-          background: #d0d0d0;
+          background: #ffffff;
           font-size: calc(10px * var(--fontScale) / 100);
           font-weight: 700;
           padding: 6px 6px;

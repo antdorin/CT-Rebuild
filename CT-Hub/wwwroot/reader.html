@@ -488,6 +488,11 @@
         <div id="textSizeXValue" class="panel-value">100%</div>
       </div>
       <div class="panel-control">
+        <label for="textSharpnessRange">Text Sharpness</label>
+        <input id="textSharpnessRange" type="range" min="0.50" max="2.00" step="0.05" value="1.00" />
+        <div id="textSharpnessValue" class="panel-value">100%</div>
+      </div>
+      <div class="panel-control">
         <label for="textSpacingXRange">Text Spacing X (Letter)</label>
         <input id="textSpacingXRange" type="range" min="-2" max="12" step="0.5" value="0" />
         <div id="textSpacingXValue" class="panel-value">0px</div>
@@ -637,6 +642,8 @@
       const pageZoomXValue = document.getElementById('pageZoomXValue');
       const pageZoomYRange = document.getElementById('pageZoomYRange');
       const pageZoomYValue = document.getElementById('pageZoomYValue');
+      const textSharpnessRange = document.getElementById('textSharpnessRange');
+      const textSharpnessValue = document.getElementById('textSharpnessValue');
       const textBoldToggle = document.getElementById('textBoldToggle');
       const searchInput = document.getElementById('searchInput');
       const searchBtn = document.getElementById('searchBtn');
@@ -711,6 +718,18 @@
         const shipped = localStorage.getItem(docStateKey('shipped')) === '1';
         applyDocState(picked, shipped);
       }
+      async function setShippedState(next) {
+        localStorage.setItem(docStateKey('shipped'), next ? '1' : '0');
+        const picked = pickedToggle.getAttribute('aria-pressed') === 'true';
+        applyDocState(picked, next);
+        if (hideShipped) await buildPageList();
+      }
+
+      async function toggleShippedState() {
+        const next = shippedToggle.getAttribute('aria-pressed') !== 'true';
+        await setShippedState(next);
+      }
+
       pickedToggle.addEventListener('click', () => {
         const next = pickedToggle.getAttribute('aria-pressed') !== 'true';
         localStorage.setItem(docStateKey('picked'), next ? '1' : '0');
@@ -718,11 +737,7 @@
         applyDocState(next, shipped);
       });
       shippedToggle.addEventListener('click', async () => {
-        const next = shippedToggle.getAttribute('aria-pressed') !== 'true';
-        localStorage.setItem(docStateKey('shipped'), next ? '1' : '0');
-        const picked = pickedToggle.getAttribute('aria-pressed') === 'true';
-        applyDocState(picked, next);
-        if (hideShipped) await buildPageList();
+        await toggleShippedState();
       });
       loadDocState();
 
@@ -835,6 +850,7 @@
         pageZoomY: parseFloat(localStorage.getItem('readerPageZoomY') || '1.00'),
         textSizeY: parseFloat(localStorage.getItem('readerTextSizeY') || '1.45'),
         textSizeX: parseFloat(localStorage.getItem('readerTextSizeX') || '1.00'),
+        textSharpness: parseFloat(localStorage.getItem('readerTextSharpness') || '1.00'),
         textSpacingX: parseFloat(localStorage.getItem('readerTextSpacingX') || '0'),
         textSpacingY: parseFloat(localStorage.getItem('readerTextSpacingY') || '1'),
         forceBold: localStorage.getItem('readerForceBold') === '1',
@@ -961,6 +977,8 @@
         const tsxV = document.getElementById('textSizeXValue');
         if (tsxR) tsxR.value = String(textViewSettings.textSizeX);
         if (tsxV) tsxV.textContent = Math.round(textViewSettings.textSizeX * 100) + '%';
+        if (textSharpnessRange) textSharpnessRange.value = String(textViewSettings.textSharpness);
+        if (textSharpnessValue) textSharpnessValue.textContent = Math.round(textViewSettings.textSharpness * 100) + '%';
         const toxR = document.getElementById('textSpacingXRange');
         const toxV = document.getElementById('textSpacingXValue');
         const toyR = document.getElementById('textSpacingYRange');
@@ -1123,6 +1141,11 @@
           if (textViewSettings.textSpacingX !== 0) span.style.letterSpacing = textViewSettings.textSpacingX + 'px';
           span.style.fontSize = Math.max(6, baseFs * ov.sizeScale) + 'px';
           if (fontScaleX !== 1) span.style.transform = 'scaleX(' + fontScaleX + ')';
+          const sharpness = Math.max(0.5, Math.min(2, textViewSettings.textSharpness || 1));
+          if (sharpness > 1) {
+            const glow = ((sharpness - 1) * 0.5).toFixed(2);
+            span.style.textShadow = '0 0 ' + glow + 'px rgba(0,0,0,.75)';
+          }
           if (textViewSettings.forceBold) { span.style.fontWeight = '700'; }
           span.style.fontFamily = textViewSettings.fontOverride || run.fontFamily;
           pageEl.appendChild(span);
@@ -1275,6 +1298,15 @@
         if (!Number.isFinite(next)) return;
         textViewSettings.textSizeX = Math.max(0.25, Math.min(3, next));
         localStorage.setItem('readerTextSizeX', String(textViewSettings.textSizeX));
+        updateTextControlsUi();
+        await renderPage();
+      });
+
+      textSharpnessRange?.addEventListener('input', async () => {
+        const next = Number(textSharpnessRange.value);
+        if (!Number.isFinite(next)) return;
+        textViewSettings.textSharpness = Math.max(0.5, Math.min(2, next));
+        localStorage.setItem('readerTextSharpness', String(textViewSettings.textSharpness));
         updateTextControlsUi();
         await renderPage();
       });
@@ -1443,6 +1475,7 @@
 
       const SETTINGS_KEYS = [
         'readerPageZoomX','readerPageZoomY','readerTextSizeY','readerTextSizeX',
+        'readerTextSharpness',
         'readerTextSpacingX','readerTextSpacingY','readerFont','readerForceBold',
         'runOverrides:global'
       ];
@@ -1457,6 +1490,7 @@
         textViewSettings.pageZoomY   = parseFloat(localStorage.getItem('readerPageZoomY')   || '1.00');
         textViewSettings.textSizeY   = parseFloat(localStorage.getItem('readerTextSizeY')   || '1.45');
         textViewSettings.textSizeX   = parseFloat(localStorage.getItem('readerTextSizeX')   || '1.00');
+        textViewSettings.textSharpness = parseFloat(localStorage.getItem('readerTextSharpness') || '1.00');
         textViewSettings.textSpacingX= parseFloat(localStorage.getItem('readerTextSpacingX')|| '0');
         textViewSettings.textSpacingY= parseFloat(localStorage.getItem('readerTextSpacingY')|| '1');
         textViewSettings.forceBold   = localStorage.getItem('readerForceBold') === '1';
@@ -1509,6 +1543,9 @@
 
       let touchStartX = 0;
       let touchStartY = 0;
+      let lastTapTime = 0;
+      let lastTapX = 0;
+      let lastTapY = 0;
       viewerWrap.addEventListener('touchstart', (e) => {
         const t = e.changedTouches && e.changedTouches[0];
         if (!t) return;
@@ -1522,7 +1559,23 @@
         if (!t) return;
         const dx = t.clientX - touchStartX;
         const dy = t.clientY - touchStartY;
+        const now = Date.now();
+        const tapDistance = Math.hypot(t.clientX - touchStartX, t.clientY - touchStartY);
+        const sinceLastTap = now - lastTapTime;
+        const fromLastTap = Math.hypot(t.clientX - lastTapX, t.clientY - lastTapY);
         const verticalDominant = Math.abs(dy) > Math.abs(dx);
+
+        // Double tap on page toggles shipped status and stamp.
+        if (!document.body.classList.contains('sidepanel-bottom-open') && tapDistance < 16) {
+          if (sinceLastTap < 320 && fromLastTap < 40) {
+            lastTapTime = 0;
+            await toggleShippedState();
+            return;
+          }
+          lastTapTime = now;
+          lastTapX = t.clientX;
+          lastTapY = t.clientY;
+        }
 
         // Swipe up from lower quarter of screen → open controls panel
         const nearBottom = touchStartY > window.innerHeight * 0.75;
@@ -1550,6 +1603,13 @@
           }
         }
       }, { passive: true });
+
+      viewerWrap.addEventListener('dblclick', async (e) => {
+        if (document.body.classList.contains('sidepanel-bottom-open')) return;
+        const target = e.target;
+        if (target && target.closest && target.closest('#runEditor')) return;
+        await toggleShippedState();
+      });
 
       function animatePage(dir) {
         textView.classList.remove('page-enter-next', 'page-enter-prev');
