@@ -521,14 +521,14 @@ private struct PdfDetailView: View {
 
                 // ── Content ───────────────────────────────────────────────
                 ZStack {
-                    PdfKitView(document: displayDoc, currentPageIdx: $currentPage,
-                               singlePage: singlePageMode,
-                               autoCrop: autoCropEnabled,
-                               overrides: pdfOverrides)
-                        .opacity(viewMode == .pdf ? 1 : 0)
-
-                    NativeReaderView(document: displayDoc, filenames: filenames)
-                        .opacity(viewMode == .reader ? 1 : 0)
+                    if viewMode == .pdf {
+                        PdfKitView(document: displayDoc, currentPageIdx: $currentPage,
+                                   singlePage: singlePageMode,
+                                   autoCrop: autoCropEnabled,
+                                   overrides: pdfOverrides)
+                    } else {
+                        NativeReaderView(document: displayDoc, filenames: filenames)
+                    }
                 }
 
                 Divider().opacity(0.12)
@@ -1265,6 +1265,9 @@ private struct PdfKitView: UIViewRepresentable {
         let bounds = page.bounds(for: .cropBox)
         guard bounds.width > 0, bounds.height > 0 else { return }
 
+        // Edited-only mode: hide the original PDF content and render only override text.
+        addFullPageWhiteout(to: page, bounds: bounds)
+
         let global = overrides.global
         let zoomX = max(0.1, global.pageZoomX)
         let zoomY = max(0.1, global.pageZoomY)
@@ -1279,11 +1282,6 @@ private struct PdfKitView: UIViewRepresentable {
             let fontSize = max(8.0, 11.0 * global.textSizeY * runScale)
             let lineInfo = lineInfo(for: entry.runIndex, lineRuns: lineRuns)
             let lineText = lineInfo?.text ?? "Run \(entry.runIndex)"
-
-            if let lineInfo,
-               let originalTextBounds = originalLineBounds(for: lineInfo.range, on: page, within: bounds) {
-                addWhiteoutAnnotation(to: page, bounds: originalTextBounds)
-            }
 
             let font = resolvedFont(
                 fontName: global.fontOverride,
@@ -1324,6 +1322,18 @@ private struct PdfKitView: UIViewRepresentable {
         }
     }
 
+    private func addFullPageWhiteout(to page: PDFPage, bounds: CGRect) {
+        let whiteout = PDFAnnotation(bounds: bounds, forType: .square, withProperties: nil)
+        whiteout.color = .clear
+        whiteout.interiorColor = .white
+        let border = PDFBorder()
+        border.lineWidth = 0
+        whiteout.border = border
+        whiteout.shouldDisplay = true
+        whiteout.shouldPrint = true
+        page.addAnnotation(whiteout)
+    }
+
     private func parseRunKey(_ key: String) -> (Int, Int)? {
         let parts = key.split(separator: ":")
         guard parts.count == 2 else { return nil }
@@ -1358,38 +1368,6 @@ private struct PdfKitView: UIViewRepresentable {
             return lineRuns[runIndex - 1]
         }
         return nil
-    }
-
-    private func originalLineBounds(for range: NSRange, on page: PDFPage, within pageBounds: CGRect) -> CGRect? {
-        guard range.location != NSNotFound, range.length > 0,
-              let selection = page.selection(for: range) else {
-            return nil
-        }
-
-        var rect = selection.bounds(for: page)
-        guard !rect.isNull, !rect.isEmpty else { return nil }
-
-        rect = rect.insetBy(dx: -2.0, dy: -1.5)
-
-        let minX = max(pageBounds.minX + 1.0, rect.minX)
-        let minY = max(pageBounds.minY + 1.0, rect.minY)
-        let maxX = min(pageBounds.maxX - 1.0, rect.maxX)
-        let maxY = min(pageBounds.maxY - 1.0, rect.maxY)
-
-        guard maxX > minX, maxY > minY else { return nil }
-        return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
-    }
-
-    private func addWhiteoutAnnotation(to page: PDFPage, bounds: CGRect) {
-        let whiteout = PDFAnnotation(bounds: bounds, forType: .square, withProperties: nil)
-        whiteout.color = .clear
-        whiteout.interiorColor = .white
-        let border = PDFBorder()
-        border.lineWidth = 0
-        whiteout.border = border
-        whiteout.shouldDisplay = true
-        whiteout.shouldPrint = true
-        page.addAnnotation(whiteout)
     }
 
     private func resolvedFont(fontName: String, size: CGFloat, forceBold: Bool) -> UIFont {
