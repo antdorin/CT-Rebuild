@@ -12,6 +12,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Text.Json;
+using UglyToad.PdfPig;
 using CTHub.Models;
 using CTHub.Services;
 using Microsoft.Win32;
@@ -2105,6 +2106,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private bool _pdfEditorIsEditMode = true;
     private System.Windows.Media.Imaging.BitmapSource? _pdfEditorBasePreview;
     private readonly System.Collections.ObjectModel.ObservableCollection<RunOverrideRow> _runOverrides = new();
+    private List<string> _pdfEditorPageLines = [];
+    private List<PdfTextLayoutRun> _pdfEditorLayoutRuns = [];
 
     private async void PdfFileGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -2112,6 +2115,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             _pdfEditorCurrentFile = null;
             _pdfEditorBasePreview = null;
+            _pdfEditorPageLines.Clear();
+            _pdfEditorLayoutRuns.Clear();
             PdfEditorSelectedFileText.Text = "Select a PDF from the list above";
             PdfEditorImage.Source = null;
             PdfEditorOverlay.Children.Clear();
@@ -2369,6 +2374,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (!File.Exists(path))
             {
                 _pdfEditorBasePreview = null;
+                _pdfEditorPageLines.Clear();
+                _pdfEditorLayoutRuns.Clear();
                 PdfEditorImage.Source = null;
                 PdfEditorOverlay.Children.Clear();
                 StatusText = $"Preview file not found: {filename}";
@@ -2381,6 +2388,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (bmp is null)
             {
                 _pdfEditorBasePreview = null;
+                _pdfEditorPageLines.Clear();
+                _pdfEditorLayoutRuns.Clear();
                 PdfEditorImage.Source = null;
                 PdfEditorOverlay.Children.Clear();
                 StatusText = $"Preview failed for: {filename}";
@@ -2388,12 +2397,17 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             }
 
             _pdfEditorBasePreview = bmp;
+            _pdfEditorLayoutRuns = ExtractPageLayoutRuns(path, bmp.Width, bmp.Height);
+            _pdfEditorPageLines = _pdfEditorLayoutRuns.Select(r => r.Text).ToList();
+            SyncRunOverridePreviewText();
             RefreshPdfEditorSurface();
             StatusText = $"Preview loaded: {filename}";
         }
         catch (Exception ex)
         {
             _pdfEditorBasePreview = null;
+            _pdfEditorPageLines.Clear();
+            _pdfEditorLayoutRuns.Clear();
             PdfEditorImage.Source = null;
             PdfEditorOverlay.Children.Clear();
             StatusText = $"Preview error: {ex.Message}";
@@ -2439,18 +2453,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             var visual = new DrawingVisual();
             using (var dc = visual.RenderOpen())
             {
-                dc.PushClip(new RectangleGeometry(new Rect(0, 0, width, height)));
-                dc.PushTransform(new TranslateTransform(width * (1.0 - zoomX) / 2.0, height * (1.0 - zoomY) / 2.0));
-                dc.PushTransform(new ScaleTransform(zoomX, zoomY));
-                dc.DrawImage(basePreview, new Rect(0, 0, width, height));
-                dc.Pop();
-                dc.Pop();
-
-                var panel = new Rect(10, Math.Max(10, height - 110), Math.Max(160, width - 20), 100);
-                dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(155, 15, 15, 15)), null, panel);
-
-                var accent = new Pen(new SolidColorBrush(Color.FromArgb(220, 0x4E, 0xC9, 0xA0)), 1.5);
-                dc.DrawLine(accent, new Point(panel.Left + 8, panel.Top + 22), new Point(panel.Right - 8, panel.Top + 22));
+                // Edited view: show only composed text output, not original PDF raster.
+                dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, width, height));
 
                 string fontName = TxtFont?.Text?.Trim() ?? string.Empty;
                 FontFamily fontFamily;
@@ -2466,31 +2470,27 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 }
 
                 var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
-                var titleText = new FormattedText(
-                    "VIEW MODE | COMPOSED PREVIEW",
-                    CultureInfo.CurrentUICulture,
-                    FlowDirection.LeftToRight,
-                    new Typeface(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
-                    12,
-                    Brushes.White,
-                    dpi);
-                dc.DrawText(titleText, new Point(panel.Left + 8, panel.Top + 4));
-
-                double baseFontSize = Math.Max(9, 12 * sizeY);
-                var textBrush = Brushes.White;
+                var textBrush = new SolidColorBrush(Color.FromRgb(0x11, 0x11, 0x11));
                 var textWeight = ChkBold?.IsChecked == true ? FontWeights.Bold : FontWeights.Normal;
 
-                int rowsToShow = Math.Min(3, _runOverrides.Count);
-                for (int i = 0; i < rowsToShow; i++)
+                var overrideMap = _runOverrides
+                    .Where(r => r.Page <= 1)
+                    .GroupBy(r => r.RunIndex)
+                    .ToDictionary(g => g.Key, g => g.Last());
+
+                for (int i = 0; i < _pdfEditorLayoutRuns.Count; i++)
                 {
-                    var run = _runOverrides[i];
-                    double rowFont = Math.Max(8, baseFontSize * Math.Max(0.1, run.SizeScale / 100.0));
-                    string label = string.IsNullOrWhiteSpace(run.PreviewText)
-                        ? $"p{run.Page}:r{run.RunIndex}"
-                        : run.PreviewText;
+                    var layout = _pdfEditorLayoutRuns[i];
+                    overrideMap.TryGetValue(layout.RunIndex, out var runOverride);
+
+                    var label = string.IsNullOrWhiteSpace(runOverride?.PreviewText)
+                        ? layout.Text
+                        : runOverride!.PreviewText;
+                    double runSizeScale = Math.Max(0.1, (runOverride?.SizeScale ?? 100.0) / 100.0);
+                    double rowFont = Math.Max(6, layout.Height * sizeY * runSizeScale);
 
                     var runText = new FormattedText(
-                        $"{label}  dx {run.NudgeX:0.##} dy {run.NudgeY:0.##}",
+                        label,
                         CultureInfo.CurrentUICulture,
                         FlowDirection.LeftToRight,
                         new Typeface(fontFamily, FontStyles.Normal, textWeight, FontStretches.Normal),
@@ -2498,12 +2498,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                         textBrush,
                         dpi);
 
-                    double drawX = panel.Left + 8 + run.NudgeX;
-                    double drawY = panel.Top + 28 + (i * (rowFont + 4)) + run.NudgeY;
-                    double maxX = Math.Max(panel.Left + 8, panel.Right - runText.Width - 8);
-                    double maxY = Math.Max(panel.Top + 24, panel.Bottom - runText.Height - 6);
-                    drawX = Math.Clamp(drawX, panel.Left + 8, maxX);
-                    drawY = Math.Clamp(drawY, panel.Top + 24, maxY);
+                    double centeredX = ((layout.X - (width / 2.0)) * zoomX) + (width / 2.0);
+                    double centeredY = ((layout.Y - (height / 2.0)) * zoomY) + (height / 2.0);
+                    double drawX = centeredX + (runOverride?.NudgeX ?? 0);
+                    double drawY = centeredY + (runOverride?.NudgeY ?? 0);
+                    double maxX = Math.Max(0, width - runText.Width);
+                    double maxY = Math.Max(0, height - runText.Height);
+                    drawX = Math.Clamp(drawX, 0, maxX);
+                    drawY = Math.Clamp(drawY, 0, maxY);
 
                     if (Math.Abs(sizeX - 1.0) > 0.001)
                     {
@@ -2517,17 +2519,17 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     }
                 }
 
-                if (_runOverrides.Count == 0)
+                if (_pdfEditorLayoutRuns.Count == 0)
                 {
                     var emptyText = new FormattedText(
-                        "No run overrides yet. Save edits to create positioned text overrides.",
+                        "No positioned text runs were detected on page 1.",
                         CultureInfo.CurrentUICulture,
                         FlowDirection.LeftToRight,
                         new Typeface(new FontFamily("Segoe UI"), FontStyles.Italic, FontWeights.Normal, FontStretches.Normal),
                         12,
-                        new SolidColorBrush(Color.FromRgb(0xDD, 0xDD, 0xDD)),
+                        new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66)),
                         dpi);
-                    dc.DrawText(emptyText, new Point(panel.Left + 8, panel.Top + 32));
+                    dc.DrawText(emptyText, new Point(12, 12));
                 }
             }
 
@@ -2544,6 +2546,26 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         catch
         {
             return basePreview;
+        }
+    }
+
+    private void SyncRunOverridePreviewText()
+    {
+        foreach (var row in _runOverrides)
+        {
+            if (row.Page > 1)
+                continue;
+
+            if (row.RunIndex >= 0 && row.RunIndex < _pdfEditorLayoutRuns.Count)
+                row.PreviewText = _pdfEditorLayoutRuns[row.RunIndex].Text;
+            else if (row.RunIndex > 0 && row.RunIndex - 1 < _pdfEditorLayoutRuns.Count)
+                row.PreviewText = _pdfEditorLayoutRuns[row.RunIndex - 1].Text;
+            else if (row.RunIndex >= 0 && row.RunIndex < _pdfEditorPageLines.Count)
+                row.PreviewText = _pdfEditorPageLines[row.RunIndex];
+            else if (row.RunIndex > 0 && row.RunIndex - 1 < _pdfEditorPageLines.Count)
+                row.PreviewText = _pdfEditorPageLines[row.RunIndex - 1];
+            else if (string.IsNullOrWhiteSpace(row.PreviewText))
+                row.PreviewText = $"Run {row.RunIndex}";
         }
     }
 
@@ -2641,6 +2663,79 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private static double ParsePercentOrDefault(string? text, double defaultValue)
         => double.TryParse(text, out var value) ? value : defaultValue;
+
+    private sealed class PdfTextLayoutRun
+    {
+        public int RunIndex { get; init; }
+        public string Text { get; init; } = string.Empty;
+        public double X { get; init; }
+        public double Y { get; init; }
+        public double Height { get; init; }
+    }
+
+    private static List<PdfTextLayoutRun> ExtractPageLayoutRuns(string pdfPath, double targetWidth, double targetHeight)
+    {
+        string? tempPdfPath = null;
+        try
+        {
+            var ext = Path.GetExtension(pdfPath);
+            var normalizedPath = pdfPath;
+            if (!string.Equals(ext, ".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                tempPdfPath = Path.ChangeExtension(Path.GetTempFileName(), ".pdf");
+                File.Copy(pdfPath, tempPdfPath, overwrite: true);
+                normalizedPath = tempPdfPath;
+            }
+
+            using var doc = PdfDocument.Open(normalizedPath);
+            if (doc.NumberOfPages <= 0)
+                return [];
+
+            var page = doc.GetPage(1);
+            if (page is null || page.Width <= 0 || page.Height <= 0)
+                return [];
+
+            double scaleX = targetWidth / page.Width;
+            double scaleY = targetHeight / page.Height;
+
+            var runs = new List<PdfTextLayoutRun>();
+            var words = page.GetWords().ToList();
+            for (int i = 0; i < words.Count; i++)
+            {
+                var word = words[i];
+                var text = word.Text?.Trim();
+                if (string.IsNullOrWhiteSpace(text))
+                    continue;
+
+                var box = word.BoundingBox;
+                double x = box.Left * scaleX;
+                double y = targetHeight - (box.Top * scaleY);
+                double h = Math.Max(6, box.Height * scaleY);
+
+                runs.Add(new PdfTextLayoutRun
+                {
+                    RunIndex = i,
+                    Text = text,
+                    X = x,
+                    Y = y,
+                    Height = h
+                });
+            }
+
+            return runs;
+        }
+        catch
+        {
+            return [];
+        }
+        finally
+        {
+            if (!string.IsNullOrEmpty(tempPdfPath) && File.Exists(tempPdfPath))
+            {
+                try { File.Delete(tempPdfPath); } catch { }
+            }
+        }
+    }
 
     private void UpdatePdfEditorModeUi()
     {
