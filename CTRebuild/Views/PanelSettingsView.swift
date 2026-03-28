@@ -23,10 +23,14 @@ struct PanelSettingsView: View {
     @AppStorage("panel_showMaterial")    private var showMaterial = true
 
     // ── Panel size (percent of screen) ───────────────────────────────────
-    @AppStorage("panel_leftSizePercent")   private var leftSizePercent: Int = 97
-    @AppStorage("panel_rightSizePercent")  private var rightSizePercent: Int = 97
-    @AppStorage("panel_topSizePercent")    private var topSizePercent: Int = 97
-    @AppStorage("panel_bottomSizePercent") private var bottomSizePercent: Int = 97
+    @AppStorage("panel_leftSizePercent")    private var leftSizePercent: Int = 97
+    @AppStorage("panel_rightSizePercent")   private var rightSizePercent: Int = 97
+    @AppStorage("panel_topSizePercent")     private var topSizePercent: Int = 97
+    @AppStorage("panel_bottomSizePercent")  private var bottomSizePercent: Int = 97
+    @AppStorage("panel_leftHeightPercent")  private var leftHeightPercent: Int = 97
+    @AppStorage("panel_rightHeightPercent") private var rightHeightPercent: Int = 97
+    @AppStorage("panel_topWidthPercent")    private var topWidthPercent: Int = 97
+    @AppStorage("panel_bottomWidthPercent") private var bottomWidthPercent: Int = 97
 
     var body: some View {
         ZStack {
@@ -118,7 +122,7 @@ struct PanelSettingsView: View {
                         VStack(spacing: 0) {
                             stepperRow(
                                 icon: "sidebar.left",
-                                label: "Left Panel Width",
+                                label: "Left Panel Size X",
                                 detail: "Width as % of screen",
                                 value: $leftSizePercent,
                                 range: 60...100,
@@ -126,8 +130,17 @@ struct PanelSettingsView: View {
                             )
                             Divider().opacity(0.1).padding(.leading, 46)
                             stepperRow(
+                                icon: "sidebar.left",
+                                label: "Left Panel Size Y",
+                                detail: "Height as % of screen",
+                                value: $leftHeightPercent,
+                                range: 60...100,
+                                suffix: "%"
+                            )
+                            Divider().opacity(0.1).padding(.leading, 46)
+                            stepperRow(
                                 icon: "sidebar.right",
-                                label: "Right Panel Width",
+                                label: "Right Panel Size X",
                                 detail: "Width as % of screen",
                                 value: $rightSizePercent,
                                 range: 60...100,
@@ -135,8 +148,26 @@ struct PanelSettingsView: View {
                             )
                             Divider().opacity(0.1).padding(.leading, 46)
                             stepperRow(
+                                icon: "sidebar.right",
+                                label: "Right Panel Size Y",
+                                detail: "Height as % of screen",
+                                value: $rightHeightPercent,
+                                range: 60...100,
+                                suffix: "%"
+                            )
+                            Divider().opacity(0.1).padding(.leading, 46)
+                            stepperRow(
                                 icon: "rectangle.tophalf.inset.filled",
-                                label: "Top Panel Height",
+                                label: "Top Panel Size X",
+                                detail: "Width as % of screen",
+                                value: $topWidthPercent,
+                                range: 60...100,
+                                suffix: "%"
+                            )
+                            Divider().opacity(0.1).padding(.leading, 46)
+                            stepperRow(
+                                icon: "rectangle.tophalf.inset.filled",
+                                label: "Top Panel Size Y",
                                 detail: "Height as % of screen",
                                 value: $topSizePercent,
                                 range: 60...100,
@@ -145,7 +176,16 @@ struct PanelSettingsView: View {
                             Divider().opacity(0.1).padding(.leading, 46)
                             stepperRow(
                                 icon: "rectangle.bottomhalf.inset.filled",
-                                label: "Bottom Panel Height",
+                                label: "Bottom Panel Size X",
+                                detail: "Width as % of screen",
+                                value: $bottomWidthPercent,
+                                range: 60...100,
+                                suffix: "%"
+                            )
+                            Divider().opacity(0.1).padding(.leading, 46)
+                            stepperRow(
+                                icon: "rectangle.bottomhalf.inset.filled",
+                                label: "Bottom Panel Size Y",
                                 detail: "Height as % of screen",
                                 value: $bottomSizePercent,
                                 range: 60...100,

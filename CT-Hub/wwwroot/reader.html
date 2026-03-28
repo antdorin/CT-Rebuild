@@ -213,6 +213,8 @@
     body.light-mode .text-view{background:transparent}
     .text-page{
       position:relative;
+      display:flex;
+      flex-direction:column;
       background:#fff;
       color:#111;
       overflow:visible;
@@ -221,11 +223,19 @@
       border-radius:8px;
       box-shadow:0 2px 24px rgba(0,0,0,.45);
     }
+    .text-line{
+      display:flex;
+      flex-wrap:wrap;
+      align-items:flex-start;
+      align-content:flex-start;
+      width:100%;
+      min-height:1px;
+    }
     .text-run{
-      position:absolute;
-      display:block;
+      position:relative;
+      display:inline-block;
       white-space:pre-wrap;
-      overflow-wrap:break-word;
+      overflow-wrap:anywhere;
       word-break:break-word;
       color:#111;
       line-height:1.2;
@@ -862,11 +872,33 @@
       });
       const textCache = new Map();
       // Per-run overrides: key = `p${pageNum}:r${runIndex}`, value = { dx, dy, sizeScale }
-      // Persisted per file in localStorage
+      // Persisted globally in localStorage so template edits apply to new PDFs
       const RUN_OVERRIDES_KEY = 'runOverrides:global';
       const runOverrides = new Map(
         Object.entries(JSON.parse(localStorage.getItem(RUN_OVERRIDES_KEY) || '{}'))
       );
+      function runOverrideKey(pageNum, runIndex) {
+        return 'p' + pageNum + ':r' + runIndex;
+      }
+      function parseRunOverrideKey(key) {
+        const m = /^p(\d+):r(\d+)$/.exec(String(key || ''));
+        if (!m) return null;
+        return { pageNum: Number(m[1]), runIndex: Number(m[2]) };
+      }
+      function getRunOverrideByKey(key) {
+        const scoped = runOverrides.get(key);
+        if (scoped) return scoped;
+        const parsed = parseRunOverrideKey(key);
+        if (parsed) {
+          // Backward compatibility with legacy keys that were run-only (r0, r1, ...)
+          const legacy = runOverrides.get('r' + parsed.runIndex);
+          if (legacy) return legacy;
+        }
+        return { dx: 0, dy: 0, sizeScale: 1 };
+      }
+      function getRunOverride(pageNum, runIndex) {
+        return getRunOverrideByKey(runOverrideKey(pageNum, runIndex));
+      }
       function saveRunOverrides() {
         const obj = {};
         runOverrides.forEach((v, k) => { obj[k] = v; });
@@ -1120,35 +1152,86 @@
         const pageEl = document.createElement('div');
         pageEl.className = 'text-page';
         pageEl.style.width = outW + 'px';
-        pageEl.style.height = outH + 'px';
+        pageEl.style.minHeight = outH + 'px';
 
-        for (let ri = 0; ri < layout.runs.length; ri++) {
-          const run = layout.runs[ri];
-          const overrideKey = 'r' + ri;
-          const ov = runOverrides.get(overrideKey) || { dx: 0, dy: 0, sizeScale: 1 };
-          const span = document.createElement('span');
-          span.className = 'text-run';
-          span.dataset.runKey = overrideKey;
-          span.textContent = run.text;
-          const baseLeft = (run.left - layout.bounds.left) * scaleX;
-          const baseTop  = (run.top  - layout.bounds.top)  * scaleY * textViewSettings.textSpacingY;
-          const baseFs   = Math.max(6, run.fontSize * fontScaleY);
-          span.dataset.origLeft     = baseLeft + 'px';
-          span.dataset.origTop      = baseTop  + 'px';
-          span.dataset.origFontSize = baseFs    + 'px';
-          span.style.left = (baseLeft + ov.dx) + 'px';
-          span.style.top  = (baseTop  + ov.dy) + 'px';
-          if (textViewSettings.textSpacingX !== 0) span.style.letterSpacing = textViewSettings.textSpacingX + 'px';
-          span.style.fontSize = Math.max(6, baseFs * ov.sizeScale) + 'px';
-          if (fontScaleX !== 1) span.style.transform = 'scaleX(' + fontScaleX + ')';
-          const sharpness = Math.max(0.5, Math.min(2, textViewSettings.textSharpness || 1));
-          if (sharpness > 1) {
-            const glow = ((sharpness - 1) * 0.5).toFixed(2);
-            span.style.textShadow = '0 0 ' + glow + 'px rgba(0,0,0,.75)';
+        const scaledRuns = layout.runs.map((run, ri) => {
+          const scaledLeft = (run.left - layout.bounds.left) * scaleX;
+          const scaledTop = (run.top - layout.bounds.top) * scaleY * textViewSettings.textSpacingY;
+          const scaledWidth = Math.max(1, run.width * scaleX);
+          return { run, ri, scaledLeft, scaledTop, scaledWidth };
+        }).sort((a, b) => {
+          if (Math.abs(a.scaledTop - b.scaledTop) > 0.5) return a.scaledTop - b.scaledTop;
+          return a.scaledLeft - b.scaledLeft;
+        });
+
+        const lineTolerance = Math.max(2, 4 * scaleY * textViewSettings.textSpacingY);
+        const lines = [];
+        for (const entry of scaledRuns) {
+          const last = lines[lines.length - 1];
+          if (!last || Math.abs(entry.scaledTop - last.anchorTop) > lineTolerance) {
+            lines.push({
+              anchorTop: entry.scaledTop,
+              maxBaseFont: entry.run.fontSize,
+              runs: [entry]
+            });
+          } else {
+            last.runs.push(entry);
+            if (entry.run.fontSize > last.maxBaseFont) last.maxBaseFont = entry.run.fontSize;
           }
-          if (textViewSettings.forceBold) { span.style.fontWeight = '700'; }
-          span.style.fontFamily = textViewSettings.fontOverride || run.fontFamily;
-          pageEl.appendChild(span);
+        }
+
+        for (let li = 0; li < lines.length; li++) {
+          const line = lines[li];
+          line.runs.sort((a, b) => a.scaledLeft - b.scaledLeft);
+          const lineEl = document.createElement('div');
+          lineEl.className = 'text-line';
+
+          if (li === 0) {
+            lineEl.style.marginTop = Math.max(0, line.anchorTop) + 'px';
+          } else {
+            const prev = lines[li - 1];
+            const prevFont = Math.max(6, prev.maxBaseFont * fontScaleY);
+            const baselineGap = line.anchorTop - prev.anchorTop;
+            const marginTop = Math.max(0, baselineGap - (prevFont * 1.2));
+            lineEl.style.marginTop = marginTop + 'px';
+          }
+
+          let cursorX = 0;
+          for (const entry of line.runs) {
+            const run = entry.run;
+            const ri = entry.ri;
+            const overrideKey = runOverrideKey(currentPage, ri);
+            const ov = getRunOverride(currentPage, ri);
+            const span = document.createElement('span');
+            span.className = 'text-run';
+            span.dataset.runKey = overrideKey;
+            span.textContent = run.text;
+
+            const leftGap = Math.max(0, entry.scaledLeft - cursorX);
+            const baseFs = Math.max(6, run.fontSize * fontScaleY);
+            span.dataset.origMarginLeft = leftGap + 'px';
+            span.dataset.origFontSize = baseFs + 'px';
+            span.dataset.origNudgeY = '0px';
+
+            span.style.marginLeft = (leftGap + ov.dx) + 'px';
+            span.style.top = ov.dy + 'px';
+            span.style.maxWidth = Math.max(16, outW - Math.max(0, entry.scaledLeft)) + 'px';
+            if (textViewSettings.textSpacingX !== 0) span.style.letterSpacing = textViewSettings.textSpacingX + 'px';
+            span.style.fontSize = Math.max(6, baseFs * ov.sizeScale) + 'px';
+            if (fontScaleX !== 1) span.style.transform = 'scaleX(' + fontScaleX + ')';
+            const sharpness = Math.max(0.5, Math.min(2, textViewSettings.textSharpness || 1));
+            if (sharpness > 1) {
+              const glow = ((sharpness - 1) * 0.5).toFixed(2);
+              span.style.textShadow = '0 0 ' + glow + 'px rgba(0,0,0,.75)';
+            }
+            if (textViewSettings.forceBold) { span.style.fontWeight = '700'; }
+            span.style.fontFamily = textViewSettings.fontOverride || run.fontFamily;
+            lineEl.appendChild(span);
+
+            cursorX = Math.max(cursorX, entry.scaledLeft + entry.scaledWidth);
+          }
+
+          pageEl.appendChild(lineEl);
         }
 
         textView.appendChild(pageEl);
@@ -1372,7 +1455,7 @@
         spanEl.classList.add('run-selected');
 
         const key = spanEl.dataset.runKey;
-        const ov = runOverrides.get(key) || { dx: 0, dy: 0, sizeScale: 1 };
+        const ov = getRunOverrideByKey(key);
 
         document.getElementById('runEditorTitle').textContent = 'Run: \u201c' + spanEl.textContent.slice(0, 32) + '\u201d';
         document.getElementById('reNudgeX').value = String(ov.dx);
@@ -1397,10 +1480,12 @@
       }
 
       function applyRunOverride(key, patch) {
-        const existing = runOverrides.get(key) || { dx: 0, dy: 0, sizeScale: 1 };
+        const existing = getRunOverrideByKey(key);
         const updated = Object.assign({}, existing, patch);
         if (updated.dx === 0 && updated.dy === 0 && updated.sizeScale === 1) {
           runOverrides.delete(key);
+          const parsed = parseRunOverrideKey(key);
+          if (parsed) runOverrides.delete('r' + parsed.runIndex);
         } else {
           runOverrides.set(key, updated);
         }
@@ -1408,11 +1493,10 @@
         // Update the span in-place without full re-render
         const span = document.querySelector('[data-run-key="' + key + '"]');
         if (span) {
-          const origLeft = parseFloat(span.dataset.origLeft);
-          const origTop  = parseFloat(span.dataset.origTop);
+          const origMarginLeft = parseFloat(span.dataset.origMarginLeft);
           const origFs   = parseFloat(span.dataset.origFontSize);
-          span.style.left     = (origLeft + updated.dx) + 'px';
-          span.style.top      = (origTop  + updated.dy) + 'px';
+          span.style.marginLeft = (origMarginLeft + updated.dx) + 'px';
+          span.style.top      = updated.dy + 'px';
           span.style.fontSize = Math.max(6, origFs * updated.sizeScale) + 'px';
         }
       }
@@ -1440,7 +1524,10 @@
 
       document.getElementById('reReset')?.addEventListener('click', async () => {
         if (!selectedRunEl) return;
-        runOverrides.delete(selectedRunEl.dataset.runKey);
+        const key = selectedRunEl.dataset.runKey;
+        runOverrides.delete(key);
+        const parsed = parseRunOverrideKey(key);
+        if (parsed) runOverrides.delete('r' + parsed.runIndex);
         saveRunOverrides();
         document.getElementById('reNudgeX').value = '0';
         document.getElementById('reNudgeXVal').textContent = '0px';

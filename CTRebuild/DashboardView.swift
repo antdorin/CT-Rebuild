@@ -14,10 +14,14 @@ struct DashboardView: View {
     @ObservedObject private var gestureSettings = GestureSettings.shared
     @AppStorage("panel_hapticOnChange") private var panelHapticOnChange = false
     @AppStorage("panel_dimOnOpen")       private var panelDimOnOpen = true
-    @AppStorage("panel_leftSizePercent")   private var leftSizePercent: Int = 97
-    @AppStorage("panel_rightSizePercent")  private var rightSizePercent: Int = 97
-    @AppStorage("panel_topSizePercent")    private var topSizePercent: Int = 97
-    @AppStorage("panel_bottomSizePercent") private var bottomSizePercent: Int = 97
+    @AppStorage("panel_leftSizePercent")    private var leftSizePercent: Int = 97
+    @AppStorage("panel_rightSizePercent")   private var rightSizePercent: Int = 97
+    @AppStorage("panel_topSizePercent")     private var topSizePercent: Int = 97
+    @AppStorage("panel_bottomSizePercent")  private var bottomSizePercent: Int = 97
+    @AppStorage("panel_leftHeightPercent")  private var leftHeightPercent: Int = 97
+    @AppStorage("panel_rightHeightPercent") private var rightHeightPercent: Int = 97
+    @AppStorage("panel_topWidthPercent")    private var topWidthPercent: Int = 97
+    @AppStorage("panel_bottomWidthPercent") private var bottomWidthPercent: Int = 97
 
     var body: some View {
         // GeometryReader ignores safe area so panels slide in from the true
@@ -53,7 +57,10 @@ struct DashboardView: View {
                 // ── Left Panel (swipe RIGHT to open) ──────────────────────────
                 if activePanel == .left {
                     panelContent(for: .left, safeArea: safe)
-                        .frame(width: geo.size.width * panelFraction(leftSizePercent), height: geo.size.height)
+                        .frame(
+                            width: geo.size.width * panelFraction(leftSizePercent),
+                            height: geo.size.height * panelFraction(leftHeightPercent)
+                        )
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                         .zIndex(11)
                         .transition(.move(edge: .leading))
@@ -62,7 +69,10 @@ struct DashboardView: View {
                 // ── Right Panel (swipe LEFT to open) ──────────────────────────
                 if activePanel == .right {
                     panelContent(for: .right, safeArea: safe)
-                        .frame(width: geo.size.width * panelFraction(rightSizePercent), height: geo.size.height)
+                        .frame(
+                            width: geo.size.width * panelFraction(rightSizePercent),
+                            height: geo.size.height * panelFraction(rightHeightPercent)
+                        )
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                         .zIndex(11)
                         .transition(.move(edge: .trailing))
@@ -71,7 +81,10 @@ struct DashboardView: View {
                 // ── Top Panel (swipe DOWN to open) ────────────────────────────
                 if activePanel == .top {
                     panelContent(for: .top, safeArea: safe)
-                        .frame(width: geo.size.width, height: geo.size.height * panelFraction(topSizePercent))
+                        .frame(
+                            width: geo.size.width * panelFraction(topWidthPercent),
+                            height: geo.size.height * panelFraction(topSizePercent)
+                        )
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         .zIndex(11)
                         .transition(.move(edge: .top))
@@ -80,7 +93,10 @@ struct DashboardView: View {
                 // ── Bottom Panel (swipe UP to open) ───────────────────────────
                 if activePanel == .bottom {
                     panelContent(for: .bottom, safeArea: safe)
-                        .frame(width: geo.size.width, height: geo.size.height * panelFraction(bottomSizePercent))
+                        .frame(
+                            width: geo.size.width * panelFraction(bottomWidthPercent),
+                            height: geo.size.height * panelFraction(bottomSizePercent)
+                        )
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                         .zIndex(11)
                         .transition(.move(edge: .bottom))
@@ -188,20 +204,6 @@ struct DashboardView: View {
         let adx = abs(dx)
         let ady = abs(dy)
 
-        // Plain swipe with a panel open: check panel picker overrides, then close direction.
-        // Close threshold is fixed at 50pt — not configurable to avoid lockout.
-        if !allowSwitch, activePanel != .none {
-            let t: CGFloat = 50
-            switch activePanel {
-            case .left   where dx < -t && adx > ady: activePanel = .none
-            case .right  where dx >  t && adx > ady: activePanel = .none
-            case .top    where dy < -t && ady > adx: activePanel = .none
-            case .bottom where dy > t && ady > adx && value.predictedEndTranslation.height > 200: activePanel = .none
-            default: break
-            }
-            return
-        }
-
         // Use calibrated thresholds from GestureSettings
         let threshold: CGFloat = allowSwitch
             ? CGFloat(gestureSettings.lpSwipeThreshold)
@@ -229,7 +231,44 @@ struct DashboardView: View {
                     : (dy > 0 ? .swipeDown  : .swipeUp) }
         }
 
-        executeAction(gestureSettings.action(for: trigger))
+        let action = gestureSettings.action(for: trigger)
+
+        // Keep legacy one-finger swipe-to-close when a panel is open and the
+        // trigger is still mapped to its default open action. If the user
+        // customized the trigger (e.g., Switch Panel), honor that mapping.
+        if !allowSwitch, activePanel != .none, action == trigger.defaultAction {
+            if closeActivePanelIfNeeded(dx: dx, dy: dy, adx: adx, ady: ady, predictedEndDy: value.predictedEndTranslation.height) {
+                return
+            }
+        }
+
+        executeAction(action)
+    }
+
+    private func closeActivePanelIfNeeded(
+        dx: CGFloat,
+        dy: CGFloat,
+        adx: CGFloat,
+        ady: CGFloat,
+        predictedEndDy: CGFloat
+    ) -> Bool {
+        let t: CGFloat = 50
+        switch activePanel {
+        case .left where dx < -t && adx > ady:
+            activePanel = .none
+            return true
+        case .right where dx > t && adx > ady:
+            activePanel = .none
+            return true
+        case .top where dy < -t && ady > adx:
+            activePanel = .none
+            return true
+        case .bottom where dy > t && ady > adx && predictedEndDy > 200:
+            activePanel = .none
+            return true
+        default:
+            return false
+        }
     }
 
     // MARK: - Execute Action

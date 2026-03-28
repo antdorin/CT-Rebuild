@@ -20,7 +20,7 @@ public class CatalogLinkEntry
     public string ScannedCode { get; set; } = string.Empty;
 
     [JsonPropertyName("linkCode")]
-    public string LinkCode { get; set; } = string.Empty;
+    public string LinkCode { get; set; } = "?-000";
 
     [JsonPropertyName("createdAtUtc")]
     public string CreatedAtUtc { get; set; } = DateTime.UtcNow.ToString("o");

@@ -303,7 +303,23 @@ public sealed class HubServer
                     res.StatusCode = 204; break;
 
                 case ("GET", "/api/links"):
-                    await WriteJsonAsync(res, CatalogLinks.GetAll()); break;
+                {
+                    var links = CatalogLinks.GetAll()
+                        .Select(x =>
+                            new CatalogLinkEntry
+                            {
+                                Id = x.Id,
+                                SourceCatalog = x.SourceCatalog,
+                                SourceItemId = x.SourceItemId,
+                                SourceItemLabelSnapshot = x.SourceItemLabelSnapshot,
+                                ScannedCode = x.ScannedCode,
+                                LinkCode = NormalizeLinkCode(x.LinkCode),
+                                CreatedAtUtc = x.CreatedAtUtc
+                            })
+                        .ToList();
+                    await WriteJsonAsync(res, links);
+                    break;
+                }
 
                 case ("POST", "/api/links"):
                 {
@@ -320,9 +336,7 @@ public sealed class HubServer
                     linkEntry.SourceItemLabelSnapshot = linkEntry.SourceItemLabelSnapshot?.Trim() ?? string.Empty;
                     linkEntry.SourceItemId = linkEntry.SourceItemId.Trim();
                     linkEntry.ScannedCode = linkEntry.ScannedCode.Trim();
-                    linkEntry.LinkCode = string.IsNullOrWhiteSpace(linkEntry.LinkCode)
-                        ? BuildLinkCode(linkEntry.SourceCatalog)
-                        : linkEntry.LinkCode.Trim();
+                    linkEntry.LinkCode = NormalizeLinkCode(linkEntry.LinkCode);
                     linkEntry.CreatedAtUtc = string.IsNullOrWhiteSpace(linkEntry.CreatedAtUtc)
                         ? DateTime.UtcNow.ToString("o")
                         : linkEntry.CreatedAtUtc;
@@ -472,11 +486,10 @@ public sealed class HubServer
             : "chase_tactical";
     }
 
-    private static string BuildLinkCode(string sourceCatalog)
+    private static string NormalizeLinkCode(string? linkCode)
     {
-        var prefix = sourceCatalog.Equals("tough_hook", StringComparison.OrdinalIgnoreCase) ? "T" : "C";
-        var value = Random.Shared.Next(1, 1000);
-        return $"{prefix}-{value:000}";
+        var trimmed = linkCode?.Trim() ?? string.Empty;
+        return string.IsNullOrWhiteSpace(trimmed) ? "?-000" : trimmed;
     }
 }
 
