@@ -1216,6 +1216,9 @@ private struct PdfKitView: UIViewRepresentable {
             let source = autoCrop ? autoCropped(document) : document
             let doc = composedDocument(from: source, overrides: overrides)
             uiView.document = doc
+            // Re-trigger auto-scaling after document replacement; without this the
+            // page can render smaller than the view following an overrides update.
+            uiView.autoScales = true
             let pageIdx = docChanged ? 0 : currentPageIdx
             if let page = doc.page(at: pageIdx) {
                 uiView.go(to: page)
@@ -1293,9 +1296,12 @@ private struct PdfKitView: UIViewRepresentable {
             let estimatedWidth = max(24.0, min(bounds.width - 4.0, layout.bounds.width * textScaleX)) * pageScaleX
 
             let centeredX = ((layout.bounds.minX - bounds.midX) * zoomX) + bounds.midX
-            let centeredY = ((layout.bounds.minY - bounds.midY) * zoomY) + bounds.midY
+            // Anchor on word TOP (maxY in PDF coords) to match desktop which draws at the
+            // top-left of each word. Annotation bottom = word_top_zoomed - rowHeight so
+            // the annotation's visual top aligns with the word's zoomed top edge.
+            let centeredYtop = ((layout.bounds.maxY - bounds.midY) * zoomY) + bounds.midY
             var x = bounds.minX + ((centeredX - bounds.minX) * pageScaleX)
-            var y = bounds.minY + ((centeredY - bounds.minY) * pageScaleY)
+            var y = bounds.minY + ((centeredYtop - rowHeight - bounds.minY) * pageScaleY)
             x += CGFloat(entry.run.dx)
             y += CGFloat(entry.run.dy)
 
@@ -1319,6 +1325,12 @@ private struct PdfKitView: UIViewRepresentable {
             annotation.color = .clear
             annotation.interiorColor = .clear
             annotation.border = textBorder
+            // Force PDF-level border suppression — PDFKit's color/.clear alone is not
+            // always honoured when the document is re-rendered.
+            annotation.setValue([0.0, 0.0, 0.0] as NSArray,
+                                forAnnotationKey: PDFAnnotationKey(rawValue: "/Border"))
+            annotation.setValue(["W": 0, "S": "S"] as NSDictionary,
+                                forAnnotationKey: PDFAnnotationKey(rawValue: "/BS"))
             annotation.alignment = .left
             annotation.shouldDisplay = true
             annotation.shouldPrint = true
@@ -1329,11 +1341,16 @@ private struct PdfKitView: UIViewRepresentable {
 
     private func addFullPageWhiteout(to page: PDFPage, bounds: CGRect) {
         let whiteout = PDFAnnotation(bounds: bounds, forType: .square, withProperties: nil)
-        whiteout.color = .clear
+        // Use white for both fill and border so any border fallback is invisible.
+        whiteout.color = .white
         whiteout.interiorColor = .white
         let border = PDFBorder()
         border.lineWidth = 0
         whiteout.border = border
+        whiteout.setValue([0.0, 0.0, 0.0] as NSArray,
+                          forAnnotationKey: PDFAnnotationKey(rawValue: "/Border"))
+        whiteout.setValue(["W": 0, "S": "S"] as NSDictionary,
+                          forAnnotationKey: PDFAnnotationKey(rawValue: "/BS"))
         whiteout.shouldDisplay = true
         whiteout.shouldPrint = true
         page.addAnnotation(whiteout)
@@ -1371,7 +1388,16 @@ private struct PdfKitView: UIViewRepresentable {
         }
 
         if !runLayouts.isEmpty {
-            return runLayouts
+            // Sort top-to-bottom then left-to-right (PDF Y grows upward, so descending
+            // minY = top first). This matches PdfPig's NearestNeighbourWordExtractor
+            // reading-order so that run-index keys align across platforms.
+            return runLayouts.sorted { lhs, rhs in
+                let yDelta = abs(lhs.bounds.midY - rhs.bounds.midY)
+                if yDelta > 2.0 {
+                    return lhs.bounds.midY > rhs.bounds.midY
+                }
+                return lhs.bounds.minX < rhs.bounds.minX
+            }
         }
 
         // Fallback for PDFs where word-range selections cannot be resolved reliably.
