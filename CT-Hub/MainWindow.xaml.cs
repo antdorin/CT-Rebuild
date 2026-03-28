@@ -4,12 +4,14 @@ using System.IO;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Text.Json;
 using CTHub.Models;
 using CTHub.Services;
 using Microsoft.Win32;
@@ -506,6 +508,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             PdfFolderPathText.Text = _hub.PdfFolder.CurrentFolder;
 
         InitializeSearchFilters();
+        UpdatePdfEditorModeUi();
 
         // Populate server info panel
         RefreshServerInfo();
@@ -2094,4 +2097,662 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         dlg.ShowDialog();
         return result;
     }
+
+    // ── PDF Editor handlers ───────────────────────────────────────────────────
+
+    private bool _pdfEditorSyncing;
+    private string? _pdfEditorCurrentFile;
+    private bool _pdfEditorIsEditMode = true;
+    private System.Windows.Media.Imaging.BitmapSource? _pdfEditorBasePreview;
+    private readonly System.Collections.ObjectModel.ObservableCollection<RunOverrideRow> _runOverrides = new();
+
+    private async void PdfFileGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (PdfFileGrid.SelectedItem is not PdfFileRow row)
+        {
+            _pdfEditorCurrentFile = null;
+            _pdfEditorBasePreview = null;
+            PdfEditorSelectedFileText.Text = "Select a PDF from the list above";
+            PdfEditorImage.Source = null;
+            PdfEditorOverlay.Children.Clear();
+            return;
+        }
+
+        _pdfEditorCurrentFile = row.Name;
+        PdfEditorSelectedFileText.Text = row.Name;
+
+        var folder = _hub.PdfFolder.CurrentFolder;
+        if (string.IsNullOrEmpty(folder))
+        {
+            StatusText = "Select a PDF folder first.";
+            return;
+        }
+
+        await LoadPdfOverridesAsync(row.Name);
+        await RenderPdfPreviewAsync(folder, row.Name);
+    }
+
+    private async Task LoadPdfOverridesAsync(string filename)
+    {
+        try
+        {
+            using var http = new System.Net.Http.HttpClient();
+            var url  = $"http://localhost:{HubServer.Port}/api/pdf-overrides/{Uri.EscapeDataString(filename)}";
+            var json = await http.GetStringAsync(url);
+            ApplyOverridesJson(json);
+        }
+        catch
+        {
+            ResetEditorToDefaults();
+        }
+    }
+
+    private void ApplyOverridesJson(string json)
+    {
+        _pdfEditorSyncing = true;
+        try
+        {
+            using var doc  = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("global", out var global))
+            {
+                if (global.TryGetProperty("textSizeY",   out var v)  && v.TryGetDouble(out var d))
+                    SetSliderAndText(SldSizeY, TxtSizeY, d * 100);
+                if (global.TryGetProperty("textSizeX",   out var v2) && v2.TryGetDouble(out var d2))
+                    SetSliderAndText(SldSizeX, TxtSizeX, d2 * 100);
+                if (global.TryGetProperty("pageZoomX",   out var v3) && v3.TryGetDouble(out var d3))
+                    SetSliderAndText(SldZoomX, TxtZoomX, d3 * 100);
+                if (global.TryGetProperty("pageZoomY",   out var v4) && v4.TryGetDouble(out var d4))
+                    SetSliderAndText(SldZoomY, TxtZoomY, d4 * 100);
+                if (global.TryGetProperty("fontOverride", out var vf))
+                    TxtFont.Text = vf.GetString() ?? string.Empty;
+                if (global.TryGetProperty("forceBold",   out var vb))
+                    ChkBold.IsChecked = vb.GetBoolean();
+            }
+
+            _runOverrides.Clear();
+            if (root.TryGetProperty("runs", out var runs))
+            {
+                foreach (var prop in runs.EnumerateObject())
+                {
+                    var parts = prop.Name.TrimStart('p').Split(":r");
+                    if (parts.Length != 2
+                        || !int.TryParse(parts[0], out var page)
+                        || !int.TryParse(parts[1], out var run))
+                        continue;
+
+                    var overrideRow = new RunOverrideRow { Page = page, RunIndex = run };
+                    if (prop.Value.TryGetProperty("dx",        out var dx)  && dx.TryGetDouble(out var dxVal))
+                        overrideRow.NudgeX = dxVal;
+                    if (prop.Value.TryGetProperty("dy",        out var dy)  && dy.TryGetDouble(out var dyVal))
+                        overrideRow.NudgeY = dyVal;
+                    if (prop.Value.TryGetProperty("sizeScale", out var ss)  && ss.TryGetDouble(out var ssVal))
+                        overrideRow.SizeScale = ssVal * 100;
+                    _runOverrides.Add(overrideRow);
+                }
+            }
+
+            RunOverridesGrid.ItemsSource = _runOverrides;
+            RefreshPdfEditorSurface();
+        }
+        catch
+        {
+            ResetEditorToDefaults();
+        }
+        finally
+        {
+            _pdfEditorSyncing = false;
+        }
+    }
+
+    private void ResetEditorToDefaults()
+    {
+        _pdfEditorSyncing = true;
+        SetSliderAndText(SldSizeY, TxtSizeY, 175);
+        SetSliderAndText(SldSizeX, TxtSizeX, 100);
+        SetSliderAndText(SldZoomX, TxtZoomX, 100);
+        SetSliderAndText(SldZoomY, TxtZoomY, 100);
+        TxtFont.Text      = string.Empty;
+        ChkBold.IsChecked = false;
+        _runOverrides.Clear();
+        RunOverridesGrid.ItemsSource = _runOverrides;
+        _pdfEditorSyncing = false;
+        RefreshPdfEditorSurface();
+    }
+
+    private void SetSliderAndText(Slider sld, TextBox txt, double value)
+    {
+        txt.Text  = ((int)Math.Round(value)).ToString();
+        sld.Value = Math.Clamp(value, sld.Minimum, sld.Maximum);
+    }
+
+    private void GlobalSetting_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_pdfEditorSyncing || SldSizeY is null || SldSizeX is null || SldZoomX is null || SldZoomY is null) return;
+        if (sender is not TextBox tb) return;
+        _pdfEditorSyncing = true;
+        try
+        {
+            if      (tb == TxtSizeY && double.TryParse(tb.Text, out var v))
+                SldSizeY.Value = Math.Clamp(v, SldSizeY.Minimum, SldSizeY.Maximum);
+            else if (tb == TxtSizeX && double.TryParse(tb.Text, out var v2))
+                SldSizeX.Value = Math.Clamp(v2, SldSizeX.Minimum, SldSizeX.Maximum);
+            else if (tb == TxtZoomX && double.TryParse(tb.Text, out var v3))
+                SldZoomX.Value = Math.Clamp(v3, SldZoomX.Minimum, SldZoomX.Maximum);
+            else if (tb == TxtZoomY && double.TryParse(tb.Text, out var v4))
+                SldZoomY.Value = Math.Clamp(v4, SldZoomY.Minimum, SldZoomY.Maximum);
+        }
+        finally
+        {
+            _pdfEditorSyncing = false;
+        }
+
+        RefreshPdfEditorSurface();
+    }
+
+    private void SldSizeY_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_pdfEditorSyncing || TxtSizeY is null) return;
+        _pdfEditorSyncing = true;
+        TxtSizeY.Text = ((int)Math.Round(e.NewValue)).ToString();
+        _pdfEditorSyncing = false;
+        RefreshPdfEditorSurface();
+    }
+
+    private void SldSizeX_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_pdfEditorSyncing || TxtSizeX is null) return;
+        _pdfEditorSyncing = true;
+        TxtSizeX.Text = ((int)Math.Round(e.NewValue)).ToString();
+        _pdfEditorSyncing = false;
+        RefreshPdfEditorSurface();
+    }
+
+    private void SldZoomX_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_pdfEditorSyncing || TxtZoomX is null) return;
+        _pdfEditorSyncing = true;
+        TxtZoomX.Text = ((int)Math.Round(e.NewValue)).ToString();
+        _pdfEditorSyncing = false;
+        RefreshPdfEditorSurface();
+    }
+
+    private void SldZoomY_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_pdfEditorSyncing || TxtZoomY is null) return;
+        _pdfEditorSyncing = true;
+        TxtZoomY.Text = ((int)Math.Round(e.NewValue)).ToString();
+        _pdfEditorSyncing = false;
+        RefreshPdfEditorSurface();
+    }
+
+    private void RunOverrides_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+    {
+        Dispatcher.InvokeAsync(RefreshPdfEditorSurface);
+    }
+
+    private void PdfEditorEditMode_Click(object sender, RoutedEventArgs e)
+    {
+        _pdfEditorIsEditMode = true;
+        UpdatePdfEditorModeUi();
+        RefreshPdfEditorSurface();
+    }
+
+    private void PdfEditorViewMode_Click(object sender, RoutedEventArgs e)
+    {
+        _pdfEditorIsEditMode = false;
+        UpdatePdfEditorModeUi();
+        RefreshPdfEditorSurface();
+    }
+
+    private async void PdfEditorSave_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_pdfEditorCurrentFile)) return;
+
+        var payload = BuildOverridesPayload();
+        var json    = JsonSerializer.Serialize(payload,
+            new JsonSerializerOptions { WriteIndented = true });
+
+        try
+        {
+            using var http    = new System.Net.Http.HttpClient();
+            var url           = $"http://localhost:{HubServer.Port}/api/pdf-overrides/{Uri.EscapeDataString(_pdfEditorCurrentFile)}";
+            var content       = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            var response      = await http.PostAsync(url, content);
+            StatusText = response.IsSuccessStatusCode
+                ? $"Saved: {_pdfEditorCurrentFile}"
+                : $"Save failed: {(int)response.StatusCode}";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Save failed: {ex.Message}";
+        }
+    }
+
+    private object BuildOverridesPayload()
+    {
+        double sizeY = double.TryParse(TxtSizeY.Text, out var v1) ? v1 / 100.0 : 1.75;
+        double sizeX = double.TryParse(TxtSizeX.Text, out var v2) ? v2 / 100.0 : 1.0;
+        double zoomX = double.TryParse(TxtZoomX.Text, out var v3) ? v3 / 100.0 : 1.0;
+        double zoomY = double.TryParse(TxtZoomY.Text, out var v4) ? v4 / 100.0 : 1.0;
+
+        var runsDict = new Dictionary<string, object>();
+        foreach (RunOverrideRow row in _runOverrides)
+            runsDict[$"p{row.Page}:r{row.RunIndex}"] = new
+            {
+                dx        = row.NudgeX,
+                dy        = row.NudgeY,
+                sizeScale = row.SizeScale / 100.0
+            };
+
+        return new
+        {
+            global = new
+            {
+                textSizeY    = sizeY,
+                textSizeX    = sizeX,
+                pageZoomX    = zoomX,
+                pageZoomY    = zoomY,
+                forceBold    = ChkBold.IsChecked == true,
+                fontOverride = TxtFont.Text.Trim()
+            },
+            runs = runsDict
+        };
+    }
+
+    private async Task RenderPdfPreviewAsync(string folder, string filename)
+    {
+        try
+        {
+            var path = Path.Combine(folder, filename);
+            if (!File.Exists(path))
+            {
+                _pdfEditorBasePreview = null;
+                PdfEditorImage.Source = null;
+                PdfEditorOverlay.Children.Clear();
+                StatusText = $"Preview file not found: {filename}";
+                return;
+            }
+
+            // Render preview synchronously on the UI thread to avoid cross-thread bitmap issues.
+            System.Windows.Media.Imaging.BitmapSource? bmp = RenderPageToBitmapSource(path);
+
+            if (bmp is null)
+            {
+                _pdfEditorBasePreview = null;
+                PdfEditorImage.Source = null;
+                PdfEditorOverlay.Children.Clear();
+                StatusText = $"Preview failed for: {filename}";
+                return;
+            }
+
+            _pdfEditorBasePreview = bmp;
+            RefreshPdfEditorSurface();
+            StatusText = $"Preview loaded: {filename}";
+        }
+        catch (Exception ex)
+        {
+            _pdfEditorBasePreview = null;
+            PdfEditorImage.Source = null;
+            PdfEditorOverlay.Children.Clear();
+            StatusText = $"Preview error: {ex.Message}";
+        }
+    }
+
+    private void RefreshPdfEditorSurface()
+    {
+        if (PdfEditorImage is null || PdfEditorOverlay is null || PdfEditorCanvas is null)
+            return;
+
+        if (_pdfEditorBasePreview is null)
+        {
+            PdfEditorImage.Source = null;
+            PdfEditorOverlay.Children.Clear();
+            return;
+        }
+
+        var surface = _pdfEditorIsEditMode
+            ? _pdfEditorBasePreview
+            : BuildComposedViewBitmap(_pdfEditorBasePreview);
+
+        PdfEditorImage.Source = surface;
+        PdfEditorCanvas.Width = surface.PixelWidth;
+        PdfEditorCanvas.Height = surface.PixelHeight;
+        RefreshPdfEditorOverlay();
+    }
+
+    private System.Windows.Media.Imaging.BitmapSource BuildComposedViewBitmap(System.Windows.Media.Imaging.BitmapSource basePreview)
+    {
+        try
+        {
+            double width = basePreview.Width;
+            double height = basePreview.Height;
+            if (width <= 0 || height <= 0)
+                return basePreview;
+
+            double zoomX = Math.Clamp(ParsePercentOrDefault(TxtZoomX?.Text, 100), 10, 1000) / 100.0;
+            double zoomY = Math.Clamp(ParsePercentOrDefault(TxtZoomY?.Text, 100), 10, 1000) / 100.0;
+            double sizeY = Math.Clamp(ParsePercentOrDefault(TxtSizeY?.Text, 175), 10, 1000) / 100.0;
+            double sizeX = Math.Clamp(ParsePercentOrDefault(TxtSizeX?.Text, 100), 10, 1000) / 100.0;
+
+            var visual = new DrawingVisual();
+            using (var dc = visual.RenderOpen())
+            {
+                dc.PushClip(new RectangleGeometry(new Rect(0, 0, width, height)));
+                dc.PushTransform(new TranslateTransform(width * (1.0 - zoomX) / 2.0, height * (1.0 - zoomY) / 2.0));
+                dc.PushTransform(new ScaleTransform(zoomX, zoomY));
+                dc.DrawImage(basePreview, new Rect(0, 0, width, height));
+                dc.Pop();
+                dc.Pop();
+
+                var panel = new Rect(10, Math.Max(10, height - 110), Math.Max(160, width - 20), 100);
+                dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(155, 15, 15, 15)), null, panel);
+
+                var accent = new Pen(new SolidColorBrush(Color.FromArgb(220, 0x4E, 0xC9, 0xA0)), 1.5);
+                dc.DrawLine(accent, new Point(panel.Left + 8, panel.Top + 22), new Point(panel.Right - 8, panel.Top + 22));
+
+                string fontName = TxtFont?.Text?.Trim() ?? string.Empty;
+                FontFamily fontFamily;
+                try
+                {
+                    fontFamily = string.IsNullOrWhiteSpace(fontName)
+                        ? new FontFamily("Segoe UI")
+                        : new FontFamily(fontName);
+                }
+                catch
+                {
+                    fontFamily = new FontFamily("Segoe UI");
+                }
+
+                var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+                var titleText = new FormattedText(
+                    "VIEW MODE | COMPOSED PREVIEW",
+                    CultureInfo.CurrentUICulture,
+                    FlowDirection.LeftToRight,
+                    new Typeface(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
+                    12,
+                    Brushes.White,
+                    dpi);
+                dc.DrawText(titleText, new Point(panel.Left + 8, panel.Top + 4));
+
+                double baseFontSize = Math.Max(9, 12 * sizeY);
+                var textBrush = Brushes.White;
+                var textWeight = ChkBold?.IsChecked == true ? FontWeights.Bold : FontWeights.Normal;
+
+                int rowsToShow = Math.Min(3, _runOverrides.Count);
+                for (int i = 0; i < rowsToShow; i++)
+                {
+                    var run = _runOverrides[i];
+                    double rowFont = Math.Max(8, baseFontSize * Math.Max(0.1, run.SizeScale / 100.0));
+                    string label = string.IsNullOrWhiteSpace(run.PreviewText)
+                        ? $"p{run.Page}:r{run.RunIndex}"
+                        : run.PreviewText;
+
+                    var runText = new FormattedText(
+                        $"{label}  dx {run.NudgeX:0.##} dy {run.NudgeY:0.##}",
+                        CultureInfo.CurrentUICulture,
+                        FlowDirection.LeftToRight,
+                        new Typeface(fontFamily, FontStyles.Normal, textWeight, FontStretches.Normal),
+                        rowFont,
+                        textBrush,
+                        dpi);
+
+                    double drawX = panel.Left + 8 + run.NudgeX;
+                    double drawY = panel.Top + 28 + (i * (rowFont + 4)) + run.NudgeY;
+                    double maxX = Math.Max(panel.Left + 8, panel.Right - runText.Width - 8);
+                    double maxY = Math.Max(panel.Top + 24, panel.Bottom - runText.Height - 6);
+                    drawX = Math.Clamp(drawX, panel.Left + 8, maxX);
+                    drawY = Math.Clamp(drawY, panel.Top + 24, maxY);
+
+                    if (Math.Abs(sizeX - 1.0) > 0.001)
+                    {
+                        dc.PushTransform(new ScaleTransform(sizeX, 1.0, drawX, drawY));
+                        dc.DrawText(runText, new Point(drawX, drawY));
+                        dc.Pop();
+                    }
+                    else
+                    {
+                        dc.DrawText(runText, new Point(drawX, drawY));
+                    }
+                }
+
+                if (_runOverrides.Count == 0)
+                {
+                    var emptyText = new FormattedText(
+                        "No run overrides yet. Save edits to create positioned text overrides.",
+                        CultureInfo.CurrentUICulture,
+                        FlowDirection.LeftToRight,
+                        new Typeface(new FontFamily("Segoe UI"), FontStyles.Italic, FontWeights.Normal, FontStretches.Normal),
+                        12,
+                        new SolidColorBrush(Color.FromRgb(0xDD, 0xDD, 0xDD)),
+                        dpi);
+                    dc.DrawText(emptyText, new Point(panel.Left + 8, panel.Top + 32));
+                }
+            }
+
+            var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(
+                basePreview.PixelWidth,
+                basePreview.PixelHeight,
+                96,
+                96,
+                PixelFormats.Pbgra32);
+            bitmap.Render(visual);
+            bitmap.Freeze();
+            return bitmap;
+        }
+        catch
+        {
+            return basePreview;
+        }
+    }
+
+    private void RefreshPdfEditorOverlay()
+    {
+        if (PdfEditorOverlay is null)
+            return;
+
+        PdfEditorOverlay.Children.Clear();
+
+        if (!_pdfEditorIsEditMode)
+            return;
+
+        var source = PdfEditorImage.Source;
+        if (source is null)
+            return;
+
+        var canvasW = PdfEditorCanvas.Width > 0 ? PdfEditorCanvas.Width : source.Width;
+        var canvasH = PdfEditorCanvas.Height > 0 ? PdfEditorCanvas.Height : source.Height;
+        if (canvasW <= 0 || canvasH <= 0)
+            return;
+
+        PdfEditorOverlay.Width = canvasW;
+        PdfEditorOverlay.Height = canvasH;
+
+        // Visual guide only: this does not rewrite PDF text yet.
+        double sizeX = Math.Clamp(ParsePercentOrDefault(TxtSizeX?.Text, 100), 10, 1000) / 100.0;
+        double sizeY = Math.Clamp(ParsePercentOrDefault(TxtSizeY?.Text, 175), 10, 1000) / 100.0;
+        double zoomX = Math.Clamp(ParsePercentOrDefault(TxtZoomX?.Text, 100), 10, 1000) / 100.0;
+        double zoomY = Math.Clamp(ParsePercentOrDefault(TxtZoomY?.Text, 100), 10, 1000) / 100.0;
+
+        var guideW = Math.Clamp(canvasW * 0.42 * zoomX, 60, canvasW - 8);
+        var guideH = Math.Clamp(canvasH * 0.14 * sizeY * zoomY, 24, canvasH - 8);
+        var guideX = (canvasW - guideW) / 2;
+        var guideY = Math.Max(8, canvasH * 0.12);
+
+        var guide = new System.Windows.Shapes.Rectangle
+        {
+            Width = guideW,
+            Height = guideH,
+            Stroke = new SolidColorBrush(Color.FromArgb(220, 0x00, 0xE5, 0xFF)),
+            StrokeThickness = 2,
+            Fill = new SolidColorBrush(Color.FromArgb(52, 0x00, 0xE5, 0xFF)),
+            RadiusX = 4,
+            RadiusY = 4
+        };
+        Canvas.SetLeft(guide, guideX);
+        Canvas.SetTop(guide, guideY);
+        PdfEditorOverlay.Children.Add(guide);
+
+        var globalLabel = new TextBlock
+        {
+            Text = $"Preview overlay | X {sizeX:P0}  Y {sizeY:P0}  ZX {zoomX:P0}  ZY {zoomY:P0}",
+            Foreground = Brushes.White,
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
+            Background = new SolidColorBrush(Color.FromArgb(170, 0, 0, 0)),
+            Padding = new Thickness(6, 3, 6, 3)
+        };
+        Canvas.SetLeft(globalLabel, 8);
+        Canvas.SetTop(globalLabel, 8);
+        PdfEditorOverlay.Children.Add(globalLabel);
+
+        for (int i = 0; i < _runOverrides.Count; i++)
+        {
+            var run = _runOverrides[i];
+            var y = guideY + guideH + 10 + (i * 20);
+            if (y > canvasH - 24)
+                break;
+
+            var runX = Math.Clamp(guideX + run.NudgeX, 8, Math.Max(8, canvasW - 120));
+            var marker = new System.Windows.Shapes.Ellipse
+            {
+                Width = 7,
+                Height = 7,
+                Fill = new SolidColorBrush(Color.FromRgb(0xFF, 0xC1, 0x07))
+            };
+            Canvas.SetLeft(marker, runX);
+            Canvas.SetTop(marker, y + Math.Clamp(run.NudgeY, -12, 12));
+            PdfEditorOverlay.Children.Add(marker);
+
+            var runLabel = new TextBlock
+            {
+                Text = $"p{run.Page}:r{run.RunIndex}  dx {run.NudgeX:0.##}  dy {run.NudgeY:0.##}  size {run.SizeScale:0.#}%",
+                Foreground = Brushes.White,
+                FontSize = 11,
+                Background = new SolidColorBrush(Color.FromArgb(150, 25, 25, 25)),
+                Padding = new Thickness(4, 2, 4, 2)
+            };
+            Canvas.SetLeft(runLabel, Math.Min(runX + 10, canvasW - 260));
+            Canvas.SetTop(runLabel, y - 4);
+            PdfEditorOverlay.Children.Add(runLabel);
+        }
+    }
+
+    private static double ParsePercentOrDefault(string? text, double defaultValue)
+        => double.TryParse(text, out var value) ? value : defaultValue;
+
+    private void UpdatePdfEditorModeUi()
+    {
+        var editButton = FindName("PdfEditorEditModeBtn") as Button;
+        var viewButton = FindName("PdfEditorViewModeBtn") as Button;
+
+        if (editButton is null || viewButton is null)
+            return;
+
+        ApplyPdfEditorModeButtonState(editButton, _pdfEditorIsEditMode);
+        ApplyPdfEditorModeButtonState(viewButton, !_pdfEditorIsEditMode);
+    }
+
+    private static void ApplyPdfEditorModeButtonState(Button button, bool isActive)
+    {
+        if (isActive)
+        {
+            button.Background = new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC));
+            button.BorderBrush = new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC));
+            button.Foreground = Brushes.White;
+            return;
+        }
+
+        button.Background = new SolidColorBrush(Color.FromRgb(0x3C, 0x3C, 0x3C));
+        button.BorderBrush = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55));
+        button.Foreground = new SolidColorBrush(Color.FromRgb(0xD4, 0xD4, 0xD4));
+    }
+
+    // Renders the first page of a PDF to a frozen WPF BitmapSource scaled to 390 px wide.
+    // Called on the UI thread; returns null on any failure.
+    private static System.Windows.Media.Imaging.BitmapSource? RenderPageToBitmapSource(string pdfPath)
+    {
+        string? tempPdfPath = null;
+        try
+        {
+            var ext = Path.GetExtension(pdfPath);
+            var normalizedPath = pdfPath;
+
+            // Some upstream systems store valid PDF bytes with a .nl extension.
+            if (!string.Equals(ext, ".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                tempPdfPath = Path.ChangeExtension(Path.GetTempFileName(), ".pdf");
+                File.Copy(pdfPath, tempPdfPath, overwrite: true);
+                normalizedPath = tempPdfPath;
+            }
+
+            using var doc = PdfiumViewer.PdfDocument.Load(normalizedPath);
+            if (doc.PageCount == 0) return null;
+
+            var pageSize = doc.PageSizes[0];
+            if (pageSize.Width <= 0 || pageSize.Height <= 0) return null;
+
+            const int targetWidth = 390;
+            double scale = targetWidth / pageSize.Width;
+            int w = targetWidth;
+            int h = Math.Max(1, (int)Math.Round(pageSize.Height * scale));
+
+            using var renderedImage = doc.Render(
+                0,
+                w,
+                h,
+                96,
+                96,
+                PdfiumViewer.PdfRenderFlags.Annotations);
+
+            if (renderedImage is null) return null;
+
+            using var bitmap = new System.Drawing.Bitmap(renderedImage);
+
+            using var ms = new MemoryStream();
+            bitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+            ms.Position = 0;
+
+            var bitmapImage = new System.Windows.Media.Imaging.BitmapImage();
+            bitmapImage.BeginInit();
+            bitmapImage.CacheOption  = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            bitmapImage.StreamSource = ms;
+            bitmapImage.EndInit();
+            bitmapImage.Freeze();
+            return bitmapImage;
+        }
+        catch
+        {
+            return null;
+        }
+        finally
+        {
+            if (!string.IsNullOrEmpty(tempPdfPath) && File.Exists(tempPdfPath))
+            {
+                try { File.Delete(tempPdfPath); } catch { /* ignore temp cleanup failures */ }
+            }
+        }
+    }
+}
+
+public sealed class RunOverrideRow : INotifyPropertyChanged
+{
+    private int    _page        = 1;
+    private int    _runIndex;
+    private string _previewText = string.Empty;
+    private double _nudgeX;
+    private double _nudgeY;
+    private double _sizeScale   = 100;
+
+    public int    Page        { get => _page;        set { _page        = value; OnPropertyChanged(); } }
+    public int    RunIndex    { get => _runIndex;    set { _runIndex    = value; OnPropertyChanged(); } }
+    public string PreviewText { get => _previewText; set { _previewText = value; OnPropertyChanged(); } }
+    public double NudgeX      { get => _nudgeX;      set { _nudgeX      = value; OnPropertyChanged(); } }
+    public double NudgeY      { get => _nudgeY;      set { _nudgeY      = value; OnPropertyChanged(); } }
+    public double SizeScale   { get => _sizeScale;   set { _sizeScale   = value; OnPropertyChanged(); } }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? name = null)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }

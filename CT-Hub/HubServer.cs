@@ -362,6 +362,51 @@ public sealed class HubServer
                 case ("GET", "/api/pdfs/context"):
                     await WriteJsonAsync(res, new { sourceCatalog = PdfFolder.GetActiveSourceCatalog() }); break;
 
+                // ── PDF run overrides ─────────────────────────────────────
+                case ("GET", _) when path.StartsWith("/api/pdf-overrides/"):
+                {
+                    var filename = Uri.UnescapeDataString(path["/api/pdf-overrides/".Length..]);
+                    var folder   = PdfFolder.CurrentFolder;
+                    if (string.IsNullOrWhiteSpace(folder)
+                        || filename.Contains('/') || filename.Contains('\\')
+                        || filename.Contains(".."))
+                    {
+                        res.StatusCode = 400; break;
+                    }
+                    var overridePath = Path.Combine(folder, filename + ".overrides.json");
+                    if (!File.Exists(overridePath))
+                    {
+                        await WriteJsonAsync(res, new { }); break;
+                    }
+                    var json  = await File.ReadAllTextAsync(overridePath);
+                    var bytes = Encoding.UTF8.GetBytes(json);
+                    res.ContentType     = "application/json; charset=utf-8";
+                    res.ContentLength64 = bytes.Length;
+                    await res.OutputStream.WriteAsync(bytes);
+                    break;
+                }
+
+                case ("POST", _) when path.StartsWith("/api/pdf-overrides/"):
+                {
+                    var filename = Uri.UnescapeDataString(path["/api/pdf-overrides/".Length..]);
+                    var folder   = PdfFolder.CurrentFolder;
+                    if (string.IsNullOrWhiteSpace(folder)
+                        || filename.Contains('/') || filename.Contains('\\')
+                        || filename.Contains(".."))
+                    {
+                        res.StatusCode = 400; break;
+                    }
+                    using var reader = new StreamReader(req.InputStream, Encoding.UTF8);
+                    var body = await reader.ReadToEndAsync();
+                    // Validate it is parseable JSON before writing
+                    try { JsonSerializer.Deserialize<object>(body); }
+                    catch { res.StatusCode = 400; break; }
+                    var overridePath = Path.Combine(folder, filename + ".overrides.json");
+                    await File.WriteAllTextAsync(overridePath, body, Encoding.UTF8);
+                    res.StatusCode = 204;
+                    break;
+                }
+
                 // ── PDF folder listing ────────────────────────────────────
                 case ("GET", "/api/pdfs"):
                     await WriteJsonAsync(res, PdfFolder.FileNames.ToList()); break;

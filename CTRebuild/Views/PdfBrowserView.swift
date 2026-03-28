@@ -1,6 +1,7 @@
 import SwiftUI
 import PDFKit
 import WebKit
+import UIKit
 
 // MARK: - SO Number Helpers
 
@@ -208,7 +209,6 @@ struct PdfBrowserView: View {
     @AppStorage("panel_showMaterial") private var showMaterial = true
 
     @ObservedObject private var binStore = BinDataStore.shared
-    @StateObject private var readerCache = ReaderWebViewCache()
 
     var body: some View {
         ZStack {
@@ -222,7 +222,6 @@ struct PdfBrowserView: View {
                     title: group.soLabel.isEmpty ? group.dateLabel : group.soLabel,
                     safeArea: safeArea,
                     filenames: group.filenames,
-                    readerCache: readerCache,
                     currentPage: Binding(
                         get: { lastPages[group.id] ?? 0 },
                         set: { newPage in
@@ -413,7 +412,6 @@ struct PdfBrowserView: View {
                 let label = group.soLabel.isEmpty ? group.dateLabel : group.soLabel
                 binStore.activate(groupId: group.id, label: label, document: doc)
             }
-            readerCache.load(filenames: group.filenames)
             if let sourceCatalog = group.sourceCatalog {
                 await MainActor.run { ScanStore.shared.setActiveTicketCatalog(sourceCatalog) }
             } else {
@@ -477,7 +475,6 @@ private struct PdfDetailView: View {
     let title: String
     let safeArea: EdgeInsets
     let filenames: [String]
-    let readerCache: ReaderWebViewCache
     @Binding var currentPage: Int
     let onBack: () -> Void
 
@@ -488,20 +485,19 @@ private struct PdfDetailView: View {
     @AppStorage("pdfViewMode") private var viewMode: ViewMode = .pdf
     @State private var isPicked: Bool = false
     @State private var isShipped: Bool = false
+    @State private var pdfOverrides: PdfOverridesPayload = .empty
     @AppStorage("panel_showMaterial") private var showMaterial = true
 
     init(document: PDFDocument, title: String, safeArea: EdgeInsets,
          filenames: [String] = [],
-         readerCache: ReaderWebViewCache,
          currentPage: Binding<Int>, onBack: @escaping () -> Void) {
-        self.document    = document
-        self.title       = title
-        self.safeArea    = safeArea
-        self.filenames   = filenames
-        self.readerCache = readerCache
+        self.document     = document
+        self.title        = title
+        self.safeArea     = safeArea
+        self.filenames    = filenames
         self._currentPage = currentPage
-        self.onBack      = onBack
-        self._displayDoc = State(initialValue: document)
+        self.onBack       = onBack
+        self._displayDoc  = State(initialValue: document)
     }
 
     var body: some View {
@@ -526,19 +522,13 @@ private struct PdfDetailView: View {
                 // ── Content ───────────────────────────────────────────────
                 ZStack {
                     PdfKitView(document: displayDoc, currentPageIdx: $currentPage,
-                               singlePage: singlePageMode, autoCrop: autoCropEnabled)
+                               singlePage: singlePageMode,
+                               autoCrop: autoCropEnabled,
+                               overrides: pdfOverrides)
                         .opacity(viewMode == .pdf ? 1 : 0)
 
-                    ReaderContainerView(cache: readerCache)
+                    NativeReaderView(document: displayDoc, filenames: filenames)
                         .opacity(viewMode == .reader ? 1 : 0)
-                        .overlay {
-                            if viewMode == .reader && !readerCache.isReady {
-                                ZStack {
-                                    Color.black.ignoresSafeArea()
-                                    ProgressView().tint(.white)
-                                }
-                            }
-                        }
                 }
 
                 Divider().opacity(0.12)
@@ -616,6 +606,30 @@ private struct PdfDetailView: View {
             soTitle = soDisplayTitle(from: displayDoc)
             isPicked  = UserDefaults.standard.bool(forKey: "docpicked:\(title)")
             isShipped = UserDefaults.standard.bool(forKey: "docshipped:\(title)")
+        }
+        .task(id: filenames.joined(separator: "|")) {
+            await loadPdfOverrides()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: UIApplication.didBecomeActiveNotification
+            )
+        ) { _ in
+            Task { await loadPdfOverrides() }
+        }
+    }
+
+    private func loadPdfOverrides() async {
+        guard let filename = filenames.first else {
+            await MainActor.run { pdfOverrides = .empty }
+            return
+        }
+
+        do {
+            let fetched = try await HubClient.shared.fetchPdfOverrides(filename: filename)
+            await MainActor.run { pdfOverrides = fetched }
+        } catch {
+            await MainActor.run { pdfOverrides = .empty }
         }
     }
 
@@ -1160,6 +1174,7 @@ private struct PdfKitView: UIViewRepresentable {
     @Binding var currentPageIdx: Int
     var singlePage: Bool = false
     var autoCrop: Bool = false
+    var overrides: PdfOverridesPayload = .empty
 
     func makeCoordinator() -> Coordinator { Coordinator(binding: $currentPageIdx) }
 
@@ -1170,10 +1185,12 @@ private struct PdfKitView: UIViewRepresentable {
         view.displayDirection = .vertical
         view.backgroundColor = .black
         view.usePageViewController(singlePage)
-        let doc = autoCrop ? autoCropped(document) : document
+        let source = autoCrop ? autoCropped(document) : document
+        let doc = composedDocument(from: source, overrides: overrides)
         view.document = doc
         context.coordinator.lastAutoCrop = autoCrop
         context.coordinator.sourceDoc = document
+        context.coordinator.lastOverrides = overrides
         if currentPageIdx > 0, let page = doc.page(at: currentPageIdx) {
             DispatchQueue.main.async { view.go(to: page) }
         }
@@ -1190,11 +1207,14 @@ private struct PdfKitView: UIViewRepresentable {
         let coord = context.coordinator
         let docChanged = coord.sourceDoc !== document
         let cropChanged = coord.lastAutoCrop != autoCrop
+        let overridesChanged = coord.lastOverrides != overrides
 
-        if docChanged || cropChanged {
+        if docChanged || cropChanged || overridesChanged {
             coord.sourceDoc = document
             coord.lastAutoCrop = autoCrop
-            let doc = autoCrop ? autoCropped(document) : document
+            coord.lastOverrides = overrides
+            let source = autoCrop ? autoCropped(document) : document
+            let doc = composedDocument(from: source, overrides: overrides)
             uiView.document = doc
             let pageIdx = docChanged ? 0 : currentPageIdx
             if let page = doc.page(at: pageIdx) {
@@ -1208,9 +1228,134 @@ private struct PdfKitView: UIViewRepresentable {
         }
     }
 
+    private func composedDocument(from source: PDFDocument, overrides: PdfOverridesPayload) -> PDFDocument {
+        guard overrides.hasEdits else { return source }
+
+        let out = PDFDocument()
+        for pageIdx in 0..<source.pageCount {
+            guard let page = source.page(at: pageIdx),
+                  let copy = page.copy() as? PDFPage else { continue }
+
+            applyOverrides(to: copy, pageNumber: pageIdx + 1, overrides: overrides)
+            out.insert(copy, at: out.pageCount)
+        }
+
+        return out
+    }
+
+    private func applyOverrides(to page: PDFPage, pageNumber: Int, overrides: PdfOverridesPayload) {
+        var pageRuns: [(runIndex: Int, run: PdfRunOverride)] = overrides.runs
+            .compactMap { key, value in
+                guard let (pageIdx, runIdx) = parseRunKey(key), pageIdx == pageNumber else { return nil }
+                return (runIdx, value)
+            }
+            .sorted { lhs, rhs in lhs.runIndex < rhs.runIndex }
+
+        let lines = (page.string ?? "")
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        if pageRuns.isEmpty {
+            guard overrides.global != .defaults else { return }
+            guard !lines.isEmpty else { return }
+            let syntheticCount = min(12, lines.count)
+            pageRuns = (0..<syntheticCount).map { index in
+                (runIndex: index, run: PdfRunOverride())
+            }
+        }
+
+        let bounds = page.bounds(for: .cropBox)
+        guard bounds.width > 0, bounds.height > 0 else { return }
+
+        let global = overrides.global
+        let zoomX = max(0.1, global.pageZoomX)
+        let zoomY = max(0.1, global.pageZoomY)
+        let textScaleX = max(0.4, global.textSizeX)
+
+        let baseX = bounds.minX + (14 * zoomX)
+        let baseY = bounds.maxY - (26 * zoomY)
+        let rowStep = max(12.0, 14.0 * global.textSizeY * zoomY)
+
+        for (visualRow, entry) in pageRuns.enumerated() {
+            let runScale = max(0.2, entry.run.sizeScale)
+            let fontSize = max(8.0, 11.0 * global.textSizeY * runScale)
+            let lineText = runText(for: entry.runIndex, lines: lines)
+
+            let font = resolvedFont(
+                fontName: global.fontOverride,
+                size: fontSize,
+                forceBold: global.forceBold
+            )
+
+            let rowHeight = fontSize * 1.35
+            let estimatedWidth = max(
+                120.0,
+                min(bounds.width - 20.0, CGFloat(lineText.count) * fontSize * 0.55 * textScaleX)
+            )
+
+            var x = baseX + CGFloat(entry.run.dx)
+            var y = baseY - (CGFloat(visualRow) * rowStep) + CGFloat(entry.run.dy)
+
+            let minX = bounds.minX + 8.0
+            let maxX = max(minX, bounds.maxX - estimatedWidth - 8.0)
+            let minY = bounds.minY + 8.0
+            let maxY = max(minY, bounds.maxY - rowHeight - 8.0)
+            x = min(max(x, minX), maxX)
+            y = min(max(y, minY), maxY)
+
+            let annotation = PDFAnnotation(
+                bounds: CGRect(x: x, y: y, width: estimatedWidth, height: rowHeight),
+                forType: .freeText,
+                withProperties: nil
+            )
+            annotation.contents = lineText
+            annotation.font = font
+            annotation.fontColor = UIColor.black.withAlphaComponent(0.88)
+            annotation.color = .clear
+            annotation.alignment = .left
+            annotation.shouldDisplay = true
+            annotation.shouldPrint = true
+
+            page.addAnnotation(annotation)
+        }
+    }
+
+    private func parseRunKey(_ key: String) -> (Int, Int)? {
+        let parts = key.split(separator: ":")
+        guard parts.count == 2 else { return nil }
+
+        let pagePart = parts[0].trimmingCharacters(in: CharacterSet(charactersIn: "p"))
+        let runPart = parts[1].trimmingCharacters(in: CharacterSet(charactersIn: "r"))
+        guard let page = Int(pagePart), let run = Int(runPart) else { return nil }
+        return (page, run)
+    }
+
+    private func runText(for runIndex: Int, lines: [String]) -> String {
+        if runIndex >= 0, runIndex < lines.count {
+            return lines[runIndex]
+        }
+        if runIndex > 0, runIndex - 1 < lines.count {
+            return lines[runIndex - 1]
+        }
+        return "Run \(runIndex)"
+    }
+
+    private func resolvedFont(fontName: String, size: CGFloat, forceBold: Bool) -> UIFont {
+        let trimmed = fontName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty, let custom = UIFont(name: trimmed, size: size) {
+            return custom
+        }
+        if forceBold {
+            return .boldSystemFont(ofSize: size)
+        }
+        return .systemFont(ofSize: size)
+    }
+
     final class Coordinator: NSObject {
         @Binding var currentPageIdx: Int
         var lastAutoCrop: Bool = false
+        var lastOverrides: PdfOverridesPayload = .empty
         weak var sourceDoc: PDFDocument?
         init(binding: Binding<Int>) { _currentPageIdx = binding }
 
