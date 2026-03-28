@@ -1251,12 +1251,12 @@ private struct PdfKitView: UIViewRepresentable {
             }
             .sorted { lhs, rhs in lhs.runIndex < rhs.runIndex }
 
-        let lineRuns = pageLineRuns(from: page)
+        let lineLayouts = pageLineLayouts(from: page)
 
         if pageRuns.isEmpty {
             guard overrides.global != .defaults else { return }
-            guard !lineRuns.isEmpty else { return }
-            let syntheticCount = min(12, lineRuns.count)
+            guard !lineLayouts.isEmpty else { return }
+            let syntheticCount = min(12, lineLayouts.count)
             pageRuns = (0..<syntheticCount).map { index in
                 (runIndex: index, run: PdfRunOverride())
             }
@@ -1273,15 +1273,13 @@ private struct PdfKitView: UIViewRepresentable {
         let zoomY = max(0.1, global.pageZoomY)
         let textScaleX = max(0.4, global.textSizeX)
 
-        let baseX = bounds.minX + (14 * zoomX)
-        let baseY = bounds.maxY - (26 * zoomY)
-        let rowStep = max(12.0, 14.0 * global.textSizeY * zoomY)
+        for entry in pageRuns {
+            guard let layout = lineLayout(for: entry.runIndex, lineLayouts: lineLayouts) else { continue }
 
-        for (visualRow, entry) in pageRuns.enumerated() {
             let runScale = max(0.2, entry.run.sizeScale)
-            let fontSize = max(8.0, 11.0 * global.textSizeY * runScale)
-            let lineInfo = lineInfo(for: entry.runIndex, lineRuns: lineRuns)
-            let lineText = lineInfo?.text ?? "Run \(entry.runIndex)"
+            let baseFontSize = max(8.0, layout.bounds.height)
+            let fontSize = max(8.0, baseFontSize * global.textSizeY * runScale)
+            let lineText = layout.text
 
             let font = resolvedFont(
                 fontName: global.fontOverride,
@@ -1289,14 +1287,15 @@ private struct PdfKitView: UIViewRepresentable {
                 forceBold: global.forceBold
             )
 
-            let rowHeight = fontSize * 1.35
-            let estimatedWidth = max(
-                120.0,
-                min(bounds.width - 20.0, CGFloat(lineText.count) * fontSize * 0.55 * textScaleX)
-            )
+            let rowHeight = max(fontSize * 1.35, layout.bounds.height * global.textSizeY * runScale)
+            let estimatedWidth = max(24.0, min(bounds.width - 4.0, layout.bounds.width * textScaleX))
 
-            var x = baseX + CGFloat(entry.run.dx)
-            var y = baseY - (CGFloat(visualRow) * rowStep) + CGFloat(entry.run.dy)
+            let layoutMidX = layout.bounds.midX
+            let layoutMidY = layout.bounds.midY
+            var x = ((layoutMidX - bounds.midX) * zoomX) + bounds.midX - (estimatedWidth / 2.0)
+            var y = ((layoutMidY - bounds.midY) * zoomY) + bounds.midY - (rowHeight / 2.0)
+            x += CGFloat(entry.run.dx)
+            y += CGFloat(entry.run.dy)
 
             let minX = bounds.minX + 8.0
             let maxX = max(minX, bounds.maxX - estimatedWidth - 8.0)
@@ -1344,28 +1343,31 @@ private struct PdfKitView: UIViewRepresentable {
         return (page, run)
     }
 
-    private func pageLineRuns(from page: PDFPage) -> [(text: String, range: NSRange)] {
-        guard let rawText = page.string else { return [] }
+    private func pageLineLayouts(from page: PDFPage) -> [(text: String, bounds: CGRect)] {
+        let cropBounds = page.bounds(for: .cropBox)
+        guard cropBounds.width > 0, cropBounds.height > 0,
+              let selection = page.selection(for: cropBounds)
+        else { return [] }
 
-        let nsText = rawText as NSString
-        var runs: [(text: String, range: NSRange)] = []
+        return selection
+            .selectionsByLine()
+            .compactMap { lineSelection in
+                guard let raw = lineSelection.string?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !raw.isEmpty
+                else { return nil }
 
-        nsText.enumerateSubstrings(in: NSRange(location: 0, length: nsText.length), options: [.byLines]) { line, range, _, _ in
-            guard let line else { return }
-            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { return }
-            runs.append((text: trimmed, range: range))
-        }
-
-        return runs
+                let lineBounds = lineSelection.bounds(for: page)
+                guard lineBounds.width > 0, lineBounds.height > 0 else { return nil }
+                return (text: raw, bounds: lineBounds)
+            }
     }
 
-    private func lineInfo(for runIndex: Int, lineRuns: [(text: String, range: NSRange)]) -> (text: String, range: NSRange)? {
-        if runIndex >= 0, runIndex < lineRuns.count {
-            return lineRuns[runIndex]
+    private func lineLayout(for runIndex: Int, lineLayouts: [(text: String, bounds: CGRect)]) -> (text: String, bounds: CGRect)? {
+        if runIndex >= 0, runIndex < lineLayouts.count {
+            return lineLayouts[runIndex]
         }
-        if runIndex > 0, runIndex - 1 < lineRuns.count {
-            return lineRuns[runIndex - 1]
+        if runIndex > 0, runIndex - 1 < lineLayouts.count {
+            return lineLayouts[runIndex - 1]
         }
         return nil
     }
