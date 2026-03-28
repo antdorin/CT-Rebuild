@@ -487,6 +487,7 @@ private struct PdfDetailView: View {
     @State private var isShipped: Bool = false
     @State private var pdfOverrides: PdfOverridesPayload = .empty
     @AppStorage("panel_showMaterial") private var showMaterial = true
+    @State private var readerFontPercent: Int = 100
 
     init(document: PDFDocument, title: String, safeArea: EdgeInsets,
          filenames: [String] = [],
@@ -527,7 +528,7 @@ private struct PdfDetailView: View {
                                    autoCrop: autoCropEnabled,
                                    overrides: pdfOverrides)
                     } else {
-                        NativeReaderView(document: displayDoc, filenames: filenames, singlePage: singlePageMode)
+                        ReflowWebView(document: displayDoc, fontPercent: readerFontPercent)
                     }
                 }
 
@@ -593,11 +594,18 @@ private struct PdfDetailView: View {
                         }
                         .buttonStyle(.plain)
                     case .reader:
-                        // Single page toggle (same behaviour as PDF tab)
-                        Button { singlePageMode.toggle() } label: {
-                            Image(systemName: singlePageMode ? "doc" : "doc.on.doc")
-                                .font(.system(size: 13))
-                                .foregroundColor(singlePageMode ? .orange : .white.opacity(0.45))
+                        // Font size controls for the reflow reader
+                        Button { readerFontPercent = max(60, readerFontPercent - 10) } label: {
+                            Text("A−")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(readerFontPercent <= 60 ? .white.opacity(0.2) : .white.opacity(0.55))
+                                .padding(.horizontal, 8).padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+                        Button { readerFontPercent = min(200, readerFontPercent + 10) } label: {
+                            Text("A+")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(readerFontPercent >= 200 ? .white.opacity(0.2) : .white.opacity(0.55))
                                 .padding(.horizontal, 8).padding(.vertical, 10)
                         }
                         .buttonStyle(.plain)
