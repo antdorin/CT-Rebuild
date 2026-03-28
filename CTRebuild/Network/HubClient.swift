@@ -25,6 +25,8 @@ struct PdfOverrideGlobal: Codable, Equatable {
     var textSizeX: Double
     var pageZoomX: Double
     var pageZoomY: Double
+    var pageSizeX: Double
+    var pageSizeY: Double
     var forceBold: Bool
     var fontOverride: String
 
@@ -33,6 +35,8 @@ struct PdfOverrideGlobal: Codable, Equatable {
         textSizeX: 1.0,
         pageZoomX: 1.0,
         pageZoomY: 1.0,
+        pageSizeX: 1.0,
+        pageSizeY: 1.0,
         forceBold: false,
         fontOverride: ""
     )
@@ -42,6 +46,8 @@ struct PdfOverrideGlobal: Codable, Equatable {
         textSizeX: Double = 1.0,
         pageZoomX: Double = 1.0,
         pageZoomY: Double = 1.0,
+        pageSizeX: Double = 1.0,
+        pageSizeY: Double = 1.0,
         forceBold: Bool = false,
         fontOverride: String = ""
     ) {
@@ -49,12 +55,14 @@ struct PdfOverrideGlobal: Codable, Equatable {
         self.textSizeX = textSizeX
         self.pageZoomX = pageZoomX
         self.pageZoomY = pageZoomY
+        self.pageSizeX = pageSizeX
+        self.pageSizeY = pageSizeY
         self.forceBold = forceBold
         self.fontOverride = fontOverride
     }
 
     enum CodingKeys: String, CodingKey {
-        case textSizeY, textSizeX, pageZoomX, pageZoomY, forceBold, fontOverride
+        case textSizeY, textSizeX, pageZoomX, pageZoomY, pageSizeX, pageSizeY, forceBold, fontOverride
     }
 
     init(from decoder: Decoder) throws {
@@ -63,6 +71,8 @@ struct PdfOverrideGlobal: Codable, Equatable {
         textSizeX = try container.decodeIfPresent(Double.self, forKey: .textSizeX) ?? 1.0
         pageZoomX = try container.decodeIfPresent(Double.self, forKey: .pageZoomX) ?? 1.0
         pageZoomY = try container.decodeIfPresent(Double.self, forKey: .pageZoomY) ?? 1.0
+        pageSizeX = try container.decodeIfPresent(Double.self, forKey: .pageSizeX) ?? 1.0
+        pageSizeY = try container.decodeIfPresent(Double.self, forKey: .pageSizeY) ?? 1.0
         forceBold = try container.decodeIfPresent(Bool.self, forKey: .forceBold) ?? false
         fontOverride = try container.decodeIfPresent(String.self, forKey: .fontOverride) ?? ""
     }

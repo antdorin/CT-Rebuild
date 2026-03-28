@@ -1251,12 +1251,12 @@ private struct PdfKitView: UIViewRepresentable {
             }
             .sorted { lhs, rhs in lhs.runIndex < rhs.runIndex }
 
-        let lineLayouts = pageLineLayouts(from: page)
+        let runLayouts = pageRunLayouts(from: page)
 
         if pageRuns.isEmpty {
             guard overrides.global != .defaults else { return }
-            guard !lineLayouts.isEmpty else { return }
-            let syntheticCount = min(12, lineLayouts.count)
+            guard !runLayouts.isEmpty else { return }
+            let syntheticCount = min(24, runLayouts.count)
             pageRuns = (0..<syntheticCount).map { index in
                 (runIndex: index, run: PdfRunOverride())
             }
@@ -1271,10 +1271,12 @@ private struct PdfKitView: UIViewRepresentable {
         let global = overrides.global
         let zoomX = max(0.1, global.pageZoomX)
         let zoomY = max(0.1, global.pageZoomY)
+        let pageScaleX = max(0.1, global.pageSizeX)
+        let pageScaleY = max(0.1, global.pageSizeY)
         let textScaleX = max(0.4, global.textSizeX)
 
         for entry in pageRuns {
-            guard let layout = lineLayout(for: entry.runIndex, lineLayouts: lineLayouts) else { continue }
+            guard let layout = runLayout(for: entry.runIndex, runLayouts: runLayouts) else { continue }
 
             let runScale = max(0.2, entry.run.sizeScale)
             let baseFontSize = max(8.0, layout.bounds.height)
@@ -1287,11 +1289,13 @@ private struct PdfKitView: UIViewRepresentable {
                 forceBold: global.forceBold
             )
 
-            let rowHeight = max(fontSize * 1.35, layout.bounds.height * global.textSizeY * runScale)
-            let estimatedWidth = max(24.0, min(bounds.width - 4.0, layout.bounds.width * textScaleX))
+            let rowHeight = max(fontSize * 1.35, layout.bounds.height * global.textSizeY * runScale) * pageScaleY
+            let estimatedWidth = max(24.0, min(bounds.width - 4.0, layout.bounds.width * textScaleX)) * pageScaleX
 
-            var x = bounds.minX + ((layout.bounds.minX - bounds.minX) * zoomX)
-            var y = bounds.minY + ((layout.bounds.minY - bounds.minY) * zoomY)
+            let centeredX = ((layout.bounds.minX - bounds.midX) * zoomX) + bounds.midX
+            let centeredY = ((layout.bounds.minY - bounds.midY) * zoomY) + bounds.midY
+            var x = bounds.minX + ((centeredX - bounds.minX) * pageScaleX)
+            var y = bounds.minY + ((centeredY - bounds.minY) * pageScaleY)
             x += CGFloat(entry.run.dx)
             y += CGFloat(entry.run.dy)
 
@@ -1345,6 +1349,35 @@ private struct PdfKitView: UIViewRepresentable {
         return (page, run)
     }
 
+    private func pageRunLayouts(from page: PDFPage) -> [(text: String, bounds: CGRect)] {
+        guard let rawText = page.string else { return [] }
+
+        let nsText = rawText as NSString
+        let fullRange = NSRange(location: 0, length: nsText.length)
+        guard let wordRegex = try? NSRegularExpression(pattern: #"\S+"#) else {
+            return pageLineLayouts(from: page)
+        }
+
+        var runLayouts: [(text: String, bounds: CGRect)] = []
+        for match in wordRegex.matches(in: rawText, options: [], range: fullRange) {
+            let token = nsText.substring(with: match.range).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !token.isEmpty,
+                  let tokenSelection = page.selection(for: match.range)
+            else { continue }
+
+            let tokenBounds = tokenSelection.bounds(for: page)
+            guard tokenBounds.width > 0, tokenBounds.height > 0 else { continue }
+            runLayouts.append((text: token, bounds: tokenBounds))
+        }
+
+        if !runLayouts.isEmpty {
+            return runLayouts
+        }
+
+        // Fallback for PDFs where word-range selections cannot be resolved reliably.
+        return pageLineLayouts(from: page)
+    }
+
     private func pageLineLayouts(from page: PDFPage) -> [(text: String, bounds: CGRect)] {
         let cropBounds = page.bounds(for: .cropBox)
         guard cropBounds.width > 0, cropBounds.height > 0,
@@ -1372,12 +1405,12 @@ private struct PdfKitView: UIViewRepresentable {
             }
     }
 
-    private func lineLayout(for runIndex: Int, lineLayouts: [(text: String, bounds: CGRect)]) -> (text: String, bounds: CGRect)? {
-        if runIndex >= 0, runIndex < lineLayouts.count {
-            return lineLayouts[runIndex]
+    private func runLayout(for runIndex: Int, runLayouts: [(text: String, bounds: CGRect)]) -> (text: String, bounds: CGRect)? {
+        if runIndex >= 0, runIndex < runLayouts.count {
+            return runLayouts[runIndex]
         }
-        if runIndex > 0, runIndex - 1 < lineLayouts.count {
-            return lineLayouts[runIndex - 1]
+        if runIndex > 0, runIndex - 1 < runLayouts.count {
+            return runLayouts[runIndex - 1]
         }
         return nil
     }

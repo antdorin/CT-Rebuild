@@ -476,6 +476,30 @@
                                                 ValueChanged="SldZoomY_ValueChanged"/>
                                     </DockPanel>
 
+                                    <TextBlock Text="Page Size X (%)" Foreground="#9CDCFE"
+                                               FontFamily="Consolas" FontSize="11" Margin="0,8,0,3"/>
+                                    <DockPanel Margin="0,0,0,2">
+                                        <TextBox x:Name="TxtPageSizeX" DockPanel.Dock="Right"
+                                                 Width="60" Margin="8,0,0,0"
+                                                 Style="{StaticResource SearchBox}"
+                                                 Text="100" TextChanged="GlobalSetting_Changed"/>
+                                        <Slider x:Name="SldPageSizeX" Minimum="25" Maximum="300"
+                                                Value="100" TickFrequency="5"
+                                                ValueChanged="SldPageSizeX_ValueChanged"/>
+                                    </DockPanel>
+
+                                    <TextBlock Text="Page Size Y (%)" Foreground="#9CDCFE"
+                                               FontFamily="Consolas" FontSize="11" Margin="0,8,0,3"/>
+                                    <DockPanel Margin="0,0,0,2">
+                                        <TextBox x:Name="TxtPageSizeY" DockPanel.Dock="Right"
+                                                 Width="60" Margin="8,0,0,0"
+                                                 Style="{StaticResource SearchBox}"
+                                                 Text="100" TextChanged="GlobalSetting_Changed"/>
+                                        <Slider x:Name="SldPageSizeY" Minimum="25" Maximum="300"
+                                                Value="100" TickFrequency="5"
+                                                ValueChanged="SldPageSizeY_ValueChanged"/>
+                                    </DockPanel>
+
                                     <TextBlock Text="Font" Foreground="#9CDCFE"
                                                FontFamily="Consolas" FontSize="11" Margin="0,8,0,3"/>
                                     <TextBox x:Name="TxtFont"

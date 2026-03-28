@@ -2162,6 +2162,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
             if (root.TryGetProperty("global", out var global))
             {
+                var sldPageSizeX = GetPageSizeXSlider();
+                var sldPageSizeY = GetPageSizeYSlider();
+                var txtPageSizeX = GetPageSizeXTextBox();
+                var txtPageSizeY = GetPageSizeYTextBox();
+
                 if (global.TryGetProperty("textSizeY",   out var v)  && v.TryGetDouble(out var d))
                     SetSliderAndText(SldSizeY, TxtSizeY, d * 100);
                 if (global.TryGetProperty("textSizeX",   out var v2) && v2.TryGetDouble(out var d2))
@@ -2170,6 +2175,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     SetSliderAndText(SldZoomX, TxtZoomX, d3 * 100);
                 if (global.TryGetProperty("pageZoomY",   out var v4) && v4.TryGetDouble(out var d4))
                     SetSliderAndText(SldZoomY, TxtZoomY, d4 * 100);
+                if (sldPageSizeX is not null && txtPageSizeX is not null
+                    && global.TryGetProperty("pageSizeX", out var v5) && v5.TryGetDouble(out var d5))
+                    SetSliderAndText(sldPageSizeX, txtPageSizeX, d5 * 100);
+                if (sldPageSizeY is not null && txtPageSizeY is not null
+                    && global.TryGetProperty("pageSizeY", out var v6) && v6.TryGetDouble(out var d6))
+                    SetSliderAndText(sldPageSizeY, txtPageSizeY, d6 * 100);
                 if (global.TryGetProperty("fontOverride", out var vf))
                     TxtFont.Text = vf.GetString() ?? string.Empty;
                 if (global.TryGetProperty("forceBold",   out var vb))
@@ -2214,10 +2225,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void ResetEditorToDefaults()
     {
         _pdfEditorSyncing = true;
+        var sldPageSizeX = GetPageSizeXSlider();
+        var sldPageSizeY = GetPageSizeYSlider();
+        var txtPageSizeX = GetPageSizeXTextBox();
+        var txtPageSizeY = GetPageSizeYTextBox();
         SetSliderAndText(SldSizeY, TxtSizeY, 175);
         SetSliderAndText(SldSizeX, TxtSizeX, 100);
         SetSliderAndText(SldZoomX, TxtZoomX, 100);
         SetSliderAndText(SldZoomY, TxtZoomY, 100);
+        if (sldPageSizeX is not null && txtPageSizeX is not null)
+            SetSliderAndText(sldPageSizeX, txtPageSizeX, 100);
+        if (sldPageSizeY is not null && txtPageSizeY is not null)
+            SetSliderAndText(sldPageSizeY, txtPageSizeY, 100);
         TxtFont.Text      = string.Empty;
         ChkBold.IsChecked = false;
         _runOverrides.Clear();
@@ -2232,9 +2251,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         sld.Value = Math.Clamp(value, sld.Minimum, sld.Maximum);
     }
 
+    private Slider? GetPageSizeXSlider() => FindName("SldPageSizeX") as Slider;
+    private Slider? GetPageSizeYSlider() => FindName("SldPageSizeY") as Slider;
+    private TextBox? GetPageSizeXTextBox() => FindName("TxtPageSizeX") as TextBox;
+    private TextBox? GetPageSizeYTextBox() => FindName("TxtPageSizeY") as TextBox;
+
     private void GlobalSetting_Changed(object sender, RoutedEventArgs e)
     {
-        if (_pdfEditorSyncing || SldSizeY is null || SldSizeX is null || SldZoomX is null || SldZoomY is null) return;
+        var sldPageSizeX = GetPageSizeXSlider();
+        var sldPageSizeY = GetPageSizeYSlider();
+        var txtPageSizeX = GetPageSizeXTextBox();
+        var txtPageSizeY = GetPageSizeYTextBox();
+        if (_pdfEditorSyncing || SldSizeY is null || SldSizeX is null || SldZoomX is null || SldZoomY is null || sldPageSizeX is null || sldPageSizeY is null || txtPageSizeX is null || txtPageSizeY is null) return;
         if (sender is not TextBox tb) return;
         _pdfEditorSyncing = true;
         try
@@ -2247,6 +2275,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 SldZoomX.Value = Math.Clamp(v3, SldZoomX.Minimum, SldZoomX.Maximum);
             else if (tb == TxtZoomY && double.TryParse(tb.Text, out var v4))
                 SldZoomY.Value = Math.Clamp(v4, SldZoomY.Minimum, SldZoomY.Maximum);
+            else if (tb == txtPageSizeX && double.TryParse(tb.Text, out var v5))
+                sldPageSizeX.Value = Math.Clamp(v5, sldPageSizeX.Minimum, sldPageSizeX.Maximum);
+            else if (tb == txtPageSizeY && double.TryParse(tb.Text, out var v6))
+                sldPageSizeY.Value = Math.Clamp(v6, sldPageSizeY.Minimum, sldPageSizeY.Maximum);
         }
         finally
         {
@@ -2288,6 +2320,26 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (_pdfEditorSyncing || TxtZoomY is null) return;
         _pdfEditorSyncing = true;
         TxtZoomY.Text = ((int)Math.Round(e.NewValue)).ToString();
+        _pdfEditorSyncing = false;
+        RefreshPdfEditorSurface();
+    }
+
+    private void SldPageSizeX_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        var txtPageSizeX = GetPageSizeXTextBox();
+        if (_pdfEditorSyncing || txtPageSizeX is null) return;
+        _pdfEditorSyncing = true;
+        txtPageSizeX.Text = ((int)Math.Round(e.NewValue)).ToString();
+        _pdfEditorSyncing = false;
+        RefreshPdfEditorSurface();
+    }
+
+    private void SldPageSizeY_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        var txtPageSizeY = GetPageSizeYTextBox();
+        if (_pdfEditorSyncing || txtPageSizeY is null) return;
+        _pdfEditorSyncing = true;
+        txtPageSizeY.Text = ((int)Math.Round(e.NewValue)).ToString();
         _pdfEditorSyncing = false;
         RefreshPdfEditorSurface();
     }
@@ -2337,10 +2389,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private object BuildOverridesPayload()
     {
+        var txtPageSizeX = GetPageSizeXTextBox();
+        var txtPageSizeY = GetPageSizeYTextBox();
         double sizeY = double.TryParse(TxtSizeY.Text, out var v1) ? v1 / 100.0 : 1.75;
         double sizeX = double.TryParse(TxtSizeX.Text, out var v2) ? v2 / 100.0 : 1.0;
         double zoomX = double.TryParse(TxtZoomX.Text, out var v3) ? v3 / 100.0 : 1.0;
         double zoomY = double.TryParse(TxtZoomY.Text, out var v4) ? v4 / 100.0 : 1.0;
+        double pageSizeX = double.TryParse(txtPageSizeX?.Text, out var v5) ? v5 / 100.0 : 1.0;
+        double pageSizeY = double.TryParse(txtPageSizeY?.Text, out var v6) ? v6 / 100.0 : 1.0;
 
         var runsDict = new Dictionary<string, object>();
         foreach (RunOverrideRow row in _runOverrides)
@@ -2359,6 +2415,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 textSizeX    = sizeX,
                 pageZoomX    = zoomX,
                 pageZoomY    = zoomY,
+                pageSizeX    = pageSizeX,
+                pageSizeY    = pageSizeY,
                 forceBold    = ChkBold.IsChecked == true,
                 fontOverride = TxtFont.Text.Trim()
             },
@@ -2422,6 +2480,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (_pdfEditorBasePreview is null)
         {
             PdfEditorImage.Source = null;
+            PdfEditorCanvas.LayoutTransform = Transform.Identity;
             PdfEditorOverlay.Children.Clear();
             return;
         }
@@ -2430,9 +2489,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             ? _pdfEditorBasePreview
             : BuildComposedViewBitmap(_pdfEditorBasePreview);
 
+        var txtPageSizeX = GetPageSizeXTextBox();
+        var txtPageSizeY = GetPageSizeYTextBox();
+        double pageScaleX = Math.Clamp(ParsePercentOrDefault(txtPageSizeX?.Text, 100), 10, 500) / 100.0;
+        double pageScaleY = Math.Clamp(ParsePercentOrDefault(txtPageSizeY?.Text, 100), 10, 500) / 100.0;
+
         PdfEditorImage.Source = surface;
         PdfEditorCanvas.Width = surface.PixelWidth;
         PdfEditorCanvas.Height = surface.PixelHeight;
+        PdfEditorCanvas.LayoutTransform = new ScaleTransform(pageScaleX, pageScaleY);
         RefreshPdfEditorOverlay();
     }
 
