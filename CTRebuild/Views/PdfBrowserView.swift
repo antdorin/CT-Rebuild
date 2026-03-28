@@ -1290,10 +1290,8 @@ private struct PdfKitView: UIViewRepresentable {
             let rowHeight = max(fontSize * 1.35, layout.bounds.height * global.textSizeY * runScale)
             let estimatedWidth = max(24.0, min(bounds.width - 4.0, layout.bounds.width * textScaleX))
 
-            let layoutMidX = layout.bounds.midX
-            let layoutMidY = layout.bounds.midY
-            var x = ((layoutMidX - bounds.midX) * zoomX) + bounds.midX - (estimatedWidth / 2.0)
-            var y = ((layoutMidY - bounds.midY) * zoomY) + bounds.midY - (rowHeight / 2.0)
+            var x = bounds.minX + ((layout.bounds.minX - bounds.minX) * zoomX)
+            var y = bounds.minY + ((layout.bounds.minY - bounds.minY) * zoomY)
             x += CGFloat(entry.run.dx)
             y += CGFloat(entry.run.dy)
 
@@ -1309,10 +1307,14 @@ private struct PdfKitView: UIViewRepresentable {
                 forType: .freeText,
                 withProperties: nil
             )
+            let textBorder = PDFBorder()
+            textBorder.lineWidth = 0
             annotation.contents = lineText
             annotation.font = font
             annotation.fontColor = UIColor.black.withAlphaComponent(0.88)
             annotation.color = .clear
+            annotation.interiorColor = .clear
+            annotation.border = textBorder
             annotation.alignment = .left
             annotation.shouldDisplay = true
             annotation.shouldPrint = true
@@ -1359,6 +1361,14 @@ private struct PdfKitView: UIViewRepresentable {
                 let lineBounds = lineSelection.bounds(for: page)
                 guard lineBounds.width > 0, lineBounds.height > 0 else { return nil }
                 return (text: raw, bounds: lineBounds)
+            }
+            .sorted { lhs, rhs in
+                let yDelta = abs(lhs.bounds.minY - rhs.bounds.minY)
+                if yDelta > 1.0 {
+                    // PDF coordinates grow upward, so sort top-to-bottom.
+                    return lhs.bounds.minY > rhs.bounds.minY
+                }
+                return lhs.bounds.minX < rhs.bounds.minX
             }
     }
 
