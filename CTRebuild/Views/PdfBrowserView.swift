@@ -527,7 +527,7 @@ private struct PdfDetailView: View {
                                    autoCrop: autoCropEnabled,
                                    overrides: pdfOverrides)
                     } else {
-                        NativeReaderView(document: displayDoc, filenames: filenames)
+                        NativeReaderView(document: displayDoc, filenames: filenames, singlePage: singlePageMode)
                     }
                 }
 
@@ -593,7 +593,14 @@ private struct PdfDetailView: View {
                         }
                         .buttonStyle(.plain)
                     case .reader:
-                        EmptyView()
+                        // Single page toggle (same behaviour as PDF tab)
+                        Button { singlePageMode.toggle() } label: {
+                            Image(systemName: singlePageMode ? "doc" : "doc.on.doc")
+                                .font(.system(size: 13))
+                                .foregroundColor(singlePageMode ? .orange : .white.opacity(0.45))
+                                .padding(.horizontal, 8).padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
                     }
 
                     Spacer()

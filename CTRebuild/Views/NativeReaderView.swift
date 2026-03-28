@@ -16,13 +16,14 @@ struct PdfGlobalOverrides: Equatable {
 /// Fetches override settings from the Hub and renders extracted PDF text
 /// in per-page cards styled with the global settings.
 struct NativeReaderView: View {
-    let document:  PDFDocument
-    let filenames: [String]
+    let document:   PDFDocument
+    let filenames:  [String]
+    var singlePage: Bool = false
 
     @State private var overrides = PdfGlobalOverrides()
 
     var body: some View {
-        NativeReaderScrollable(document: document, overrides: overrides)
+        NativeReaderScrollable(document: document, overrides: overrides, singlePage: singlePage)
             .background(Color(uiColor: UIColor(white: 0.07, alpha: 1)))
             .task { await fetchOverrides() }
             .onReceive(
@@ -69,15 +70,16 @@ struct NativeReaderView: View {
 // MARK: - UIViewRepresentable bridge
 
 private struct NativeReaderScrollable: UIViewRepresentable {
-    let document:  PDFDocument
-    let overrides: PdfGlobalOverrides
+    let document:   PDFDocument
+    let overrides:  PdfGlobalOverrides
+    var singlePage: Bool = false
 
     func makeUIView(context: Context) -> NativeReaderHostView {
         NativeReaderHostView()
     }
 
     func updateUIView(_ view: NativeReaderHostView, context: Context) {
-        view.configure(document: document, overrides: overrides)
+        view.configure(document: document, overrides: overrides, singlePage: singlePage)
     }
 }
 
@@ -85,15 +87,16 @@ private struct NativeReaderScrollable: UIViewRepresentable {
 
 final class NativeReaderHostView: UIScrollView {
 
-    private let stack         = UIStackView()
-    private var lastPageCount = -1
-    private var lastFontSize: CGFloat = -1
-    private var lastBold      = false
-    private var lastFontName  = ""
+    private let stack       = UIStackView()
+    private var lastDoc: PDFDocument? = nil
+    private var lastOverrides   = PdfGlobalOverrides()
+    private var lastSinglePage  = false
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = UIColor(white: 0.07, alpha: 1)
+        showsVerticalScrollIndicator   = true
+        showsHorizontalScrollIndicator = false
 
         stack.axis    = .vertical
         stack.spacing = 14
@@ -101,67 +104,53 @@ final class NativeReaderHostView: UIScrollView {
         addSubview(stack)
 
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: contentLayoutGuide.topAnchor,      constant: 14),
-            stack.leadingAnchor.constraint(equalTo: contentLayoutGuide.leadingAnchor,  constant: 14),
+            stack.topAnchor.constraint(equalTo: contentLayoutGuide.topAnchor,       constant: 14),
+            stack.leadingAnchor.constraint(equalTo: contentLayoutGuide.leadingAnchor,   constant: 14),
             stack.trailingAnchor.constraint(equalTo: contentLayoutGuide.trailingAnchor, constant: -14),
-            stack.bottomAnchor.constraint(equalTo: contentLayoutGuide.bottomAnchor,   constant: -14),
+            stack.bottomAnchor.constraint(equalTo: contentLayoutGuide.bottomAnchor,    constant: -14),
             stack.widthAnchor.constraint(equalTo: frameLayoutGuide.widthAnchor, constant: -28),
         ])
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    func configure(document: PDFDocument, overrides: PdfGlobalOverrides) {
-        let fontSize  = CGFloat(14.0 * overrides.textSizeY)
-        let isBold    = overrides.forceBold
-        let fontName  = overrides.fontOverride
-        let pageCount = document.pageCount
+    func configure(document: PDFDocument, overrides: PdfGlobalOverrides, singlePage: Bool = false) {
+        let needsRebuild = document !== lastDoc || overrides != lastOverrides
+        let modeChanged  = singlePage != lastSinglePage
 
-        // Skip full rebuild when nothing changed
-        let docChanged   = pageCount != lastPageCount
-        let styleChanged = fontSize != lastFontSize || isBold != lastBold || fontName != lastFontName
-        guard docChanged || styleChanged else { return }
+        guard needsRebuild || modeChanged else { return }
+        lastDoc        = document
+        lastOverrides  = overrides
+        lastSinglePage = singlePage
 
-        lastPageCount = pageCount
-        lastFontSize  = fontSize
-        lastBold      = isBold
-        lastFontName  = fontName
+        // Single-page mode: snap to full-width pages horizontally, one per screen.
+        // Continuous mode: vertical stack with a card per page.
+        isPagingEnabled                    = singlePage
+        stack.axis                         = singlePage ? .horizontal : .vertical
+        showsHorizontalScrollIndicator     = singlePage
+        showsVerticalScrollIndicator       = !singlePage
 
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
-        let font: UIFont
-        if !fontName.isEmpty, let named = UIFont(name: fontName, size: fontSize) {
-            font = named
-        } else if isBold {
-            font = .boldSystemFont(ofSize: fontSize)
-        } else {
-            font = .systemFont(ofSize: fontSize)
-        }
-
-        for pageIdx in 0..<pageCount {
-            guard let page = document.page(at: pageIdx),
-                  let raw  = page.string else { continue }
-            let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty else { continue }
-            stack.addArrangedSubview(makePageCard(text: text, font: font, pageNumber: pageIdx + 1))
+        for pageIdx in 0..<document.pageCount {
+            guard let page = document.page(at: pageIdx) else { continue }
+            let card = makePageCard(page: page, pageNumber: pageIdx + 1, overrides: overrides, singlePage: singlePage)
+            stack.addArrangedSubview(card)
         }
     }
 
-    private func makePageCard(text: String, font: UIFont, pageNumber: Int) -> UIView {
+    private func makePageCard(page: PDFPage, pageNumber: Int, overrides: PdfGlobalOverrides, singlePage: Bool) -> UIView {
+        let cropBox = page.bounds(for: .cropBox)
+        let runs    = nrPageRunLayouts(from: page)
+
         let card = UIView()
         card.backgroundColor  = .white
-        card.layer.cornerRadius = 10
+        card.layer.cornerRadius = singlePage ? 0 : 10
         card.clipsToBounds    = true
 
-        let tv = UITextView()
-        tv.isEditable         = false
-        tv.isScrollEnabled    = false
-        tv.backgroundColor    = .clear
-        tv.textContainerInset = UIEdgeInsets(top: 16, left: 12, bottom: 8, right: 12)
-        tv.font               = font
-        tv.textColor          = .black
-        tv.text               = text
-        tv.translatesAutoresizingMaskIntoConstraints = false
+        let canvas = NRCoordinatePageView(runs: runs, cropBox: cropBox, overrides: overrides)
+        canvas.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(canvas)
 
         let pageLabel = UILabel()
         pageLabel.text          = "Page \(pageNumber)"
@@ -169,20 +158,151 @@ final class NativeReaderHostView: UIScrollView {
         pageLabel.textColor     = UIColor(white: 0.6, alpha: 1)
         pageLabel.textAlignment = .right
         pageLabel.translatesAutoresizingMaskIntoConstraints = false
-
-        card.addSubview(tv)
         card.addSubview(pageLabel)
 
-        NSLayoutConstraint.activate([
-            tv.topAnchor.constraint(equalTo: card.topAnchor),
-            tv.leadingAnchor.constraint(equalTo: card.leadingAnchor),
-            tv.trailingAnchor.constraint(equalTo: card.trailingAnchor),
-            pageLabel.topAnchor.constraint(equalTo: tv.bottomAnchor),
+        let aspectRatio = cropBox.width > 0 ? cropBox.height / cropBox.width : 1.4142
+        card.translatesAutoresizingMaskIntoConstraints = false
+
+        var constraints: [NSLayoutConstraint] = [
+            canvas.topAnchor.constraint(equalTo: card.topAnchor),
+            canvas.leadingAnchor.constraint(equalTo: card.leadingAnchor),
+            canvas.trailingAnchor.constraint(equalTo: card.trailingAnchor),
+            canvas.heightAnchor.constraint(equalTo: canvas.widthAnchor, multiplier: aspectRatio),
+            pageLabel.topAnchor.constraint(equalTo: canvas.bottomAnchor, constant: 4),
             pageLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 8),
             pageLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -10),
             pageLabel.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -8),
-        ])
+        ]
 
+        if singlePage {
+            // In paging mode each card must be exactly one screen-width wide so that
+            // UIScrollView.isPagingEnabled snaps one page per swipe.
+            constraints += [
+                card.widthAnchor.constraint(equalTo: frameLayoutGuide.widthAnchor),
+            ]
+        }
+
+        NSLayoutConstraint.activate(constraints)
         return card
     }
+}
+
+// MARK: - Coordinate-accurate page canvas
+
+/// Positions each word token as a UILabel using its PDF-coordinate bounding box,
+/// scaled proportionally to the view's rendered width. This bypasses the dual-layer
+/// text rendering issue seen when PDFKit renders the raw document.
+private final class NRCoordinatePageView: UIView {
+
+    private let runs:      [(text: String, bounds: CGRect)]
+    private let cropBox:   CGRect
+    private let overrides: PdfGlobalOverrides
+    private var lastLayoutWidth: CGFloat = 0
+
+    init(runs: [(text: String, bounds: CGRect)], cropBox: CGRect, overrides: PdfGlobalOverrides) {
+        self.runs      = runs
+        self.cropBox   = cropBox
+        self.overrides = overrides
+        super.init(frame: .zero)
+        backgroundColor = .white
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+
+        let w = bounds.width
+        guard w > 1, w != lastLayoutWidth, cropBox.width > 0 else { return }
+        lastLayoutWidth = w
+
+        subviews.forEach { $0.removeFromSuperview() }
+
+        let scale = w / cropBox.width
+        let pageH = cropBox.height * scale
+        let sizeY = CGFloat(overrides.textSizeY)
+        let bold  = overrides.forceBold
+        let fName = overrides.fontOverride
+
+        for run in runs {
+            // Convert PDF coords (bottom-left origin, Y increases upward)
+            // to UIKit coords (top-left origin, Y increases downward).
+            let runW = run.bounds.width  * scale
+            let runH = run.bounds.height * scale
+            let runX = (run.bounds.minX - cropBox.minX) * scale
+            let runY = pageH - ((run.bounds.maxY - cropBox.minY) * scale)
+
+            let fontSize = max(8, runH * sizeY)
+            let labelH   = fontSize * 1.35
+
+            let label = UILabel()
+            label.text          = run.text
+            label.numberOfLines = 1
+            label.textColor     = .black
+            label.frame         = CGRect(x: runX, y: runY, width: max(runW, 20), height: labelH)
+
+            if !fName.isEmpty, let f = UIFont(name: fName, size: fontSize) {
+                label.font = f
+            } else if bold {
+                label.font = .boldSystemFont(ofSize: fontSize)
+            } else {
+                label.font = .systemFont(ofSize: fontSize)
+            }
+
+            addSubview(label)
+        }
+    }
+}
+
+// MARK: - PDF run-layout extraction (mirrors PdfKitView.pageRunLayouts)
+
+private func nrPageRunLayouts(from page: PDFPage) -> [(text: String, bounds: CGRect)] {
+    guard let rawText = page.string else { return [] }
+
+    let nsText    = rawText as NSString
+    let fullRange = NSRange(location: 0, length: nsText.length)
+    guard let wordRegex = try? NSRegularExpression(pattern: #"\S+"#) else {
+        return nrPageLineLayouts(from: page)
+    }
+
+    var runLayouts: [(text: String, bounds: CGRect)] = []
+    for match in wordRegex.matches(in: rawText, options: [], range: fullRange) {
+        let token = nsText.substring(with: match.range).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !token.isEmpty,
+              let sel = page.selection(for: match.range) else { continue }
+        let b = sel.bounds(for: page)
+        guard b.width > 0, b.height > 0 else { continue }
+        runLayouts.append((text: token, bounds: b))
+    }
+
+    if !runLayouts.isEmpty {
+        return runLayouts.sorted { lhs, rhs in
+            let yDelta = abs(lhs.bounds.midY - rhs.bounds.midY)
+            if yDelta > 2.0 { return lhs.bounds.midY > rhs.bounds.midY }
+            return lhs.bounds.minX < rhs.bounds.minX
+        }
+    }
+
+    return nrPageLineLayouts(from: page)
+}
+
+private func nrPageLineLayouts(from page: PDFPage) -> [(text: String, bounds: CGRect)] {
+    let cropBounds = page.bounds(for: .cropBox)
+    guard cropBounds.width > 0, cropBounds.height > 0,
+          let selection = page.selection(for: cropBounds) else { return [] }
+
+    return selection
+        .selectionsByLine()
+        .compactMap { ls -> (text: String, bounds: CGRect)? in
+            guard let raw = ls.string?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !raw.isEmpty else { return nil }
+            let b = ls.bounds(for: page)
+            guard b.width > 0, b.height > 0 else { return nil }
+            return (text: raw, bounds: b)
+        }
+        .sorted { lhs, rhs in
+            let yDelta = abs(lhs.bounds.minY - rhs.bounds.minY)
+            if yDelta > 1.0 { return lhs.bounds.minY > rhs.bounds.minY }
+            return lhs.bounds.minX < rhs.bounds.minX
+        }
 }
