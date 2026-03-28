@@ -224,10 +224,14 @@ private final class NRCoordinatePageView: UIView {
         let bold  = overrides.forceBold
         let fName = overrides.fontOverride
 
-        for run in runs {
+        // Deduplicate runs that come from overlapping PDF text layers.
+        // Two runs are considered duplicates when they share the same text and
+        // their centre points are within 4 PDF-points of each other.
+        let deduped = nrDeduplicatedRuns(runs)
+
+        for run in deduped {
             // Convert PDF coords (bottom-left origin, Y increases upward)
             // to UIKit coords (top-left origin, Y increases downward).
-            let runW = run.bounds.width  * scale
             let runH = run.bounds.height * scale
             let runX = (run.bounds.minX - cropBox.minX) * scale
             let runY = pageH - ((run.bounds.maxY - cropBox.minY) * scale)
@@ -239,7 +243,7 @@ private final class NRCoordinatePageView: UIView {
             label.text          = run.text
             label.numberOfLines = 1
             label.textColor     = .black
-            label.frame         = CGRect(x: runX, y: runY, width: max(runW, 20), height: labelH)
+            label.lineBreakMode = .byClipping
 
             if !fName.isEmpty, let f = UIFont(name: fName, size: fontSize) {
                 label.font = f
@@ -249,12 +253,36 @@ private final class NRCoordinatePageView: UIView {
                 label.font = .systemFont(ofSize: fontSize)
             }
 
+            // Size the label to its natural text width so it never truncates,
+            // then pin its origin back to the PDF-coordinate position.
+            label.sizeToFit()
+            label.frame = CGRect(x: runX, y: runY,
+                                 width: label.frame.width,
+                                 height: max(label.frame.height, labelH))
+
             addSubview(label)
         }
     }
 }
 
 // MARK: - PDF run-layout extraction (mirrors PdfKitView.pageRunLayouts)
+
+/// Removes duplicate word runs that arise from PDFs with two overlapping text layers.
+/// Two runs are duplicates when they have the same text and their centre points
+/// are within 4 PDF-points of each other.
+private func nrDeduplicatedRuns(_ runs: [(text: String, bounds: CGRect)]) -> [(text: String, bounds: CGRect)] {
+    var kept: [(text: String, bounds: CGRect)] = []
+    for run in runs {
+        let isDuplicate = kept.contains { existing in
+            guard existing.text == run.text else { return false }
+            let dx = abs(existing.bounds.midX - run.bounds.midX)
+            let dy = abs(existing.bounds.midY - run.bounds.midY)
+            return dx < 4 && dy < 4
+        }
+        if !isDuplicate { kept.append(run) }
+    }
+    return kept
+}
 
 private func nrPageRunLayouts(from page: PDFPage) -> [(text: String, bounds: CGRect)] {
     guard let rawText = page.string else { return [] }
