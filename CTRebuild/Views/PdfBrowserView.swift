@@ -1251,15 +1251,12 @@ private struct PdfKitView: UIViewRepresentable {
             }
             .sorted { lhs, rhs in lhs.runIndex < rhs.runIndex }
 
-        let lines = (page.string ?? "")
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+        let lineRuns = pageLineRuns(from: page)
 
         if pageRuns.isEmpty {
             guard overrides.global != .defaults else { return }
-            guard !lines.isEmpty else { return }
-            let syntheticCount = min(12, lines.count)
+            guard !lineRuns.isEmpty else { return }
+            let syntheticCount = min(12, lineRuns.count)
             pageRuns = (0..<syntheticCount).map { index in
                 (runIndex: index, run: PdfRunOverride())
             }
@@ -1280,7 +1277,13 @@ private struct PdfKitView: UIViewRepresentable {
         for (visualRow, entry) in pageRuns.enumerated() {
             let runScale = max(0.2, entry.run.sizeScale)
             let fontSize = max(8.0, 11.0 * global.textSizeY * runScale)
-            let lineText = runText(for: entry.runIndex, lines: lines)
+            let lineInfo = lineInfo(for: entry.runIndex, lineRuns: lineRuns)
+            let lineText = lineInfo?.text ?? "Run \(entry.runIndex)"
+
+            if let lineInfo,
+               let originalTextBounds = originalLineBounds(for: lineInfo.range, on: page, within: bounds) {
+                addWhiteoutAnnotation(to: page, bounds: originalTextBounds)
+            }
 
             let font = resolvedFont(
                 fontName: global.fontOverride,
@@ -1331,14 +1334,62 @@ private struct PdfKitView: UIViewRepresentable {
         return (page, run)
     }
 
-    private func runText(for runIndex: Int, lines: [String]) -> String {
-        if runIndex >= 0, runIndex < lines.count {
-            return lines[runIndex]
+    private func pageLineRuns(from page: PDFPage) -> [(text: String, range: NSRange)] {
+        guard let rawText = page.string else { return [] }
+
+        let nsText = rawText as NSString
+        var runs: [(text: String, range: NSRange)] = []
+
+        nsText.enumerateSubstrings(in: NSRange(location: 0, length: nsText.length), options: [.byLines]) { line, range, _, _ in
+            guard let line else { return }
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return }
+            runs.append((text: trimmed, range: range))
         }
-        if runIndex > 0, runIndex - 1 < lines.count {
-            return lines[runIndex - 1]
+
+        return runs
+    }
+
+    private func lineInfo(for runIndex: Int, lineRuns: [(text: String, range: NSRange)]) -> (text: String, range: NSRange)? {
+        if runIndex >= 0, runIndex < lineRuns.count {
+            return lineRuns[runIndex]
         }
-        return "Run \(runIndex)"
+        if runIndex > 0, runIndex - 1 < lineRuns.count {
+            return lineRuns[runIndex - 1]
+        }
+        return nil
+    }
+
+    private func originalLineBounds(for range: NSRange, on page: PDFPage, within pageBounds: CGRect) -> CGRect? {
+        guard range.location != NSNotFound, range.length > 0,
+              let selection = page.selection(for: range) else {
+            return nil
+        }
+
+        var rect = selection.bounds(for: page)
+        guard !rect.isNull, !rect.isEmpty else { return nil }
+
+        rect = rect.insetBy(dx: -2.0, dy: -1.5)
+
+        let minX = max(pageBounds.minX + 1.0, rect.minX)
+        let minY = max(pageBounds.minY + 1.0, rect.minY)
+        let maxX = min(pageBounds.maxX - 1.0, rect.maxX)
+        let maxY = min(pageBounds.maxY - 1.0, rect.maxY)
+
+        guard maxX > minX, maxY > minY else { return nil }
+        return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+    }
+
+    private func addWhiteoutAnnotation(to page: PDFPage, bounds: CGRect) {
+        let whiteout = PDFAnnotation(bounds: bounds, forType: .square, withProperties: nil)
+        whiteout.color = .clear
+        whiteout.interiorColor = .white
+        let border = PDFBorder()
+        border.lineWidth = 0
+        whiteout.border = border
+        whiteout.shouldDisplay = true
+        whiteout.shouldPrint = true
+        page.addAnnotation(whiteout)
     }
 
     private func resolvedFont(fontName: String, size: CGFloat, forceBold: Bool) -> UIFont {
