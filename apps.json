@@ -10,12 +10,12 @@
       "localizedDescription": "Chase Tactical warehouse management app.",
       "iconURL": "https://raw.githubusercontent.com/antdorin/CT-Rebuild/main/CTRebuild/Assets.xcassets/CTHelmet.imageset/CTHelmet.png",
       "tintColor": "7AC0F8",
-      "version": "1.0.187",
+      "version": "1.0.188",
       "versionDate": "2026-03-29",
       "versionDescription": "Initial release.",
-      "downloadURL": "https://github.com/antdorin/CT-Rebuild/releases/download/v1.0.187/CTRebuild.ipa",
-      "size": 1198257,
-      "sha256": "3ed2341fe737790440f1e7b9d0b6c1eff6fa036d1c6664b72da96135e3e27875"
+      "downloadURL": "https://github.com/antdorin/CT-Rebuild/releases/download/v1.0.188/CTRebuild.ipa",
+      "size": 1198258,
+      "sha256": "965dea231b593ff43233a14acb585e95d94c4e21dc529719519ba09354e1de80"
     }
   ]
 }
