@@ -122,9 +122,9 @@ public sealed class PdfFolderService : IDisposable
             EnableRaisingEvents = true
         };
         _watcher.Created += (_, _) => Refresh();
-        _watcher.Deleted += (_, e) => { PdfWordExtractor.Invalidate(e.FullPath); Refresh(); };
-        _watcher.Renamed += (_, e) => { PdfWordExtractor.Invalidate(e.OldFullPath); Refresh(); };
-        _watcher.Changed += (_, e) => PdfWordExtractor.Invalidate(e.FullPath);
+        _watcher.Deleted += (_, e) => { PdfSidecarService.InvalidateCache(e.FullPath); Refresh(); };
+        _watcher.Renamed += (_, e) => { PdfSidecarService.InvalidateCache(e.OldFullPath); Refresh(); };
+        _watcher.Changed += (_, e) => PdfSidecarService.InvalidateCache(e.FullPath);
     }
 
     public void Dispose() => _watcher?.Dispose();

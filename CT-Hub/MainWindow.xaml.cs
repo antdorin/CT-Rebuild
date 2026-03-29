@@ -12,7 +12,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Text.Json;
-using UglyToad.PdfPig;
+using System.Net.Http;
 using CTHub.Models;
 using CTHub.Services;
 using Microsoft.Win32;
@@ -2455,7 +2455,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             }
 
             _pdfEditorBasePreview = bmp;
-            _pdfEditorLayoutRuns = ExtractPageLayoutRuns(path, bmp.Width, bmp.Height);
+            _pdfEditorLayoutRuns = await ExtractPageLayoutRunsAsync(path, bmp.Width, bmp.Height);
             _pdfEditorPageLines = _pdfEditorLayoutRuns.Select(r => r.Text).ToList();
             SyncRunOverridePreviewText();
             RefreshPdfEditorSurface();
@@ -2738,53 +2738,49 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         public double Height { get; init; }
     }
 
-    private static List<PdfTextLayoutRun> ExtractPageLayoutRuns(string pdfPath, double targetWidth, double targetHeight)
+    private static async Task<List<PdfTextLayoutRun>> ExtractPageLayoutRunsAsync(
+        string pdfPath, double targetWidth, double targetHeight)
     {
-        string? tempPdfPath = null;
         try
         {
-            var ext = Path.GetExtension(pdfPath);
-            var normalizedPath = pdfPath;
-            if (!string.Equals(ext, ".pdf", StringComparison.OrdinalIgnoreCase))
+            var encoded  = Uri.EscapeDataString(pdfPath);
+            var response = await CTHub.Services.PdfSidecarService.Http
+                .GetAsync($"/words?path={encoded}");
+
+            if (!response.IsSuccessStatusCode) return [];
+
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+
+            var pages = doc.RootElement.GetProperty("pages");
+            if (pages.GetArrayLength() == 0) return [];
+
+            var firstPage = pages[0];
+            double pageW  = firstPage.GetProperty("width").GetDouble();
+            double pageH  = firstPage.GetProperty("height").GetDouble();
+            if (pageW <= 0 || pageH <= 0) return [];
+
+            double scaleX = targetWidth  / pageW;
+            double scaleY = targetHeight / pageH;
+
+            var runs  = new List<PdfTextLayoutRun>();
+            var words = firstPage.GetProperty("words");
+            int i = 0;
+            foreach (var word in words.EnumerateArray())
             {
-                tempPdfPath = Path.ChangeExtension(Path.GetTempFileName(), ".pdf");
-                File.Copy(pdfPath, tempPdfPath, overwrite: true);
-                normalizedPath = tempPdfPath;
-            }
+                var text = word.GetProperty("text").GetString()?.Trim();
+                if (string.IsNullOrWhiteSpace(text)) { i++; continue; }
 
-            using var doc = PdfDocument.Open(normalizedPath);
-            if (doc.NumberOfPages <= 0)
-                return [];
+                // Sidecar returns PDF-space coords (bottom-left origin).
+                // y1 is the top of the word in PDF space; convert to UI space (top-left origin).
+                double x  = word.GetProperty("x0").GetDouble() * scaleX;
+                double y1 = word.GetProperty("y1").GetDouble();
+                double y0 = word.GetProperty("y0").GetDouble();
+                double y  = targetHeight - (y1 * scaleY);
+                double h  = Math.Max(6, (y1 - y0) * scaleY);
 
-            var page = doc.GetPage(1);
-            if (page is null || page.Width <= 0 || page.Height <= 0)
-                return [];
-
-            double scaleX = targetWidth / page.Width;
-            double scaleY = targetHeight / page.Height;
-
-            var runs = new List<PdfTextLayoutRun>();
-            var words = page.GetWords().ToList();
-            for (int i = 0; i < words.Count; i++)
-            {
-                var word = words[i];
-                var text = word.Text?.Trim();
-                if (string.IsNullOrWhiteSpace(text))
-                    continue;
-
-                var box = word.BoundingBox;
-                double x = box.Left * scaleX;
-                double y = targetHeight - (box.Top * scaleY);
-                double h = Math.Max(6, box.Height * scaleY);
-
-                runs.Add(new PdfTextLayoutRun
-                {
-                    RunIndex = i,
-                    Text = text,
-                    X = x,
-                    Y = y,
-                    Height = h
-                });
+                runs.Add(new PdfTextLayoutRun { RunIndex = i, Text = text, X = x, Y = y, Height = h });
+                i++;
             }
 
             return runs;
@@ -2792,13 +2788,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         catch
         {
             return [];
-        }
-        finally
-        {
-            if (!string.IsNullOrEmpty(tempPdfPath) && File.Exists(tempPdfPath))
-            {
-                try { File.Delete(tempPdfPath); } catch { }
-            }
         }
     }
 

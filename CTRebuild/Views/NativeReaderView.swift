@@ -191,11 +191,8 @@ final class NativeReaderHostView: UIScrollView {
                                hubPage: HubPageWords?, overrides: PdfGlobalOverrides,
                                singlePage: Bool) -> UIView {
         let cropBox = page.bounds(for: .cropBox)
-        // Prefer Hub-extracted word positions (PdfPig, server-side, cached).
-        // Fall back to on-device PDFKit extraction when Hub is unreachable.
-        let runs: [NRTextRun]
-        if let hp = hubPage, !hp.words.isEmpty {
-            runs = hp.words.map { w in
+        let runs: [NRTextRun] = hubPage.map { hp in
+            hp.words.map { w in
                 NRTextRun(
                     text: w.text,
                     bounds: CGRect(x: w.x0, y: w.y0,
@@ -203,9 +200,7 @@ final class NativeReaderHostView: UIScrollView {
                     originalFontHeight: w.y1 - w.y0
                 )
             }
-        } else {
-            runs = nrPageRunLayouts(from: page)
-        }
+        } ?? []
 
         let card = UIView()
         card.backgroundColor  = UIColor(white: 0.07, alpha: 1)
@@ -432,70 +427,4 @@ private func nrDeduplicatedRuns(_ runs: [NRTextRun]) -> [NRTextRun] {
         }
     }
     return unique
-}
-
-private func nrPageRunLayouts(from page: PDFPage) -> [NRTextRun] {
-    guard let rawText = page.string, !rawText.isEmpty else {
-        return nrPageLineLayouts(from: page)
-    }
-
-    // Character-by-character pass to build tight per-word NSRanges.
-    // This is more reliable than running a regex over the whole string because
-    // it respects the PDF's internal character encoding and avoids the
-    // "line box fallback" that selection(for:) can trigger on messy OCR PDFs.
-    let ns    = rawText as NSString
-    let len   = ns.length
-    let wsSet = CharacterSet.whitespacesAndNewlines as NSCharacterSet
-    var runs  = [NRTextRun]()
-    var wordStart = -1
-
-    for i in 0...len {
-        let isEnd = (i == len)
-        let isWS  = isEnd || wsSet.characterIsMember(ns.character(at: i))
-        if isWS {
-            if wordStart >= 0 {
-                let range = NSRange(location: wordStart, length: i - wordStart)
-                let token = ns.substring(with: range)
-                if let sel = page.selection(for: range) {
-                    let b = sel.bounds(for: page)
-                    if b.width > 0, b.height > 0 {
-                        runs.append(NRTextRun(text: token, bounds: b,
-                                             originalFontHeight: b.height))
-                    }
-                }
-                wordStart = -1
-            }
-        } else {
-            if wordStart < 0 { wordStart = i }
-        }
-    }
-
-    if runs.isEmpty { return nrPageLineLayouts(from: page) }
-
-    return runs.sorted { lhs, rhs in
-        let yDelta = abs(lhs.bounds.midY - rhs.bounds.midY)
-        if yDelta > 2.0 { return lhs.bounds.midY > rhs.bounds.midY }
-        return lhs.bounds.minX < rhs.bounds.minX
-    }
-}
-
-private func nrPageLineLayouts(from page: PDFPage) -> [NRTextRun] {
-    let cropBounds = page.bounds(for: .cropBox)
-    guard cropBounds.width > 0, cropBounds.height > 0,
-          let selection = page.selection(for: cropBounds) else { return [] }
-
-    return selection
-        .selectionsByLine()
-        .compactMap { ls -> NRTextRun? in
-            guard let raw = ls.string?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !raw.isEmpty else { return nil }
-            let b = ls.bounds(for: page)
-            guard b.width > 0, b.height > 0 else { return nil }
-            return NRTextRun(text: raw, bounds: b, originalFontHeight: b.height)
-        }
-        .sorted { lhs, rhs in
-            let yDelta = abs(lhs.bounds.minY - rhs.bounds.minY)
-            if yDelta > 1.0 { return lhs.bounds.minY > rhs.bounds.minY }
-            return lhs.bounds.minX < rhs.bounds.minX
-        }
 }

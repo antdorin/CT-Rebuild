@@ -1,5 +1,6 @@
 using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Net.WebSockets;
@@ -34,6 +35,7 @@ public sealed class HubServer
     public readonly JsonStore<QrClassMapping>     QrMappings;
     public readonly JsonStore<CatalogLinkEntry>   CatalogLinks;
     public readonly PdfFolderService  PdfFolder = new();
+    public readonly PdfSidecarService PdfSidecar = new();
 
     private static readonly JsonSerializerOptions _jsonOpts = new()
     {
@@ -74,7 +76,7 @@ public sealed class HubServer
     public const int DiscoveryPort      = 5052; // UDP port desktop listens on for CT-DISCOVER probes
     public const int DiscoveryReplyPort = 5051; // UDP port phone listens on (desktop broadcasts here)
 
-    public Task StartAsync()
+    public async Task StartAsync()
     {
         _cts = new CancellationTokenSource();
         _listener = new HttpListener();
@@ -82,12 +84,13 @@ public sealed class HubServer
         _listener.Start();
         _ = AcceptLoopAsync(_cts.Token);
         _ = DiscoveryLoopAsync(_cts.Token); // always runs: replies to direct CT-DISCOVER probes
-        return Task.CompletedTask;
+        _ = PdfSidecar.StartAsync(_cts.Token); // non-blocking — sidecar starts in background
     }
 
     public void Stop()
     {
         StopBroadcast();
+        PdfSidecar.Stop();
         _cts?.Cancel();
         _listener?.Stop();
         _listener?.Close();
@@ -449,7 +452,7 @@ public sealed class HubServer
                     break;
                 }
 
-                // ── PDF word layout (pre-extracted via PdfPig) ───────────────
+                // ── PDF word layout (extracted via pdfplumber sidecar) ────────
                 case ("GET", _) when path.StartsWith("/api/pdf-words/"):
                 {
                     var filename = Uri.UnescapeDataString(path["/api/pdf-words/".Length..]);
@@ -474,12 +477,30 @@ public sealed class HubServer
 
                     if (!File.Exists(fullPath)) { res.StatusCode = 404; break; }
 
-                    var jsonBytes = await Task.Run(() =>
-                        CTHub.Services.PdfWordExtractor.GetWordLayoutJson(fullPath));
+                    // Forward to pdfplumber sidecar on localhost:5053.
+                    // C# has already validated the path — sidecar trusts us.
+                    HttpResponseMessage sidecarResp;
+                    try
+                    {
+                        var encoded = Uri.EscapeDataString(fullPath);
+                        sidecarResp = await PdfSidecarService.Http.GetAsync(
+                            $"/words?path={encoded}", ct);
+                    }
+                    catch
+                    {
+                        // Sidecar unreachable — iOS will fall back to on-device PDFKit.
+                        res.StatusCode = 503; break;
+                    }
 
+                    if (!sidecarResp.IsSuccessStatusCode)
+                    {
+                        res.StatusCode = (int)sidecarResp.StatusCode; break;
+                    }
+
+                    var jsonBytes = await sidecarResp.Content.ReadAsByteArrayAsync(ct);
                     res.ContentType     = "application/json; charset=utf-8";
                     res.ContentLength64 = jsonBytes.Length;
-                    await res.OutputStream.WriteAsync(jsonBytes);
+                    await res.OutputStream.WriteAsync(jsonBytes, ct);
                     break;
                 }
 
