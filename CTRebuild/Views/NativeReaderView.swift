@@ -25,28 +25,36 @@ struct NativeReaderView: View {
     let filenames:  [String]
     var singlePage: Bool = false
 
-    @State private var overrides = PdfGlobalOverrides()
+    @State private var overrides   = PdfGlobalOverrides()
+    @State private var hubWordDoc: HubWordDocument? = nil
 
     var body: some View {
-        NativeReaderScrollable(document: document, overrides: overrides, singlePage: singlePage)
-            .background(Color(uiColor: UIColor(white: 0.07, alpha: 1)))
-            .task { await fetchOverrides() }
-            .onReceive(
-                NotificationCenter.default.publisher(
-                    for: UIApplication.didBecomeActiveNotification
-                )
-            ) { _ in
-                Task { await fetchOverrides() }
-            }
+        NativeReaderScrollable(
+            document: document,
+            overrides: overrides,
+            hubWordDoc: hubWordDoc,
+            singlePage: singlePage
+        )
+        .background(Color(uiColor: UIColor(white: 0.07, alpha: 1)))
+        .task { await fetchFromHub() }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: UIApplication.didBecomeActiveNotification
+            )
+        ) { _ in
+            Task { await fetchFromHub() }
+        }
     }
 
-    // MARK: - Fetch overrides from Hub
+    // MARK: - Fetch overrides + word layout from Hub (parallel)
 
-    private func fetchOverrides() async {
+    private func fetchFromHub() async {
         guard let filename = filenames.first else { return }
-        do {
-            let payload = try await HubClient.shared.fetchPdfOverrides(filename: filename)
-            // Empty payloads decode to legacy defaults; keep a saner native baseline.
+        async let overridesTask  = HubClient.shared.fetchPdfOverrides(filename: filename)
+        async let wordLayoutTask = HubClient.shared.fetchPdfWords(filename: filename)
+
+        // Overrides
+        if let payload = try? await overridesTask {
             let fallback = PdfGlobalOverrides()
             let rawSizeY = payload.hasEdits ? payload.global.textSizeY : fallback.textSizeY
             let newOverrides = PdfGlobalOverrides(
@@ -60,9 +68,11 @@ struct NativeReaderView: View {
                 fontOverride: payload.global.fontOverride
             )
             await MainActor.run { overrides = newOverrides }
-        } catch {
-            // Silently use defaults when Hub is unreachable
         }
+
+        // Word layout — nil when Hub is unreachable; iOS falls back to PDFKit extraction.
+        let wordDoc = try? await wordLayoutTask
+        await MainActor.run { hubWordDoc = wordDoc }
     }
 }
 
@@ -71,6 +81,7 @@ struct NativeReaderView: View {
 private struct NativeReaderScrollable: UIViewRepresentable {
     let document:   PDFDocument
     let overrides:  PdfGlobalOverrides
+    let hubWordDoc: HubWordDocument?
     var singlePage: Bool = false
 
     func makeUIView(context: Context) -> NativeReaderHostView {
@@ -78,7 +89,8 @@ private struct NativeReaderScrollable: UIViewRepresentable {
     }
 
     func updateUIView(_ view: NativeReaderHostView, context: Context) {
-        view.configure(document: document, overrides: overrides, singlePage: singlePage)
+        view.configure(document: document, overrides: overrides,
+                       hubWordDoc: hubWordDoc, singlePage: singlePage)
     }
 }
 
@@ -89,6 +101,7 @@ final class NativeReaderHostView: UIScrollView {
     private let stack           = UIStackView()
     private var lastDoc: PDFDocument? = nil
     private var lastOverrides   = PdfGlobalOverrides()
+    private var lastHubWordDoc: HubWordDocument? = nil
     private var lastSinglePage  = false
 
     // Mutable constraints swapped between continuous/paged layouts.
@@ -128,13 +141,18 @@ final class NativeReaderHostView: UIScrollView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    func configure(document: PDFDocument, overrides: PdfGlobalOverrides, singlePage: Bool = false) {
-        let needsRebuild = document !== lastDoc || overrides != lastOverrides
+    func configure(document: PDFDocument, overrides: PdfGlobalOverrides,
+                   hubWordDoc: HubWordDocument?, singlePage: Bool = false) {
+        // Rebuild when Hub word data arrives (hubWordDoc nil→value transition counts as a change).
+        let wordDocChanged = (hubWordDoc == nil) != (lastHubWordDoc == nil)
+            || (hubWordDoc?.pages.count != lastHubWordDoc?.pages.count)
+        let needsRebuild = document !== lastDoc || overrides != lastOverrides || wordDocChanged
         let modeChanged  = singlePage != lastSinglePage
 
         guard needsRebuild || modeChanged else { return }
         lastDoc        = document
         lastOverrides  = overrides
+        lastHubWordDoc = hubWordDoc
         lastSinglePage = singlePage
 
         if singlePage {
@@ -161,14 +179,33 @@ final class NativeReaderHostView: UIScrollView {
 
         for pageIdx in 0..<document.pageCount {
             guard let page = document.page(at: pageIdx) else { continue }
-            let card = makePageCard(page: page, pageNumber: pageIdx + 1, overrides: overrides, singlePage: singlePage)
+            // 1-based page number, but Hub pages array is also 1-based from PdfPig.
+            let hubPage = lastHubWordDoc?.pages.first { $0.page == pageIdx + 1 }
+            let card = makePageCard(page: page, pageNumber: pageIdx + 1,
+                                    hubPage: hubPage, overrides: overrides, singlePage: singlePage)
             stack.addArrangedSubview(card)
         }
     }
 
-    private func makePageCard(page: PDFPage, pageNumber: Int, overrides: PdfGlobalOverrides, singlePage: Bool) -> UIView {
+    private func makePageCard(page: PDFPage, pageNumber: Int,
+                               hubPage: HubPageWords?, overrides: PdfGlobalOverrides,
+                               singlePage: Bool) -> UIView {
         let cropBox = page.bounds(for: .cropBox)
-        let runs    = nrPageRunLayouts(from: page)
+        // Prefer Hub-extracted word positions (PdfPig, server-side, cached).
+        // Fall back to on-device PDFKit extraction when Hub is unreachable.
+        let runs: [NRTextRun]
+        if let hp = hubPage, !hp.words.isEmpty {
+            runs = hp.words.map { w in
+                NRTextRun(
+                    text: w.text,
+                    bounds: CGRect(x: w.x0, y: w.y0,
+                                   width: w.x1 - w.x0, height: w.y1 - w.y0),
+                    originalFontHeight: w.y1 - w.y0
+                )
+            }
+        } else {
+            runs = nrPageRunLayouts(from: page)
+        }
 
         let card = UIView()
         card.backgroundColor  = UIColor(white: 0.07, alpha: 1)

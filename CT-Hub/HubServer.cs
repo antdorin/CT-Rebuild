@@ -449,6 +449,40 @@ public sealed class HubServer
                     break;
                 }
 
+                // ── PDF word layout (pre-extracted via PdfPig) ───────────────
+                case ("GET", _) when path.StartsWith("/api/pdf-words/"):
+                {
+                    var filename = Uri.UnescapeDataString(path["/api/pdf-words/".Length..]);
+                    var folder   = PdfFolder.CurrentFolder;
+
+                    if (string.IsNullOrWhiteSpace(folder)
+                        || filename.Contains('/') || filename.Contains('\\')
+                        || filename.Contains("..")
+                        || !filename.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                    {
+                        res.StatusCode = 400; break;
+                    }
+
+                    var fullPath   = Path.GetFullPath(Path.Combine(folder, filename));
+                    var folderFull = Path.GetFullPath(folder);
+
+                    if (!fullPath.StartsWith(folderFull + Path.DirectorySeparatorChar)
+                        && !fullPath.Equals(folderFull, StringComparison.OrdinalIgnoreCase))
+                    {
+                        res.StatusCode = 400; break;
+                    }
+
+                    if (!File.Exists(fullPath)) { res.StatusCode = 404; break; }
+
+                    var jsonBytes = await Task.Run(() =>
+                        CTHub.Services.PdfWordExtractor.GetWordLayoutJson(fullPath));
+
+                    res.ContentType     = "application/json; charset=utf-8";
+                    res.ContentLength64 = jsonBytes.Length;
+                    await res.OutputStream.WriteAsync(jsonBytes);
+                    break;
+                }
+
                 // ── Static files (wwwroot) ────────────────────────────────────
                 case ("GET", _) when !path.StartsWith("/api/"):
                 {

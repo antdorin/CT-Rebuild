@@ -9,6 +9,29 @@ struct PdfMeta: Decodable {
     let modified: String   // UTC ISO 8601, e.g. "2024-01-15T10:30:00.0000000Z"
     let sourceCatalog: String?
 
+// MARK: - Word layout models (returned by /api/pdf-words/{filename})
+
+/// One word token with its PDF-space bounding box.
+/// Coordinates are bottom-left origin, Y increases upward (raw PDF space).
+struct HubWordBox: Decodable {
+    let text: String
+    let x0: Double
+    let y0: Double
+    let x1: Double
+    let y1: Double
+}
+
+struct HubPageWords: Decodable {
+    let page:   Int
+    let width:  Double
+    let height: Double
+    let words:  [HubWordBox]
+}
+
+struct HubWordDocument: Decodable {
+    let pages: [HubPageWords]
+}
+
     init(name: String, modified: String, sourceCatalog: String? = nil) {
         self.name = name
         self.modified = modified
@@ -380,6 +403,17 @@ final class HubClient: ObservableObject {
         guard !data.isEmpty else { return .empty }
 
         return (try? JSONDecoder().decode(PdfOverridesPayload.self, from: data)) ?? .empty
+    }
+
+    func fetchPdfWords(filename: String) async throws -> HubWordDocument {
+        guard let encoded = filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
+        else { throw HubError.invalidFilename }
+
+        let url = try endpoint("/api/pdf-words/\(encoded)")
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200
+        else { throw HubError.serverError }
+        return try JSONDecoder().decode(HubWordDocument.self, from: data)
     }
 
     func fetchChaseTactical() async throws -> [ChaseCatalogItem] {

@@ -118,12 +118,13 @@ public sealed class PdfFolderService : IDisposable
         _watcher = new FileSystemWatcher(folderPath)
         {
             Filter = "*",
-            NotifyFilter = NotifyFilters.FileName,
+            NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
             EnableRaisingEvents = true
         };
         _watcher.Created += (_, _) => Refresh();
-        _watcher.Deleted += (_, _) => Refresh();
-        _watcher.Renamed += (_, _) => Refresh();
+        _watcher.Deleted += (_, e) => { PdfWordExtractor.Invalidate(e.FullPath); Refresh(); };
+        _watcher.Renamed += (_, e) => { PdfWordExtractor.Invalidate(e.OldFullPath); Refresh(); };
+        _watcher.Changed += (_, e) => PdfWordExtractor.Invalidate(e.FullPath);
     }
 
     public void Dispose() => _watcher?.Dispose();
