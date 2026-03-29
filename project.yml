@@ -15,6 +15,7 @@ targets:
       - path: CTRebuild
         excludes:
           - "**/*.DS_Store"
+          - "Views/PdfBrowserView.swift"
     info:
       path: CTRebuild/Info.plist
       properties:
