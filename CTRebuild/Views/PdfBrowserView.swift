@@ -433,7 +433,6 @@ private struct PdfDetailView: View {
 
     @State private var displayDoc: PDFDocument
     @State private var soTitle: String = ""
-    @AppStorage("pdfSinglePageMode") private var singlePageMode = true
     @State private var autoCropEnabled = true
     @AppStorage("pdfViewMode") private var viewMode: ViewMode = .pdf
     @State private var isPicked: Bool = false
@@ -476,11 +475,11 @@ private struct PdfDetailView: View {
                 ZStack {
                     if viewMode == .pdf {
                         PdfKitView(document: displayDoc, currentPageIdx: $currentPage,
-                                   singlePage: singlePageMode,
+                                   singlePage: true,
                                    autoCrop: autoCropEnabled,
                                    overrides: pdfOverrides)
                     } else {
-                        NativeReaderView(document: displayDoc, filenames: filenames, singlePage: singlePageMode)
+                        NativeReaderView(document: displayDoc, filenames: filenames, singlePage: true)
                     }
                 }
 
@@ -536,24 +535,8 @@ private struct PdfDetailView: View {
                                 .padding(.horizontal, 8).padding(.vertical, 10)
                         }
                         .buttonStyle(.plain)
-
-                        // Single page toggle
-                        Button { singlePageMode.toggle() } label: {
-                            Image(systemName: singlePageMode ? "doc" : "doc.on.doc")
-                                .font(.system(size: 13))
-                                .foregroundColor(singlePageMode ? .orange : .white.opacity(0.45))
-                                .padding(.horizontal, 8).padding(.vertical, 10)
-                        }
-                        .buttonStyle(.plain)
                     case .reader:
-                        // Single page toggle (same behaviour as PDF tab)
-                        Button { singlePageMode.toggle() } label: {
-                            Image(systemName: singlePageMode ? "doc" : "doc.on.doc")
-                                .font(.system(size: 13))
-                                .foregroundColor(singlePageMode ? .orange : .white.opacity(0.45))
-                                .padding(.horizontal, 8).padding(.vertical, 10)
-                        }
-                        .buttonStyle(.plain)
+                        EmptyView()
                     }
 
                     Spacer()
