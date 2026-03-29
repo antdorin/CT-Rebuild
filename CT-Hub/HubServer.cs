@@ -431,6 +431,69 @@ public sealed class HubServer
                 case ("GET", "/api/pdfs/meta"):
                     await WriteJsonAsync(res, PdfFolder.GetFileMeta()); break;
 
+                // ── PDF page count (via sidecar) ──────────────────────────
+                case ("GET", _) when path.StartsWith("/api/pdf-pages/"):
+                {
+                    var filename = Uri.UnescapeDataString(path["/api/pdf-pages/".Length..]);
+                    var folder   = PdfFolder.CurrentFolder;
+                    if (string.IsNullOrWhiteSpace(folder)
+                        || filename.Contains('/') || filename.Contains('\\')
+                        || filename.Contains(".."))
+                    { res.StatusCode = 400; break; }
+
+                    var fullPath   = Path.GetFullPath(Path.Combine(folder, filename));
+                    var folderFull = Path.GetFullPath(folder);
+                    if (!fullPath.StartsWith(folderFull + Path.DirectorySeparatorChar))
+                    { res.StatusCode = 400; break; }
+                    if (!File.Exists(fullPath)) { res.StatusCode = 404; break; }
+
+                    try
+                    {
+                        var encoded = Uri.EscapeDataString(fullPath);
+                        var sidecarResp = await PdfSidecarService.Http.GetAsync(
+                            $"/page-count?path={encoded}", ct);
+                        var body = await sidecarResp.Content.ReadAsByteArrayAsync(ct);
+                        res.ContentType     = "application/json; charset=utf-8";
+                        res.ContentLength64 = body.Length;
+                        await res.OutputStream.WriteAsync(body, ct);
+                    }
+                    catch { res.StatusCode = 502; }
+                    break;
+                }
+
+                // ── PDF page render as JPEG (via sidecar) ─────────────────
+                case ("GET", _) when path.StartsWith("/api/pdf-render/"):
+                {
+                    var filename = Uri.UnescapeDataString(path["/api/pdf-render/".Length..]);
+                    var folder   = PdfFolder.CurrentFolder;
+                    if (string.IsNullOrWhiteSpace(folder)
+                        || filename.Contains('/') || filename.Contains('\\')
+                        || filename.Contains(".."))
+                    { res.StatusCode = 400; break; }
+
+                    var fullPath   = Path.GetFullPath(Path.Combine(folder, filename));
+                    var folderFull = Path.GetFullPath(folder);
+                    if (!fullPath.StartsWith(folderFull + Path.DirectorySeparatorChar))
+                    { res.StatusCode = 400; break; }
+                    if (!File.Exists(fullPath)) { res.StatusCode = 404; break; }
+
+                    var qs = req.QueryString;
+                    var page  = qs["page"]  ?? "1";
+                    var scale = qs["scale"] ?? "2";
+                    try
+                    {
+                        var encoded = Uri.EscapeDataString(fullPath);
+                        var sidecarResp = await PdfSidecarService.Http.GetAsync(
+                            $"/render?path={encoded}&page={page}&scale={scale}", ct);
+                        var body = await sidecarResp.Content.ReadAsByteArrayAsync(ct);
+                        res.ContentType     = "image/jpeg";
+                        res.ContentLength64 = body.Length;
+                        await res.OutputStream.WriteAsync(body, ct);
+                    }
+                    catch { res.StatusCode = 502; }
+                    break;
+                }
+
                 // ── PDF file download ─────────────────────────────────────
                 case ("GET", _) when path.StartsWith("/api/pdfs/"):
                 {

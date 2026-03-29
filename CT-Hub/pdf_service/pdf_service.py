@@ -28,13 +28,15 @@ pdfplumber uses top-of-page origin so we convert:
     y1 = page.height - word["top"]
 """
 
+import io
 import json
 import os
 import sys
 import threading
 
+import fitz  # PyMuPDF
 import pdfplumber
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 
 app = Flask(__name__)
 
@@ -179,6 +181,54 @@ def invalidate_cache():
         return jsonify({"error": "missing path"}), 400
     _invalidate(pdf_path)
     return "", 204
+
+
+@app.get("/page-count")
+def page_count():
+    pdf_path = request.args.get("path", "")
+    if not pdf_path:
+        return jsonify({"error": "missing path"}), 400
+    if not os.path.isfile(pdf_path):
+        return jsonify({"error": "not found"}), 404
+    try:
+        doc = fitz.open(pdf_path)
+        count = doc.page_count
+        doc.close()
+        return jsonify({"pageCount": count})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.get("/render")
+def render_page():
+    pdf_path = request.args.get("path", "")
+    page_num = request.args.get("page", "1")
+    scale = request.args.get("scale", "2.0")
+    if not pdf_path:
+        return jsonify({"error": "missing path"}), 400
+    if not os.path.isfile(pdf_path):
+        return jsonify({"error": "not found"}), 404
+    try:
+        page_idx = int(page_num) - 1  # API is 1-based, fitz is 0-based
+        zoom = float(scale)
+    except ValueError:
+        return jsonify({"error": "invalid page or scale"}), 400
+
+    try:
+        doc = fitz.open(pdf_path)
+        if page_idx < 0 or page_idx >= doc.page_count:
+            doc.close()
+            return jsonify({"error": "page out of range"}), 400
+        page = doc[page_idx]
+        mat = fitz.Matrix(zoom, zoom)
+        pix = page.get_pixmap(matrix=mat, alpha=False)
+        img_bytes = pix.tobytes("jpeg")
+        doc.close()
+        buf = io.BytesIO(img_bytes)
+        buf.seek(0)
+        return send_file(buf, mimetype="image/jpeg")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ---------------------------------------------------------------------------

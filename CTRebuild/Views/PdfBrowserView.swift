@@ -161,6 +161,7 @@ struct PdfBrowserView: View {
     // open group state
     @State private var openedGroup: PdfDateGroup? = nil
     @State private var mergedDoc: PDFDocument? = nil
+    @State private var groupPageCounts: [Int] = []
     @State private var isLoadingGroup = false
     @State private var groupError: String? = nil
 
@@ -182,12 +183,12 @@ struct PdfBrowserView: View {
                 Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
             }
 
-            if let group = openedGroup, let doc = mergedDoc {
+            if let group = openedGroup, !groupPageCounts.isEmpty {
                 PdfDetailView(
-                    document: doc,
                     title: group.soLabel.isEmpty ? group.dateLabel : group.soLabel,
                     safeArea: safeArea,
                     filenames: group.filenames,
+                    pageCounts: groupPageCounts,
                     currentPage: Binding(
                         get: { lastPages[group.id] ?? 0 },
                         set: { newPage in
@@ -201,6 +202,7 @@ struct PdfBrowserView: View {
                         withAnimation(.easeInOut(duration: 0.22)) {
                             openedGroup = nil
                             mergedDoc = nil
+                            groupPageCounts = []
                             openedGroupId = ""
                         }
                     }
@@ -278,7 +280,7 @@ struct PdfBrowserView: View {
                     Color.black.opacity(0.65).ignoresSafeArea()
                     VStack(spacing: 14) {
                         ProgressView().tint(.white).scaleEffect(1.4)
-                        Text("Merging PDFs\u{2026}")
+                        Text("Loading\u{2026}")
                             .font(.system(size: 12, design: .monospaced))
                             .foregroundColor(.white.opacity(0.6))
                     }
@@ -373,11 +375,13 @@ struct PdfBrowserView: View {
     private func openGroup(_ group: PdfDateGroup) async {
         isLoadingGroup = true; groupError = nil
         do {
-            let doc = try await downloadAndMerge(group)
-            if !binStore.isActive(groupId: group.id) {
-                let label = group.soLabel.isEmpty ? group.dateLabel : group.soLabel
-                binStore.activate(groupId: group.id, label: label, document: doc)
+            // Fetch page counts (fast) so the image-based reader can open immediately
+            var counts: [Int] = []
+            for filename in group.filenames {
+                let count = try await HubClient.shared.fetchPdfPageCount(filename: filename)
+                counts.append(count)
             }
+
             if let sourceCatalog = group.sourceCatalog {
                 await MainActor.run { ScanStore.shared.setActiveTicketCatalog(sourceCatalog) }
             } else {
@@ -390,10 +394,25 @@ struct PdfBrowserView: View {
                     // keep current context when context endpoint is unavailable
                 }
             }
+
             withAnimation(.easeInOut(duration: 0.22)) {
-                mergedDoc = doc
+                groupPageCounts = counts
                 openedGroup = group
                 openedGroupId = group.id
+            }
+
+            // Download raw PDFs in background for BinDataStore
+            Task {
+                do {
+                    let doc = try await downloadAndMerge(group)
+                    if !binStore.isActive(groupId: group.id) {
+                        let label = group.soLabel.isEmpty ? group.dateLabel : group.soLabel
+                        binStore.activate(groupId: group.id, label: label, document: doc)
+                    }
+                    mergedDoc = doc
+                } catch {
+                    // BinDataStore won't be populated but viewer still works
+                }
             }
         } catch {
             groupError = error.localizedDescription
@@ -430,32 +449,34 @@ struct PdfBrowserView: View {
     }
 }
 
-// MARK: - PDF Detail View
+// MARK: - PDF Detail View (server-rendered images)
 
 private struct PdfDetailView: View {
-    let document: PDFDocument
     let title: String
     let safeArea: EdgeInsets
     let filenames: [String]
+    let pageCounts: [Int]
     @Binding var currentPage: Int
     let onBack: () -> Void
 
-    @State private var displayDoc: PDFDocument
-    @State private var soTitle: String = ""
+    @State private var pageImages: [Int: UIImage] = [:]
+    @State private var loadingPages: Set<Int> = []
     @State private var isPicked: Bool = false
     @State private var isShipped: Bool = false
     @AppStorage("panel_showMaterial") private var showMaterial = true
 
-    init(document: PDFDocument, title: String, safeArea: EdgeInsets,
-         filenames: [String] = [],
-         currentPage: Binding<Int>, onBack: @escaping () -> Void) {
-        self.document     = document
-        self.title        = title
-        self.safeArea     = safeArea
-        self.filenames    = filenames
-        self._currentPage = currentPage
-        self.onBack       = onBack
-        self._displayDoc  = State(initialValue: document)
+    private var totalPages: Int { pageCounts.reduce(0, +) }
+
+    /// Maps a global page index to (filename, page-within-file).
+    private func pageMapping(_ globalIndex: Int) -> (String, Int)? {
+        var offset = 0
+        for (i, count) in pageCounts.enumerated() {
+            if globalIndex < offset + count {
+                return (filenames[i], globalIndex - offset)
+            }
+            offset += count
+        }
+        return nil
     }
 
     var body: some View {
@@ -466,10 +487,9 @@ private struct PdfDetailView: View {
             VStack(spacing: 0) {
 
                 // ── Title bar ─────────────────────────────────────────────
-                let displayTitle = soTitle.isEmpty ? title : soTitle
-                Text(displayTitle)
-                    .font(.system(size: 11, weight: soTitle.isEmpty ? .regular : .semibold, design: .monospaced))
-                    .foregroundColor(.white.opacity(soTitle.isEmpty ? 0.4 : 0.65))
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.65))
                     .lineLimit(1).truncationMode(.middle)
                     .padding(.horizontal, 16)
                     .padding(.top, safeArea.top + 8)
@@ -477,10 +497,15 @@ private struct PdfDetailView: View {
 
                 Divider().opacity(0.12)
 
-                // ── Content ───────────────────────────────────────────────
-                ZStack {
-                    PdfKitView(document: displayDoc, currentPageIdx: $currentPage, singlePage: true)
+                // ── Content – swipeable image pages ───────────────────────
+                TabView(selection: $currentPage) {
+                    ForEach(0..<totalPages, id: \.self) { pageIdx in
+                        pageView(for: pageIdx)
+                            .tag(pageIdx)
+                    }
                 }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .background(Color.black)
 
                 Divider().opacity(0.12)
 
@@ -501,6 +526,12 @@ private struct PdfDetailView: View {
                     .buttonStyle(.plain)
 
                     Divider().frame(height: 20).opacity(0.2)
+
+                    // Page counter
+                    Text("\(currentPage + 1) / \(totalPages)")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.5))
+                        .padding(.horizontal, 8)
 
                     Divider().frame(height: 20).opacity(0.2)
 
@@ -523,9 +554,48 @@ private struct PdfDetailView: View {
             }
         }
         .onAppear {
-            soTitle = soDisplayTitle(from: displayDoc)
             isPicked  = UserDefaults.standard.bool(forKey: "docpicked:\(title)")
             isShipped = UserDefaults.standard.bool(forKey: "docshipped:\(title)")
+        }
+        .onChange(of: currentPage) { _ in prefetchNearby(currentPage) }
+        .task { prefetchNearby(currentPage) }
+    }
+
+    // MARK: - Page image view
+
+    @ViewBuilder
+    private func pageView(for idx: Int) -> some View {
+        if let image = pageImages[idx] {
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+        } else {
+            ZStack {
+                Color.black
+                ProgressView().tint(.white)
+            }
+            .task { await loadPage(idx) }
+        }
+    }
+
+    private func loadPage(_ idx: Int) async {
+        guard pageImages[idx] == nil, !loadingPages.contains(idx) else { return }
+        loadingPages.insert(idx)
+        defer { loadingPages.remove(idx) }
+        guard let (filename, pageInFile) = pageMapping(idx) else { return }
+        do {
+            let image = try await HubClient.shared.fetchPdfPageImage(filename: filename, page: pageInFile)
+            pageImages[idx] = image
+        } catch {
+            // User can swipe away and back to retry
+        }
+    }
+
+    private func prefetchNearby(_ page: Int) {
+        for offset in -1...1 {
+            let idx = page + offset
+            guard idx >= 0, idx < totalPages, pageImages[idx] == nil else { continue }
+            Task { await loadPage(idx) }
         }
     }
 
@@ -543,139 +613,4 @@ private struct PdfDetailView: View {
     }
 }
 
-// MARK: - PDFKit Wrapper
 
-private struct PdfKitView: UIViewRepresentable {
-    let document: PDFDocument
-    @Binding var currentPageIdx: Int
-    var singlePage: Bool = false
-
-    func makeCoordinator() -> Coordinator { Coordinator(binding: $currentPageIdx) }
-
-    func makeUIView(context: Context) -> PDFView {
-        let view = PDFView()
-        view.autoScales = true
-        view.displayMode = singlePage ? .singlePage : .singlePageContinuous
-        view.displayDirection = .vertical
-        view.backgroundColor = .black
-        view.usePageViewController(singlePage)
-        view.document = document
-
-        if currentPageIdx > 0, let page = document.page(at: currentPageIdx) {
-            DispatchQueue.main.async { view.go(to: page) }
-        }
-
-        NotificationCenter.default.addObserver(
-            context.coordinator,
-            selector: #selector(Coordinator.pageChanged(_:)),
-            name: .PDFViewPageChanged,
-            object: view
-        )
-        return view
-    }
-
-    func updateUIView(_ uiView: PDFView, context: Context) {
-        if uiView.document !== document {
-            uiView.document = document
-            uiView.autoScales = true
-            
-            if let page = document.page(at: currentPageIdx) {
-                uiView.go(to: page)
-            }
-        }
-        
-        let mode: PDFDisplayMode = singlePage ? .singlePage : .singlePageContinuous
-        if uiView.displayMode != mode {
-            uiView.displayMode = mode
-            uiView.usePageViewController(singlePage)
-        }
-    }
-
-    class Coordinator: NSObject {
-        var binding: Binding<Int>
-        private var isNavigating = false
-
-        init(binding: Binding<Int>) {
-            self.binding = binding
-        }
-
-        @objc func pageChanged(_ notification: Notification) {
-            guard !isNavigating, let view = notification.object as? PDFView,
-                  let page = view.currentPage, let doc = view.document else { return }
-            let idx = doc.index(for: page)
-            isNavigating = true
-            DispatchQueue.main.async {
-                self.binding.wrappedValue = idx
-                self.isNavigating = false
-            }
-        }
-    }
-}
-// MARK: - PDFKit Wrapper
-
-private struct PdfKitView: UIViewRepresentable {
-    let document: PDFDocument
-    @Binding var currentPageIdx: Int
-    var singlePage: Bool = false
-
-    func makeCoordinator() -> Coordinator { Coordinator(binding: $currentPageIdx) }
-
-    func makeUIView(context: Context) -> PDFView {
-        let view = PDFView()
-        view.autoScales = true
-        view.displayMode = singlePage ? .singlePage : .singlePageContinuous
-        view.displayDirection = .vertical
-        view.backgroundColor = .black
-        view.usePageViewController(singlePage)
-        view.document = document
-
-        if currentPageIdx > 0, let page = document.page(at: currentPageIdx) {
-            DispatchQueue.main.async { view.go(to: page) }
-        }
-
-        NotificationCenter.default.addObserver(
-            context.coordinator,
-            selector: #selector(Coordinator.pageChanged(_:)),
-            name: .PDFViewPageChanged,
-            object: view
-        )
-        return view
-    }
-
-    func updateUIView(_ uiView: PDFView, context: Context) {
-        if uiView.document !== document {
-            uiView.document = document
-            uiView.autoScales = true
-            
-            if let page = document.page(at: currentPageIdx) {
-                uiView.go(to: page)
-            }
-        }
-        
-        let mode: PDFDisplayMode = singlePage ? .singlePage : .singlePageContinuous
-        if uiView.displayMode != mode {
-            uiView.displayMode = mode
-            uiView.usePageViewController(singlePage)
-        }
-    }
-
-    class Coordinator: NSObject {
-        var binding: Binding<Int>
-        private var isNavigating = false
-
-        init(binding: Binding<Int>) {
-            self.binding = binding
-        }
-
-        @objc func pageChanged(_ notification: Notification) {
-            guard !isNavigating, let view = notification.object as? PDFView,
-                  let page = view.currentPage, let doc = view.document else { return }
-            let idx = doc.index(for: page)
-            isNavigating = true
-            DispatchQueue.main.async {
-                self.binding.wrappedValue = idx
-                self.isNavigating = false
-            }
-        }
-    }
-}

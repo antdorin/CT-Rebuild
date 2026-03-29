@@ -418,6 +418,34 @@ final class HubClient: ObservableObject {
         return try JSONDecoder().decode(HubWordDocument.self, from: data)
     }
 
+    // MARK: - PDF page rendering (server-side)
+
+    struct PdfPageCount: Decodable { let pageCount: Int }
+
+    /// Returns the total page count for a PDF file on the Hub.
+    func fetchPdfPageCount(filename: String) async throws -> Int {
+        guard let encoded = filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
+        else { throw HubError.invalidFilename }
+        let url = try endpoint("/api/pdf-pages/\(encoded)")
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200
+        else { throw HubError.serverError }
+        let result = try JSONDecoder().decode(PdfPageCount.self, from: data)
+        return result.pageCount
+    }
+
+    /// Downloads a single PDF page rendered as a JPEG image by the Hub.
+    func fetchPdfPageImage(filename: String, page: Int, scale: Double = 2.0) async throws -> UIImage {
+        guard let encoded = filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
+        else { throw HubError.invalidFilename }
+        let url = try endpoint("/api/pdf-render/\(encoded)?page=\(page)&scale=\(scale)")
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let image = UIImage(data: data)
+        else { throw HubError.serverError }
+        return image
+    }
+
     func fetchChaseTactical() async throws -> [ChaseCatalogItem] {
         let url = try endpoint("/api/chasetactical")
         let (data, _) = try await URLSession.shared.data(from: url)
