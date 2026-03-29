@@ -16,19 +16,19 @@ final class BinDataStore: ObservableObject {
     @Published private(set) var binQuantities: [String: Int] = [:]
 
     /// Ordered list of active groups for display (e.g. in the camera overlay)
-    @Published private(set) var activeEntries: [(id: String, label: String, doc: PDFDocument, filenames: [String])] = []
+    @Published private(set) var activeEntries: [(id: String, label: String, doc: PDFDocument, filenames: [String], pageCounts: [Int])] = []
 
     /// group.id → per-page extracted data for that group
     private var groupData: [String: [String: Int]] = [:]
 
     /// group.id → (display label, merged PDFDocument, source filenames)
-    private var activeMeta: [String: (label: String, doc: PDFDocument, filenames: [String])] = [:]
+    private var activeMeta: [String: (label: String, doc: PDFDocument, filenames: [String], pageCounts: [Int])] = [:]
 
     // MARK: - Public API
 
     /// Called when a PDF group is toggled active.
     /// Extracts bin locations + committed numbers from the merged document.
-    func activate(groupId: String, label: String = "", document: PDFDocument, filenames: [String] = []) {
+    func activate(groupId: String, label: String = "", document: PDFDocument, filenames: [String] = [], pageCounts: [Int] = []) {
         var perGroup: [String: Int] = [:]
         for i in 0..<document.pageCount {
             guard let text = document.page(at: i)?.string else { continue }
@@ -38,7 +38,7 @@ final class BinDataStore: ObservableObject {
             }
         }
         groupData[groupId] = perGroup
-        activeMeta[groupId] = (label: label.isEmpty ? groupId : label, doc: document, filenames: filenames)
+        activeMeta[groupId] = (label: label.isEmpty ? groupId : label, doc: document, filenames: filenames, pageCounts: pageCounts)
         recalculate()
     }
 
@@ -148,7 +148,7 @@ final class BinDataStore: ObservableObject {
         }
         binQuantities = merged
         activeEntries = activeMeta
-            .map { (id: $0.key, label: $0.value.label, doc: $0.value.doc, filenames: $0.value.filenames) }
+            .map { (id: $0.key, label: $0.value.label, doc: $0.value.doc, filenames: $0.value.filenames, pageCounts: $0.value.pageCounts) }
             .sorted { $0.id < $1.id }
     }
 }

@@ -300,21 +300,24 @@ struct DashboardView: View {
     // MARK: - Execute Action
 
     private func executeAction(_ action: GestureAction) {
+        // While the picker carousel is open, block top and bottom panel gestures
+        // (the carousel uses vertical drag itself and would conflict).
+        let pickerBlocked = isDashPickerOpen
         switch action {
         case .none: break
         case .openLeft:       if activePanel == .none { activePanel = .left;   if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() } }
         case .openRight:      if activePanel == .none { activePanel = .right;  if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() } }
-        case .openTop:        if activePanel == .none { activePanel = .top;    if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() } }
-        case .openBottom:     if activePanel == .none { activePanel = .bottom; if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() } }
+        case .openTop:        if activePanel == .none && !pickerBlocked { activePanel = .top;    if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() } }
+        case .openBottom:     if activePanel == .none && !pickerBlocked { activePanel = .bottom; if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() } }
         case .closePanel:     activePanel = .none;     if panelHapticOnChange { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
         case .toggleLeft:     activePanel = activePanel == .left  ? .none : .left;   if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
         case .toggleRight:    activePanel = activePanel == .right ? .none : .right;  if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
-        case .toggleTop:      activePanel = activePanel == .top   ? .none : .top;    if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
-        case .toggleBottom:   activePanel = activePanel == .bottom ? .none : .bottom; if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+        case .toggleTop:      if !pickerBlocked { activePanel = activePanel == .top   ? .none : .top;    if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() } }
+        case .toggleBottom:   if !pickerBlocked { activePanel = activePanel == .bottom ? .none : .bottom; if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() } }
         case .switchLeft:     activePanel = .left;   if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
         case .switchRight:    activePanel = .right;  if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
-        case .switchTop:      activePanel = .top;    if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
-        case .switchBottom:   activePanel = .bottom; if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+        case .switchTop:      if !pickerBlocked { activePanel = .top;    if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() } }
+        case .switchBottom:   if !pickerBlocked { activePanel = .bottom; if panelHapticOnChange { UIImpactFeedbackGenerator(style: .medium).impactOccurred() } }
         case .haptic:
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         case .dismissKeyboard:

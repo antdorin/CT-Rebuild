@@ -30,7 +30,6 @@ struct BottomPanelView: View {
     @State private var activePdfSheetFilenames: [String] = []
     @State private var activePdfSheetPageCounts: [Int] = []
     @State private var activePdfSheetCurrentPage: Int = 0
-    @State private var activePdfSheetLoading: Bool = false
 
     var body: some View {
         ZStack {
@@ -114,25 +113,13 @@ struct BottomPanelView: View {
                                                 VStack(spacing: 6) {
                                                     ForEach(binStore.activeEntries, id: \.id) { entry in
                                                         Button {
-                                                            guard !entry.filenames.isEmpty else { return }
+                                                            guard !entry.filenames.isEmpty,
+                                                                  !entry.pageCounts.isEmpty else { return }
                                                             activePdfSheetTitle = entry.label
                                                             activePdfSheetFilenames = entry.filenames
+                                                            activePdfSheetPageCounts = entry.pageCounts
                                                             activePdfSheetCurrentPage = 0
-                                                            activePdfSheetPageCounts = []
-                                                            activePdfSheetLoading = true
                                                             activePdfSheetOpen = true
-                                                            Task {
-                                                                var counts: [Int] = []
-                                                                for filename in entry.filenames {
-                                                                    if let count = try? await HubClient.shared.fetchPdfPageCount(filename: filename) {
-                                                                        counts.append(count)
-                                                                    } else {
-                                                                        counts.append(1)
-                                                                    }
-                                                                }
-                                                                activePdfSheetPageCounts = counts
-                                                                activePdfSheetLoading = false
-                                                            }
                                                         } label: {
                                                             VStack(spacing: 2) {
                                                                 Text(entry.label)
@@ -298,18 +285,14 @@ struct BottomPanelView: View {
         .sheet(isPresented: $activePdfSheetOpen) {
             ZStack {
                 Color.black.ignoresSafeArea()
-                if activePdfSheetLoading || activePdfSheetPageCounts.isEmpty {
-                    ProgressView().tint(.white)
-                } else {
-                    PdfDetailView(
-                        title: activePdfSheetTitle,
-                        safeArea: .init(),
-                        filenames: activePdfSheetFilenames,
-                        pageCounts: activePdfSheetPageCounts,
-                        currentPage: $activePdfSheetCurrentPage,
-                        onBack: { activePdfSheetOpen = false }
-                    )
-                }
+                PdfDetailView(
+                    title: activePdfSheetTitle,
+                    safeArea: .init(),
+                    filenames: activePdfSheetFilenames,
+                    pageCounts: activePdfSheetPageCounts,
+                    currentPage: $activePdfSheetCurrentPage,
+                    onBack: { activePdfSheetOpen = false }
+                )
             }
         }
     }
