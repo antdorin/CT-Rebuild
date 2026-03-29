@@ -430,8 +430,6 @@ struct PdfBrowserView: View {
     }
 }
 
-// MARK: - View Mode Enum
-
 // MARK: - PDF Detail View
 
 private struct PdfDetailView: View {
@@ -444,9 +442,9 @@ private struct PdfDetailView: View {
 
     @State private var displayDoc: PDFDocument
     @State private var soTitle: String = ""
-            @State private var isPicked: Bool = false
+    @State private var isPicked: Bool = false
     @State private var isShipped: Bool = false
-        @AppStorage("panel_showMaterial") private var showMaterial = true
+    @AppStorage("panel_showMaterial") private var showMaterial = true
 
     init(document: PDFDocument, title: String, safeArea: EdgeInsets,
          filenames: [String] = [],
@@ -504,7 +502,19 @@ private struct PdfDetailView: View {
 
                     Divider().frame(height: 20).opacity(0.2)
 
-                    
+                    Divider().frame(height: 20).opacity(0.2)
+
+                    statusToggle(label: "PICKED", active: isPicked, activeColor: .orange) {
+                        isPicked.toggle()
+                        UserDefaults.standard.set(isPicked, forKey: "docpicked:\(title)")
+                    }
+
+                    statusToggle(label: "SHIPPED", active: isShipped, activeColor: .green) {
+                        isShipped.toggle()
+                        UserDefaults.standard.set(isShipped, forKey: "docshipped:\(title)")
+                    }
+
+                    Divider().frame(height: 20).opacity(0.2)
 
                     Spacer()
                 }
@@ -517,34 +527,6 @@ private struct PdfDetailView: View {
             isPicked  = UserDefaults.standard.bool(forKey: "docpicked:\(title)")
             isShipped = UserDefaults.standard.bool(forKey: "docshipped:\(title)")
         }
-                }
-    }
-
-    private func loadPdfOverrides() async {
-        guard let filename = filenames.first else {
-            await MainActor.run { pdfOverrides = .empty }
-            return
-        }
-
-        do {
-            let fetched = try await HubClient.shared.fetchPdfOverrides(filename: filename)
-            await MainActor.run { pdfOverrides = fetched }
-        } catch {
-            await MainActor.run { pdfOverrides = .empty }
-        }
-    }
-
-    private func modeSegment(label: String, active: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(label)
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundColor(active ? .black : .white.opacity(0.45))
-                .padding(.horizontal, 10).padding(.vertical, 6)
-                .background(active ? Color.white.opacity(0.88) : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 5))
-                .padding(.horizontal, 2).padding(.vertical, 4)
-        }
-        .buttonStyle(.plain)
     }
 
     private func statusToggle(label: String, active: Bool, activeColor: Color, action: @escaping () -> Void) -> some View {
@@ -561,81 +543,7 @@ private struct PdfDetailView: View {
     }
 }
 
-// MARK: - Auto-Crop Helpers
-
-/// Scans a PDF page bitmap to find the bounding box of non-white content.
-/// Returns the crop rect in PDF page coordinate space, or nil if the page is blank.
-private func contentBounds(for page: PDFPage, threshold: UInt8 = 240) -> CGRect? {
-    let mediaBox = page.bounds(for: .mediaBox)
-    let sampleScale: CGFloat = 1.0   // 1× is enough for edge detection
-    let w = Int(mediaBox.width * sampleScale)
-    let h = Int(mediaBox.height * sampleScale)
-    guard w > 0, h > 0 else { return nil }
-
-    // Render page to a 32-bit RGBA bitmap
-    let bytesPerRow = w * 4
-    guard let ctx = CGContext(data: nil, width: w, height: h,
-                              bitsPerComponent: 8, bytesPerRow: bytesPerRow,
-                              space: CGColorSpaceCreateDeviceRGB(),
-                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
-    else { return nil }
-
-    ctx.setFillColor(UIColor.white.cgColor)
-    ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
-    ctx.translateBy(x: 0, y: CGFloat(h))
-    ctx.scaleBy(x: sampleScale, y: -sampleScale)
-    page.draw(with: .mediaBox, to: ctx)
-
-    guard let data = ctx.data else { return nil }
-    let ptr = data.bindMemory(to: UInt8.self, capacity: bytesPerRow * h)
-
-    var minX = w, minY = h, maxX = 0, maxY = 0
-
-    for y in 0..<h {
-        let row = y * bytesPerRow
-        for x in 0..<w {
-            let offset = row + x * 4
-            let r = ptr[offset], g = ptr[offset + 1], b = ptr[offset + 2]
-            if r < threshold || g < threshold || b < threshold {
-                if x < minX { minX = x }
-                if x > maxX { maxX = x }
-                if y < minY { minY = y }
-                if y > maxY { maxY = y }
-            }
-        }
-    }
-
-    guard maxX >= minX, maxY >= minY else { return nil }
-
-    // Add margin to avoid clipping anti-aliased text at page edges
-    let margin: CGFloat = 12.0 * sampleScale
-    let cx = max(0, CGFloat(minX) - margin)
-    let cy = max(0, CGFloat(minY) - margin)
-    let cw = min(CGFloat(w), CGFloat(maxX) + margin) - cx
-    let ch = min(CGFloat(h), CGFloat(maxY) + margin) - cy
-
-    // Convert pixel coords back to PDF page coords (flip Y)
-    return CGRect(x: cx / sampleScale,
-                  y: (CGFloat(h) - cy - ch) / sampleScale,
-                  width: cw / sampleScale,
-                  height: ch / sampleScale)
-}
-
-/// Returns a new PDFDocument with each page's cropBox set to its content bounds.
-private func autoCropped(_ source: PDFDocument) -> PDFDocument {
-    let out = PDFDocument()
-    for i in 0..<source.pageCount {
-        guard let page = source.page(at: i),
-              let copy = page.copy() as? PDFPage else { continue }
-        if let crop = contentBounds(for: copy) {
-            copy.setBounds(crop, for: .cropBox)
-        }
-        out.insert(copy, at: i)
-    }
-    return out
-}
-
-// MARK: - PDFKit View
+// MARK: - PDFKit Wrapper
 
 private struct PdfKitView: UIViewRepresentable {
     let document: PDFDocument
@@ -652,11 +560,79 @@ private struct PdfKitView: UIViewRepresentable {
         view.backgroundColor = .black
         view.usePageViewController(singlePage)
         view.document = document
-        
+
         if currentPageIdx > 0, let page = document.page(at: currentPageIdx) {
             DispatchQueue.main.async { view.go(to: page) }
         }
+
+        NotificationCenter.default.addObserver(
+            context.coordinator,
+            selector: #selector(Coordinator.pageChanged(_:)),
+            name: .PDFViewPageChanged,
+            object: view
+        )
+        return view
+    }
+
+    func updateUIView(_ uiView: PDFView, context: Context) {
+        if uiView.document !== document {
+            uiView.document = document
+            uiView.autoScales = true
+            
+            if let page = document.page(at: currentPageIdx) {
+                uiView.go(to: page)
+            }
+        }
         
+        let mode: PDFDisplayMode = singlePage ? .singlePage : .singlePageContinuous
+        if uiView.displayMode != mode {
+            uiView.displayMode = mode
+            uiView.usePageViewController(singlePage)
+        }
+    }
+
+    class Coordinator: NSObject {
+        var binding: Binding<Int>
+        private var isNavigating = false
+
+        init(binding: Binding<Int>) {
+            self.binding = binding
+        }
+
+        @objc func pageChanged(_ notification: Notification) {
+            guard !isNavigating, let view = notification.object as? PDFView,
+                  let page = view.currentPage, let doc = view.document else { return }
+            let idx = doc.index(for: page)
+            isNavigating = true
+            DispatchQueue.main.async {
+                self.binding.wrappedValue = idx
+                self.isNavigating = false
+            }
+        }
+    }
+}
+// MARK: - PDFKit Wrapper
+
+private struct PdfKitView: UIViewRepresentable {
+    let document: PDFDocument
+    @Binding var currentPageIdx: Int
+    var singlePage: Bool = false
+
+    func makeCoordinator() -> Coordinator { Coordinator(binding: $currentPageIdx) }
+
+    func makeUIView(context: Context) -> PDFView {
+        let view = PDFView()
+        view.autoScales = true
+        view.displayMode = singlePage ? .singlePage : .singlePageContinuous
+        view.displayDirection = .vertical
+        view.backgroundColor = .black
+        view.usePageViewController(singlePage)
+        view.document = document
+
+        if currentPageIdx > 0, let page = document.page(at: currentPageIdx) {
+            DispatchQueue.main.async { view.go(to: page) }
+        }
+
         NotificationCenter.default.addObserver(
             context.coordinator,
             selector: #selector(Coordinator.pageChanged(_:)),
