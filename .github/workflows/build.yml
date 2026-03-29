@@ -70,6 +70,13 @@ jobs:
           APP_PATH=$(find "$RUNNER_TEMP/DerivedData" -name "*.app" \
             -not -path "*/simulator/*" | head -1)
           echo "Found app: $APP_PATH"
+
+          # Ensure install/update tools see a monotonically increasing app version.
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ steps.version.outputs.version }}" "$APP_PATH/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" "$APP_PATH/Info.plist"
+          echo "Bundled app version: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_PATH/Info.plist")"
+          echo "Bundled app build: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP_PATH/Info.plist")"
+
           mkdir -p "$RUNNER_TEMP/ipa-payload/Payload"
           cp -r "$APP_PATH" "$RUNNER_TEMP/ipa-payload/Payload/"
           cd "$RUNNER_TEMP/ipa-payload"
