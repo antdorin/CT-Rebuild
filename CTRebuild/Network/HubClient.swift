@@ -364,7 +364,9 @@ final class HubClient: ObservableObject {
     /// Fetch name + last-modified for each PDF (server must support /api/pdfs/meta).
     func fetchPdfMeta() async throws -> [PdfMeta] {
         let url = try endpoint("/api/pdfs/meta")
-        let (data, _) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode)
+        else { throw HubError.serverError }
         return try JSONDecoder().decode([PdfMeta].self, from: data)
     }
 

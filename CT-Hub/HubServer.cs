@@ -84,7 +84,17 @@ public sealed class HubServer
         _listener.Start();
         _ = AcceptLoopAsync(_cts.Token);
         _ = DiscoveryLoopAsync(_cts.Token); // always runs: replies to direct CT-DISCOVER probes
-        _ = PdfSidecar.StartAsync(_cts.Token); // non-blocking — sidecar starts in background
+
+        // Start sidecar with error handling — don't block server startup.
+        _ = Task.Run(async () =>
+        {
+            try { await PdfSidecar.StartAsync(_cts.Token); }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine(
+                    $"[HubServer] PDF sidecar failed to start: {ex.Message}");
+            }
+        });
     }
 
     public void Stop()
@@ -365,6 +375,9 @@ public sealed class HubServer
                 case ("GET", "/api/pdfs/context"):
                     await WriteJsonAsync(res, new { sourceCatalog = PdfFolder.GetActiveSourceCatalog() }); break;
 
+                case ("GET", "/api/pdf-sidecar/status"):
+                    await WriteJsonAsync(res, new { available = PdfSidecar.IsAvailable }); break;
+
                 // ── PDF run overrides ─────────────────────────────────────
                 case ("GET", _) when path.StartsWith("/api/pdf-overrides/"):
                 {
@@ -437,8 +450,7 @@ public sealed class HubServer
                     var fullPath = Path.GetFullPath(Path.Combine(folder, filename));
                     var folderFull = Path.GetFullPath(folder);
 
-                    if (!fullPath.StartsWith(folderFull + Path.DirectorySeparatorChar)
-                        && !fullPath.Equals(folderFull, StringComparison.OrdinalIgnoreCase))
+                    if (!fullPath.StartsWith(folderFull + Path.DirectorySeparatorChar))
                     {
                         res.StatusCode = 400; break;
                     }
@@ -469,8 +481,7 @@ public sealed class HubServer
                     var fullPath   = Path.GetFullPath(Path.Combine(folder, filename));
                     var folderFull = Path.GetFullPath(folder);
 
-                    if (!fullPath.StartsWith(folderFull + Path.DirectorySeparatorChar)
-                        && !fullPath.Equals(folderFull, StringComparison.OrdinalIgnoreCase))
+                    if (!fullPath.StartsWith(folderFull + Path.DirectorySeparatorChar))
                     {
                         res.StatusCode = 400; break;
                     }

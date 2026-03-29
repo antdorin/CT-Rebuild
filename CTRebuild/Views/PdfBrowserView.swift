@@ -22,7 +22,8 @@ private func soDisplayTitle(from doc: PDFDocument) -> String {
     }
     if ordered.isEmpty { return "" }
     if ordered.count == 1 { return ordered[0] }
-    return "\(ordered.first!) – \(ordered.last!)"
+    guard let first = ordered.first, let last = ordered.last else { return "" }
+    return "\(first) – \(last)"
 }
 
 // MARK: - Date Extraction from filename (fallback when server provides no modified date)
@@ -134,8 +135,11 @@ private func groupFiles(_ metas: [PdfMeta]) -> [PdfDateGroup] {
 private func mergePDFs(from parts: [Data]) -> PDFDocument {
     let out = PDFDocument()
     var idx = 0
-    for data in parts {
-        guard let doc = PDFDocument(data: data) else { continue }
+    for (partIndex, data) in parts.enumerated() {
+        guard let doc = PDFDocument(data: data) else {
+            print("[PDF] Warning: failed to parse PDF part \(partIndex + 1) of \(parts.count)")
+            continue
+        }
         for p in 0..<doc.pageCount {
             if let page = doc.page(at: p), let copy = page.copy() as? PDFPage {
                 out.insert(copy, at: idx); idx += 1
@@ -616,7 +620,7 @@ private struct PdfDetailView: View {
 
 /// Scans a PDF page bitmap to find the bounding box of non-white content.
 /// Returns the crop rect in PDF page coordinate space, or nil if the page is blank.
-private func contentBounds(for page: PDFPage, threshold: UInt8 = 245) -> CGRect? {
+private func contentBounds(for page: PDFPage, threshold: UInt8 = 240) -> CGRect? {
     let mediaBox = page.bounds(for: .mediaBox)
     let sampleScale: CGFloat = 1.0   // 1× is enough for edge detection
     let w = Int(mediaBox.width * sampleScale)
@@ -658,8 +662,8 @@ private func contentBounds(for page: PDFPage, threshold: UInt8 = 245) -> CGRect?
 
     guard maxX >= minX, maxY >= minY else { return nil }
 
-    // Add a small margin (4pt equivalent)
-    let margin: CGFloat = 4.0 * sampleScale
+    // Add margin to avoid clipping anti-aliased text at page edges
+    let margin: CGFloat = 12.0 * sampleScale
     let cx = max(0, CGFloat(minX) - margin)
     let cy = max(0, CGFloat(minY) - margin)
     let cw = min(CGFloat(w), CGFloat(maxX) + margin) - cx
@@ -898,13 +902,21 @@ private struct PdfKitView: UIViewRepresentable {
         var runLayouts: [(text: String, bounds: CGRect)] = []
         for match in wordRegex.matches(in: rawText, options: [], range: fullRange) {
             let token = nsText.substring(with: match.range).trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !token.isEmpty,
-                  let tokenSelection = page.selection(for: match.range)
-            else { continue }
+            guard !token.isEmpty else { continue }
+
+            // If selection fails, insert a zero-size placeholder to keep run indices
+            // stable so that override keys (e.g. "p1:r2") always map to the correct word.
+            guard let tokenSelection = page.selection(for: match.range) else {
+                runLayouts.append((text: token, bounds: .zero))
+                continue
+            }
 
             let tokenBounds = tokenSelection.bounds(for: page)
-            guard tokenBounds.width > 0, tokenBounds.height > 0 else { continue }
-            runLayouts.append((text: token, bounds: tokenBounds))
+            if tokenBounds.width > 0, tokenBounds.height > 0 {
+                runLayouts.append((text: token, bounds: tokenBounds))
+            } else {
+                runLayouts.append((text: token, bounds: .zero))
+            }
         }
 
         if !runLayouts.isEmpty {
@@ -953,10 +965,15 @@ private struct PdfKitView: UIViewRepresentable {
 
     private func runLayout(for runIndex: Int, runLayouts: [(text: String, bounds: CGRect)]) -> (text: String, bounds: CGRect)? {
         if runIndex >= 0, runIndex < runLayouts.count {
-            return runLayouts[runIndex]
+            let entry = runLayouts[runIndex]
+            // Skip zero-bounds placeholders (inserted when selection failed).
+            guard entry.bounds.width > 0, entry.bounds.height > 0 else { return nil }
+            return entry
         }
         if runIndex > 0, runIndex - 1 < runLayouts.count {
-            return runLayouts[runIndex - 1]
+            let entry = runLayouts[runIndex - 1]
+            guard entry.bounds.width > 0, entry.bounds.height > 0 else { return nil }
+            return entry
         }
         return nil
     }

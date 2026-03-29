@@ -49,30 +49,45 @@ struct NativeReaderView: View {
     // MARK: - Fetch overrides + word layout from Hub (parallel)
 
     private func fetchFromHub() async {
-        guard let filename = filenames.first else { return }
-        async let overridesTask  = HubClient.shared.fetchPdfOverrides(filename: filename)
-        async let wordLayoutTask = HubClient.shared.fetchPdfWords(filename: filename)
+        guard !filenames.isEmpty else { return }
 
-        // Overrides
-        if let payload = try? await overridesTask {
-            let fallback = PdfGlobalOverrides()
-            let rawSizeY = payload.hasEdits ? payload.global.textSizeY : fallback.textSizeY
-            let newOverrides = PdfGlobalOverrides(
-                textSizeY:    min(2.0, max(0.75, rawSizeY)),
-                textSizeX:    max(0.4, payload.global.textSizeX),
-                pageZoomX:    max(0.1, payload.global.pageZoomX),
-                pageZoomY:    max(0.1, payload.global.pageZoomY),
-                pageSizeX:    max(0.1, payload.global.pageSizeX),
-                pageSizeY:    max(0.1, payload.global.pageSizeY),
-                forceBold:    payload.global.forceBold,
-                fontOverride: payload.global.fontOverride
-            )
-            await MainActor.run { overrides = newOverrides }
+        // Overrides: use first file's settings as the global defaults.
+        if let filename = filenames.first {
+            if let payload = try? await HubClient.shared.fetchPdfOverrides(filename: filename) {
+                let fallback = PdfGlobalOverrides()
+                let rawSizeY = payload.hasEdits ? payload.global.textSizeY : fallback.textSizeY
+                let newOverrides = PdfGlobalOverrides(
+                    textSizeY:    min(2.0, max(0.75, rawSizeY)),
+                    textSizeX:    max(0.4, payload.global.textSizeX),
+                    pageZoomX:    max(0.1, payload.global.pageZoomX),
+                    pageZoomY:    max(0.1, payload.global.pageZoomY),
+                    pageSizeX:    max(0.1, payload.global.pageSizeX),
+                    pageSizeY:    max(0.1, payload.global.pageSizeY),
+                    forceBold:    payload.global.forceBold,
+                    fontOverride: payload.global.fontOverride
+                )
+                await MainActor.run { overrides = newOverrides }
+            }
         }
 
-        // Word layout from Hub (reader-only path).
-        let wordDoc = try? await wordLayoutTask
-        await MainActor.run { hubWordDoc = wordDoc }
+        // Word layout: fetch for every file in the merged group, then stitch
+        // page numbers so they form a single continuous document.
+        var allPages: [HubPageWords] = []
+        var pageOffset = 0
+        for filename in filenames {
+            if let doc = try? await HubClient.shared.fetchPdfWords(filename: filename) {
+                let maxPage = doc.pages.map(\.page).max() ?? 0
+                let remapped = doc.pages.map { p in
+                    HubPageWords(page: p.page + pageOffset,
+                                 width: p.width, height: p.height, words: p.words)
+                }
+                allPages.append(contentsOf: remapped)
+                pageOffset += maxPage
+            }
+        }
+
+        let merged = allPages.isEmpty ? nil : HubWordDocument(pages: allPages)
+        await MainActor.run { hubWordDoc = merged }
     }
 }
 
@@ -192,8 +207,11 @@ final class NativeReaderHostView: UIScrollView {
                                hubPage: HubPageWords?, overrides: PdfGlobalOverrides,
                                singlePage: Bool) -> UIView {
         let cropBox = page.bounds(for: .cropBox)
-        let runs: [NRTextRun] = hubPage.map { hp in
-            hp.words.compactMap { w in
+        let runs: [NRTextRun]
+
+        if let hp = hubPage {
+            // Hub-extracted word layout available.
+            runs = hp.words.compactMap { w in
                 let width = w.x1 - w.x0
                 let height = w.y1 - w.y0
                 guard !w.text.isEmpty,
@@ -202,14 +220,16 @@ final class NativeReaderHostView: UIScrollView {
                       width > 0, height > 0 else {
                     return nil
                 }
-
                 return NRTextRun(
                     text: w.text,
                     bounds: CGRect(x: w.x0, y: w.y0, width: width, height: height),
                     originalFontHeight: height
                 )
             }
-        } ?? []
+        } else {
+            // Fallback: extract text runs on-device via PDFKit selections.
+            runs = nrOnDeviceRuns(from: page)
+        }
 
         let card = UIView()
         card.backgroundColor  = UIColor(white: 0.07, alpha: 1)
@@ -400,14 +420,41 @@ private final class NRCoordinatePageView: UIView {
             // Size the label to its natural text width so it never truncates,
             // then pin its origin back to the PDF-coordinate position.
             // Apply textSizeX to scale the label width (matches Hub horizontal scale control).
+            // Constrain to uiRect width to prevent overflow clipping.
             label.sizeToFit()
+            let scaledW = label.frame.width * sizeX
+            let maxW = max(uiRect.width, scaledW)
             label.frame = CGRect(x: uiRect.minX, y: uiRect.minY,
-                                 width: label.frame.width * sizeX,
+                                 width: maxW,
                                  height: max(label.frame.height, labelH))
 
             addSubview(label)
         }
     }
+}
+
+// MARK: - On-device fallback extraction
+
+/// Extracts word-level text runs from a PDFPage using PDFKit's selection API.
+/// Used when the Hub sidecar is unavailable so the reader doesn't show blank pages.
+private func nrOnDeviceRuns(from page: PDFPage) -> [NRTextRun] {
+    guard let rawText = page.string, !rawText.isEmpty else { return [] }
+    let nsText = rawText as NSString
+    let fullRange = NSRange(location: 0, length: nsText.length)
+    guard let wordRegex = try? NSRegularExpression(pattern: #"\S+"#) else { return [] }
+
+    var runs: [NRTextRun] = []
+    for match in wordRegex.matches(in: rawText, options: [], range: fullRange) {
+        let token = nsText.substring(with: match.range)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !token.isEmpty,
+              let sel = page.selection(for: match.range) else { continue }
+        let b = sel.bounds(for: page)
+        guard b.width > 0, b.height > 0,
+              b.minX.isFinite, b.minY.isFinite else { continue }
+        runs.append(NRTextRun(text: token, bounds: b, originalFontHeight: b.height))
+    }
+    return runs
 }
 
 // MARK: - PDF run-layout extraction (mirrors PdfKitView.pageRunLayouts)

@@ -31,6 +31,9 @@ public static class PdfResizeService
     /// </summary>
     public static string Scale(string inputPath, PdfScaleOptions opts)
     {
+        if (opts.ScaleX <= 0 || opts.ScaleY <= 0)
+            throw new ArgumentOutOfRangeException(nameof(opts), "Scale factors must be positive.");
+
         var dir     = Path.GetDirectoryName(inputPath)!;
         var name    = Path.GetFileNameWithoutExtension(inputPath);
         var xPct    = (int)Math.Round(opts.ScaleX * 100);

@@ -115,7 +115,8 @@ def _get_cached(pdf_path: str) -> bytes:
     if os.path.isfile(sidecar):
         try:
             if os.path.getmtime(sidecar) >= os.path.getmtime(pdf_path):
-                data = open(sidecar, "rb").read()
+                with open(sidecar, "rb") as f:
+                    data = f.read()
                 with _cache_lock:
                     _cache[pdf_path] = data
                 return data
@@ -135,7 +136,7 @@ def _get_cached(pdf_path: str) -> bytes:
         except OSError:
             pass
 
-    threading.Thread(target=_write, daemon=True).start()
+    threading.Thread(target=_write, daemon=False).start()
     return data
 
 

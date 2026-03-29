@@ -161,8 +161,14 @@ public sealed class CdpDevToolsService : IAsyncDisposable
         await _socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, cancellationToken);
 
         using var reg = cancellationToken.Register(() => tcs.TrySetCanceled(cancellationToken));
-        var result = await tcs.Task;
-        return result;
+        var timeout = Task.Delay(TimeSpan.FromSeconds(15), cancellationToken);
+        var completed = await Task.WhenAny(tcs.Task, timeout);
+        if (completed == timeout)
+        {
+            _pending.TryRemove(id, out _);
+            throw new TimeoutException($"CDP command '{method}' timed out after 15 s.");
+        }
+        return await tcs.Task;
     }
 
     private async Task ReceiveLoopAsync(CancellationToken cancellationToken)

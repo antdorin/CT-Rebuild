@@ -34,7 +34,8 @@ public sealed class WebSocketManager
             {
                 try
                 {
-                    await ws.SendAsync(segment, WebSocketMessageType.Text, true, CancellationToken.None);
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    await ws.SendAsync(segment, WebSocketMessageType.Text, true, cts.Token);
                 }
                 catch
                 {

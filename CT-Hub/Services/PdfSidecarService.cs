@@ -29,6 +29,9 @@ public sealed class PdfSidecarService : IDisposable
         Timeout     = TimeSpan.FromSeconds(30),
     };
 
+    /// <summary>True after the sidecar has started and responded to a health check.</summary>
+    public bool IsAvailable { get; private set; }
+
     private Process? _process;
     private readonly SemaphoreSlim _startLock = new(1, 1);
 
@@ -59,6 +62,13 @@ public sealed class PdfSidecarService : IDisposable
                 ?? throw new InvalidOperationException("Failed to start pdf_service process.");
 
             await WaitForReadyAsync(ct);
+            IsAvailable = true;
+        }
+        catch (Exception ex)
+        {
+            IsAvailable = false;
+            System.Diagnostics.Debug.WriteLine($"[PdfSidecar] Start failed: {ex.Message}");
+            throw;
         }
         finally
         {
@@ -123,14 +133,33 @@ public sealed class PdfSidecarService : IDisposable
 
         // Dev fallback: run the script with the system Python.
         var script = Path.GetFullPath(
-            Path.Combine(baseDir, "..", "..", "..", "..", "pdf_service", "pdf_service.py"));
+            Path.Combine(baseDir, "..", "..", "..", "pdf_service", "pdf_service.py"));
 
         if (!File.Exists(script))
             throw new FileNotFoundException(
                 "pdf_service.exe not found and dev script path does not exist. " +
                 $"Expected: {exe}  or  {script}");
 
-        return ("python", $"\"{script}\"");
+        // Try common Python executable names on Windows.
+        foreach (var pyName in new[] { "python", "py", "python3" })
+        {
+            try
+            {
+                var which = Process.Start(new ProcessStartInfo(pyName, "--version")
+                {
+                    UseShellExecute = false, CreateNoWindow = true,
+                    RedirectStandardOutput = true, RedirectStandardError = true,
+                });
+                which?.WaitForExit(3000);
+                if (which is { ExitCode: 0 })
+                    return (pyName, $"\"{script}\"");
+            }
+            catch { /* not found on this attempt */ }
+        }
+
+        throw new FileNotFoundException(
+            "pdf_service.exe not found and no Python interpreter found on PATH. " +
+            $"Expected: {exe}  or  Python + {script}");
     }
 
     /// <summary>

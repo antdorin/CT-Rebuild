@@ -100,9 +100,16 @@ public sealed class JsonStore<T> where T : class
     /// <summary>Atomic write: serialise to .tmp then replace original.</summary>
     private void Persist()
     {
-        var tmp = _filePath + ".tmp";
-        var json = JsonSerializer.Serialize(Items.ToList(), _opts);
-        File.WriteAllText(tmp, json);
-        File.Move(tmp, _filePath, overwrite: true);
+        try
+        {
+            var tmp = _filePath + ".tmp";
+            var json = JsonSerializer.Serialize(Items.ToList(), _opts);
+            File.WriteAllText(tmp, json);
+            File.Move(tmp, _filePath, overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[JsonStore] Persist failed for {_collectionName}: {ex.Message}");
+        }
     }
 }

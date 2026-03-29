@@ -2256,6 +2256,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private TextBox? GetPageSizeXTextBox() => FindName("TxtPageSizeX") as TextBox;
     private TextBox? GetPageSizeYTextBox() => FindName("TxtPageSizeY") as TextBox;
 
+    private void FontCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_pdfEditorSyncing) return;
+        RefreshPdfEditorSurface();
+    }
+
     private void GlobalSetting_Changed(object sender, RoutedEventArgs e)
     {
         var sldPageSizeX = GetPageSizeXSlider();
@@ -2836,37 +2842,35 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 normalizedPath = tempPdfPath;
             }
 
-            using var doc = PdfiumViewer.PdfDocument.Load(normalizedPath);
-            if (doc.PageCount == 0) return null;
+            // Use Windows.Data.Pdf (built into Windows 10+) — no external NuGet dependency.
+            var file = Windows.Storage.StorageFile.GetFileFromPathAsync(
+                Path.GetFullPath(normalizedPath)).GetAwaiter().GetResult();
+            var pdfDoc = Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file)
+                .GetAwaiter().GetResult();
+            if (pdfDoc.PageCount == 0) return null;
 
-            var pageSize = doc.PageSizes[0];
+            using var page = pdfDoc.GetPage(0);
+            var pageSize = page.Size;
             if (pageSize.Width <= 0 || pageSize.Height <= 0) return null;
 
             const int targetWidth = 390;
             double scale = targetWidth / pageSize.Width;
-            int w = targetWidth;
-            int h = Math.Max(1, (int)Math.Round(pageSize.Height * scale));
+            uint w = (uint)targetWidth;
+            uint h = (uint)Math.Max(1, (int)Math.Round(pageSize.Height * scale));
 
-            using var renderedImage = doc.Render(
-                0,
-                w,
-                h,
-                96,
-                96,
-                PdfiumViewer.PdfRenderFlags.Annotations);
-
-            if (renderedImage is null) return null;
-
-            using var bitmap = new System.Drawing.Bitmap(renderedImage);
-
-            using var ms = new MemoryStream();
-            bitmap.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-            ms.Position = 0;
+            using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+            var options = new Windows.Data.Pdf.PdfPageRenderOptions
+            {
+                DestinationWidth  = w,
+                DestinationHeight = h,
+            };
+            page.RenderToStreamAsync(stream, options).GetAwaiter().GetResult();
+            stream.Seek(0);
 
             var bitmapImage = new System.Windows.Media.Imaging.BitmapImage();
             bitmapImage.BeginInit();
             bitmapImage.CacheOption  = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
-            bitmapImage.StreamSource = ms;
+            bitmapImage.StreamSource = stream.AsStreamForRead();
             bitmapImage.EndInit();
             bitmapImage.Freeze();
             return bitmapImage;

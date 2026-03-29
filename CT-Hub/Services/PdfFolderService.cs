@@ -12,6 +12,8 @@ public sealed class PdfFolderService : IDisposable
 {
     private FileSystemWatcher? _watcher;
     private string _folder = string.Empty;
+    private Timer? _debounce;
+    private readonly object _debounceLock = new();
 
     /// <summary>Filename-only list (not full paths), UI-thread-safe via Dispatcher.</summary>
     public ObservableCollection<string> FileNames { get; } = new();
@@ -48,17 +50,38 @@ public sealed class PdfFolderService : IDisposable
 
     // ── Internals ─────────────────────────────────────────────────────────────
 
+    private void ScheduleRefresh()
+    {
+        lock (_debounceLock)
+        {
+            _debounce?.Dispose();
+            _debounce = new Timer(_ => Refresh(), null, 300, Timeout.Infinite);
+        }
+    }
+
     private void Refresh()
     {
-        var files = Directory.Exists(_folder)
-            ? Directory.GetFiles(_folder, "*", SearchOption.TopDirectoryOnly)
-                       .Where(f => f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)
-                                || f.EndsWith(".nl",  StringComparison.OrdinalIgnoreCase))
-                       .Select(f => new FileInfo(f))
-                       .Where(fi => fi.Exists)
-                       .OrderBy(fi => fi.Name, StringComparer.OrdinalIgnoreCase)
-                       .ToList()
-            : new List<FileInfo>();
+        List<FileInfo> files;
+        try
+        {
+            files = Directory.Exists(_folder)
+                ? Directory.GetFiles(_folder, "*", SearchOption.TopDirectoryOnly)
+                           .Where(f => f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)
+                                    || f.EndsWith(".nl",  StringComparison.OrdinalIgnoreCase))
+                           .Select(f => new FileInfo(f))
+                           .Where(fi => fi.Exists)
+                           .OrderBy(fi => fi.Name, StringComparer.OrdinalIgnoreCase)
+                           .ToList()
+                : new List<FileInfo>();
+        }
+        catch (DirectoryNotFoundException)
+        {
+            files = new List<FileInfo>();
+        }
+        catch (IOException)
+        {
+            return; // Folder temporarily unavailable — skip this refresh
+        }
 
         // Update on the UI thread if a dispatcher is available
         var dispatcher = System.Windows.Application.Current?.Dispatcher;
@@ -121,13 +144,17 @@ public sealed class PdfFolderService : IDisposable
             NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
             EnableRaisingEvents = true
         };
-        _watcher.Created += (_, _) => Refresh();
-        _watcher.Deleted += (_, e) => { PdfSidecarService.InvalidateCache(e.FullPath); Refresh(); };
-        _watcher.Renamed += (_, e) => { PdfSidecarService.InvalidateCache(e.OldFullPath); Refresh(); };
-        _watcher.Changed += (_, e) => PdfSidecarService.InvalidateCache(e.FullPath);
+        _watcher.Created += (_, _) => ScheduleRefresh();
+        _watcher.Deleted += (_, e) => { PdfSidecarService.InvalidateCache(e.FullPath); ScheduleRefresh(); };
+        _watcher.Renamed += (_, e) => { PdfSidecarService.InvalidateCache(e.OldFullPath); ScheduleRefresh(); };
+        _watcher.Changed += (_, e) => { PdfSidecarService.InvalidateCache(e.FullPath); ScheduleRefresh(); };
     }
 
-    public void Dispose() => _watcher?.Dispose();
+    public void Dispose()
+    {
+        _watcher?.Dispose();
+        lock (_debounceLock) _debounce?.Dispose();
+    }
 
     public string GetActiveSourceCatalog()
     {

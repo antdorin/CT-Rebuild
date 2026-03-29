@@ -502,10 +502,34 @@
 
                                     <TextBlock Text="Font" Foreground="#9CDCFE"
                                                FontFamily="Consolas" FontSize="11" Margin="0,8,0,3"/>
-                                    <TextBox x:Name="TxtFont"
-                                             Style="{StaticResource SearchBox}"
-                                             Text="" Margin="0,0,0,2"
-                                             TextChanged="GlobalSetting_Changed"/>
+                                    <ComboBox x:Name="TxtFont"
+                                              IsEditable="True"
+                                              Background="#3C3C3C" Foreground="#999999"
+                                              BorderBrush="#555555"
+                                              FontFamily="Consolas" FontSize="12"
+                                              Margin="0,0,0,2"
+                                              SelectionChanged="FontCombo_SelectionChanged">
+                                        <ComboBoxItem Content="Verdana"/>
+                                        <ComboBoxItem Content="Segoe UI"/>
+                                        <ComboBoxItem Content="Arial"/>
+                                        <ComboBoxItem Content="Calibri"/>
+                                        <ComboBoxItem Content="Consolas"/>
+                                        <ComboBoxItem Content="Courier New"/>
+                                        <ComboBoxItem Content="Georgia"/>
+                                        <ComboBoxItem Content="Helvetica"/>
+                                        <ComboBoxItem Content="Impact"/>
+                                        <ComboBoxItem Content="Lucida Console"/>
+                                        <ComboBoxItem Content="Tahoma"/>
+                                        <ComboBoxItem Content="Times New Roman"/>
+                                        <ComboBoxItem Content="Trebuchet MS"/>
+                                        <ComboBoxItem Content="Century Gothic"/>
+                                        <ComboBoxItem Content="Franklin Gothic Medium"/>
+                                        <ComboBoxItem Content="Palatino Linotype"/>
+                                        <ComboBoxItem Content="Garamond"/>
+                                        <ComboBoxItem Content="Book Antiqua"/>
+                                        <ComboBoxItem Content="Candara"/>
+                                        <ComboBoxItem Content="Segoe UI Semibold"/>
+                                    </ComboBox>
 
                                     <CheckBox x:Name="ChkBold"
                                               Content="Bold Text"
@@ -553,7 +577,7 @@
                                               VerticalScrollBarVisibility="Auto"
                                               HorizontalScrollBarVisibility="Auto">
                                     <Grid x:Name="PdfEditorCanvas" Width="390"
-                                          HorizontalAlignment="Left" VerticalAlignment="Top">
+                                          HorizontalAlignment="Center" VerticalAlignment="Top">
                                         <Image x:Name="PdfEditorImage"
                                                Stretch="None"
                                                HorizontalAlignment="Left"
