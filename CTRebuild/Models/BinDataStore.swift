@@ -16,19 +16,19 @@ final class BinDataStore: ObservableObject {
     @Published private(set) var binQuantities: [String: Int] = [:]
 
     /// Ordered list of active groups for display (e.g. in the camera overlay)
-    @Published private(set) var activeEntries: [(id: String, label: String, doc: PDFDocument)] = []
+    @Published private(set) var activeEntries: [(id: String, label: String, doc: PDFDocument, filenames: [String])] = []
 
     /// group.id → per-page extracted data for that group
     private var groupData: [String: [String: Int]] = [:]
 
-    /// group.id → (display label, merged PDFDocument)
-    private var activeMeta: [String: (label: String, doc: PDFDocument)] = [:]
+    /// group.id → (display label, merged PDFDocument, source filenames)
+    private var activeMeta: [String: (label: String, doc: PDFDocument, filenames: [String])] = [:]
 
     // MARK: - Public API
 
     /// Called when a PDF group is toggled active.
     /// Extracts bin locations + committed numbers from the merged document.
-    func activate(groupId: String, label: String = "", document: PDFDocument) {
+    func activate(groupId: String, label: String = "", document: PDFDocument, filenames: [String] = []) {
         var perGroup: [String: Int] = [:]
         for i in 0..<document.pageCount {
             guard let text = document.page(at: i)?.string else { continue }
@@ -38,7 +38,7 @@ final class BinDataStore: ObservableObject {
             }
         }
         groupData[groupId] = perGroup
-        activeMeta[groupId] = (label: label.isEmpty ? groupId : label, doc: document)
+        activeMeta[groupId] = (label: label.isEmpty ? groupId : label, doc: document, filenames: filenames)
         recalculate()
     }
 
@@ -148,7 +148,7 @@ final class BinDataStore: ObservableObject {
         }
         binQuantities = merged
         activeEntries = activeMeta
-            .map { (id: $0.key, label: $0.value.label, doc: $0.value.doc) }
+            .map { (id: $0.key, label: $0.value.label, doc: $0.value.doc, filenames: $0.value.filenames) }
             .sorted { $0.id < $1.id }
     }
 }

@@ -1,6 +1,5 @@
 import SwiftUI
 import AVFoundation
-import PDFKit
 
 struct BottomPanelView: View {
     let safeArea: EdgeInsets
@@ -26,8 +25,12 @@ struct BottomPanelView: View {
     // Active PDF sheet
     @ObservedObject private var binStore = BinDataStore.shared
     @ObservedObject private var scanStore = ScanStore.shared
-    @State private var activePdfSheetDoc: PDFDocument? = nil
+    @State private var activePdfSheetOpen: Bool = false
     @State private var activePdfSheetTitle: String = ""
+    @State private var activePdfSheetFilenames: [String] = []
+    @State private var activePdfSheetPageCounts: [Int] = []
+    @State private var activePdfSheetCurrentPage: Int = 0
+    @State private var activePdfSheetLoading: Bool = false
 
     var body: some View {
         ZStack {
@@ -111,8 +114,25 @@ struct BottomPanelView: View {
                                                 VStack(spacing: 6) {
                                                     ForEach(binStore.activeEntries, id: \.id) { entry in
                                                         Button {
+                                                            guard !entry.filenames.isEmpty else { return }
                                                             activePdfSheetTitle = entry.label
-                                                            activePdfSheetDoc = entry.doc
+                                                            activePdfSheetFilenames = entry.filenames
+                                                            activePdfSheetCurrentPage = 0
+                                                            activePdfSheetPageCounts = []
+                                                            activePdfSheetLoading = true
+                                                            activePdfSheetOpen = true
+                                                            Task {
+                                                                var counts: [Int] = []
+                                                                for filename in entry.filenames {
+                                                                    if let count = try? await HubClient.shared.fetchPdfPageCount(filename: filename) {
+                                                                        counts.append(count)
+                                                                    } else {
+                                                                        counts.append(1)
+                                                                    }
+                                                                }
+                                                                activePdfSheetPageCounts = counts
+                                                                activePdfSheetLoading = false
+                                                            }
                                                         } label: {
                                                             VStack(spacing: 2) {
                                                                 Text(entry.label)
@@ -120,7 +140,7 @@ struct BottomPanelView: View {
                                                                     .foregroundColor(.white.opacity(0.85))
                                                                     .lineLimit(2)
                                                                     .multilineTextAlignment(.center)
-                                                                Text("\(entry.doc.pageCount)p")
+                                                                Text("\(entry.filenames.count) file\(entry.filenames.count == 1 ? "" : "s")")
                                                                     .font(.system(size: 8, design: .monospaced))
                                                                     .foregroundColor(.white.opacity(0.35))
                                                             }
@@ -275,20 +295,20 @@ struct BottomPanelView: View {
                 UnassignedItemModal(rawBarcode: scan.value) { pendingScan = nil }
             }
         }
-        .sheet(isPresented: Binding(
-            get: { activePdfSheetDoc != nil },
-            set: { if !$0 { activePdfSheetDoc = nil } }
-        )) {
-            if let doc = activePdfSheetDoc {
-                NavigationStack {
-                    CamPdfViewer(document: doc)
-                        .navigationTitle(activePdfSheetTitle)
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarTrailing) {
-                                Button("Done") { activePdfSheetDoc = nil }
-                            }
-                        }
+        .sheet(isPresented: $activePdfSheetOpen) {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                if activePdfSheetLoading || activePdfSheetPageCounts.isEmpty {
+                    ProgressView().tint(.white)
+                } else {
+                    PdfDetailView(
+                        title: activePdfSheetTitle,
+                        safeArea: .init(),
+                        filenames: activePdfSheetFilenames,
+                        pageCounts: activePdfSheetPageCounts,
+                        currentPage: $activePdfSheetCurrentPage,
+                        onBack: { activePdfSheetOpen = false }
+                    )
                 }
             }
         }
@@ -402,24 +422,4 @@ struct BottomPanelView: View {
     }
 }
 
-// MARK: - Camera PDF Viewer (used in the active-PDF sheet)
 
-private struct CamPdfViewer: UIViewRepresentable {
-    let document: PDFDocument
-
-    func makeUIView(context: Context) -> PDFView {
-        let view = PDFView()
-        view.autoScales = true
-        view.displayMode = .singlePageContinuous
-        view.displayDirection = .vertical
-        view.backgroundColor = .black
-        view.document = document
-        return view
-    }
-
-    func updateUIView(_ uiView: PDFView, context: Context) {
-        if uiView.document !== document {
-            uiView.document = document
-        }
-    }
-}

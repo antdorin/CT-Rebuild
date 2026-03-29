@@ -127,7 +127,7 @@ private let rightPageTitles: [String] = [
 
 // MARK: - Right Panel Page Picker
 
-private struct RightWheelSelector: View {
+struct RightWheelSelector: View {
     @Binding var selectedIndex: Int
     @Binding var isPPOpen: Bool
     let panelSize: CGSize

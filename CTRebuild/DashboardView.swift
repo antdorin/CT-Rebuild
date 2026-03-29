@@ -23,6 +23,12 @@ struct DashboardView: View {
     @AppStorage("panel_topWidthPercent")    private var topWidthPercent: Int = 97
     @AppStorage("panel_bottomWidthPercent") private var bottomWidthPercent: Int = 97
 
+    // Dashboard paged content
+    @State private var isDashPickerOpen = false
+    @AppStorage("dashboardSelectedIndex") private var dashSelectedIndex = 0
+    @AppStorage("panel_autoPickerDash")   private var autoPickerDash    = false
+    @AppStorage("panel_dashStartPage")    private var dashStartPage: Int = 0
+
     var body: some View {
         // GeometryReader ignores safe area so panels slide in from the true
         // physical edges (behind notch / home indicator). Safe area insets are
@@ -42,8 +48,19 @@ struct DashboardView: View {
                 Color(uiColor: .systemBackground)
                     .ignoresSafeArea()
 
-                // ── Placeholder Dashboard Content ─────────────────────────────
-                placeholderContent(safeArea: safe)
+                // ── Dashboard Center Content ──────────────────────────────────
+                if isDashPickerOpen {
+                    RightWheelSelector(
+                        selectedIndex: $dashSelectedIndex,
+                        isPPOpen: $isDashPickerOpen,
+                        panelSize: geo.size,
+                        safeArea: safe
+                    )
+                    .transition(.opacity.animation(.easeInOut(duration: 0.2)))
+                } else {
+                    RightPageContent(index: dashSelectedIndex, safeArea: safe)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                }
 
                 // ── Dim Backdrop (tap anywhere to dismiss) ────────────────────
                 if activePanel != .none && panelDimOnOpen {
@@ -125,28 +142,37 @@ struct DashboardView: View {
         }
         .ignoresSafeArea()
         .background(Color(uiColor: .systemBackground).ignoresSafeArea())
+        .onAppear {
+            if autoPickerDash { isDashPickerOpen = true }
+            else { dashSelectedIndex = dashStartPage }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .gestureActionFired)) { note in
+            guard let raw = note.userInfo?["action"] as? String,
+                  activePanel == .none else { return }
+            let total = 7
+            switch raw {
+            case GestureAction.openPagePicker.rawValue:
+                withAnimation(.slideBck) { isDashPickerOpen.toggle() }
+            case GestureAction.nextRightPage.rawValue:
+                withAnimation(.slideFwd) {
+                    dashSelectedIndex = (dashSelectedIndex + 1) % total
+                    isDashPickerOpen = false
+                }
+            case GestureAction.prevRightPage.rawValue:
+                withAnimation(.slideBck) {
+                    dashSelectedIndex = (dashSelectedIndex - 1 + total) % total
+                    isDashPickerOpen = false
+                }
+            default: break
+            }
+        }
     }
 
-    // MARK: - Placeholder Content
+    // MARK: - Panel Content (placeholder removed — dashboard now uses RightPageContent)
 
     private func panelFraction(_ percent: Int) -> CGFloat {
         let clamped = min(max(percent, 60), 100)
         return CGFloat(clamped) / 100
-    }
-
-    private func placeholderContent(safeArea: EdgeInsets) -> some View {
-        VStack {
-            Spacer()
-            Image("CTHelmet")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 320, height: 320)
-            Spacer()
-        }
-        .padding(.top, safeArea.top)
-        .padding(.bottom, safeArea.bottom)
-        .padding(.leading, safeArea.leading)
-        .padding(.trailing, safeArea.trailing)
     }
 
     // MARK: - Panel Content
