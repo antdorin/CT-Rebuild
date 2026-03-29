@@ -712,7 +712,7 @@ private struct PdfKitView: UIViewRepresentable {
         view.displayDirection = .vertical
         view.backgroundColor = .black
         view.usePageViewController(singlePage)
-        let source = autoCrop ? autoCropped(document) : document
+        let source = (autoCrop && !overrides.hasEdits) ? autoCropped(document) : document
         let doc = composedDocument(from: source, overrides: overrides)
         view.document = doc
         context.coordinator.lastAutoCrop = autoCrop
@@ -740,7 +740,7 @@ private struct PdfKitView: UIViewRepresentable {
             coord.sourceDoc = document
             coord.lastAutoCrop = autoCrop
             coord.lastOverrides = overrides
-            let source = autoCrop ? autoCropped(document) : document
+            let source = (autoCrop && !overrides.hasEdits) ? autoCropped(document) : document
             let doc = composedDocument(from: source, overrides: overrides)
             uiView.document = doc
             // Re-trigger auto-scaling after document replacement; without this the
@@ -807,7 +807,7 @@ private struct PdfKitView: UIViewRepresentable {
         if pageRuns.isEmpty {
             guard overrides.global != .defaults else { return }
             guard !runLayouts.isEmpty else { return }
-            let syntheticCount = min(24, runLayouts.count)
+            let syntheticCount = runLayouts.count
             pageRuns = (0..<syntheticCount).map { index in
                 (runIndex: index, run: PdfRunOverride())
             }
@@ -837,7 +837,7 @@ private struct PdfKitView: UIViewRepresentable {
                 forceBold: global.forceBold
             )
 
-            let rowHeight = max(fontSize * 1.35, layout.bounds.height * global.textSizeY * runScale) * pageScaleY
+            let rowHeight = max(fontSize * 1.35, layout.bounds.height * global.textSizeY * runScale)
             let estimatedWidth = max(24.0, min(bounds.width - 4.0, layout.bounds.width * textScaleX)) * pageScaleX
 
             let centeredX = ((layout.bounds.minX - bounds.midX) * zoomX) + bounds.midX
@@ -997,3 +997,4 @@ private struct PdfKitView: UIViewRepresentable {
         }
     }
 }
+ 

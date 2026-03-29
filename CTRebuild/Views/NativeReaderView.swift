@@ -5,7 +5,7 @@ import UIKit
 // MARK: - Global overrides model (mirrors Hub override schema)
 
 struct PdfGlobalOverrides: Equatable {
-    var textSizeY:    Double = 1.45   // font size multiplier
+    var textSizeY:    Double = 1.75   // font size multiplier
     var textSizeX:    Double = 1.0    // horizontal text width scale
     var pageZoomX:    Double = 1.0    // zoom from crop centre (X)
     var pageZoomY:    Double = 1.0    // zoom from crop centre (Y)

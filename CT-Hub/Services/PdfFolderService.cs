@@ -94,7 +94,7 @@ public sealed class PdfFolderService : IDisposable
         var baseName = Path.GetFileNameWithoutExtension(fileName);
         if (string.IsNullOrWhiteSpace(baseName)) return string.Empty;
 
-        var soMatches = Regex.Matches(baseName, @"\bSO[-_ ]?\d{4,}\b", RegexOptions.IgnoreCase)
+        var soMatches = Regex.Matches(baseName, @"\bSO-[A-Za-z0-9]+-[A-Za-z0-9]+\b", RegexOptions.IgnoreCase)
             .Select(m => m.Value.Replace("_", "-").Replace(" ", "").ToUpperInvariant())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();

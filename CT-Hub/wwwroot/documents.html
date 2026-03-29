@@ -261,7 +261,7 @@
 
     async function load() {
       try {
-        const res = await fetch('/api/docs/list');
+        const res = await fetch('/api/pdfs/meta');
         if (!res.ok) throw new Error('HTTP ' + res.status);
         allDocs = await res.json();
         // Sort newest-modified first
