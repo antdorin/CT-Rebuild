@@ -11,11 +11,14 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Text.Json;
 using System.Net.Http;
 using CTHub.Models;
 using CTHub.Services;
 using Microsoft.Win32;
+using ZXing;
+using ZXing.Common;
 
 namespace CTHub;
 
@@ -32,9 +35,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private DataGridColumnHeader? _activeHeader;
     private DataGrid? _activeGrid;
     private readonly List<string> _devCdpRawEvents = [];
-    private readonly HashSet<char> _devHotkeyBuffer = [];
-    private DateTime _devHotkeyLastInputUtc = DateTime.MinValue;
+    private bool _chadHandled = false;
     private bool _isDevToolsVisible = true;
+    private bool _qrGenSyncing;
+    private string _qrGenCurrentZpl = string.Empty;
 
     // ── Bindable properties ───────────────────────────────────────────────────
 
@@ -510,6 +514,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         InitializeSearchFilters();
         UpdatePdfEditorModeUi();
+        InitializeQrGenerator();
 
         // Populate server info panel
         RefreshServerInfo();
@@ -553,26 +558,24 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        char? pressed = KeyToUpperChar(e.Key);
-        if (pressed is null)
-            return;
+        bool c = System.Windows.Input.Keyboard.IsKeyDown(Key.C);
+        bool h = System.Windows.Input.Keyboard.IsKeyDown(Key.H);
+        bool a = System.Windows.Input.Keyboard.IsKeyDown(Key.A);
+        bool d = System.Windows.Input.Keyboard.IsKeyDown(Key.D);
 
-        if (DateTime.UtcNow - _devHotkeyLastInputUtc > TimeSpan.FromSeconds(5))
-            _devHotkeyBuffer.Clear();
-
-        _devHotkeyLastInputUtc = DateTime.UtcNow;
-
-        char c = pressed.Value;
-        if (c is 'C' or 'H' or 'A' or 'D')
+        if (c && h && a && d)
         {
-            _devHotkeyBuffer.Add(c);
-            if (_devHotkeyBuffer.Count == 4)
+            if (!_chadHandled)
             {
-                _devHotkeyBuffer.Clear();
+                _chadHandled = true;
                 _isDevToolsVisible = !_isDevToolsVisible;
                 UpdateDevToolsVisibility();
                 AddDevCdpLog(_isDevToolsVisible ? "Dev Tools tab revealed via CHAD combo." : "Dev Tools tab hidden via CHAD combo.");
             }
+        }
+        else
+        {
+            _chadHandled = false;
         }
     }
 
@@ -1333,6 +1336,390 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 Touch();
             });
         }
+    }
+
+    private void QrMappings_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (QrGenAutoFromSelection?.IsChecked != true || _qrGenSyncing)
+            return;
+
+        if (QrMappingsGrid.SelectedItem is not QrClassMapping selected)
+            return;
+
+        if (string.IsNullOrWhiteSpace(selected.QrValue))
+            return;
+
+        _qrGenSyncing = true;
+        QrGenPayload.Text = selected.QrValue.Trim();
+        _qrGenSyncing = false;
+        UpdateQrGeneratorPreview();
+    }
+
+    private void QrGenerator_UseSelected(object sender, RoutedEventArgs e)
+    {
+        if (QrMappingsGrid.SelectedItem is not QrClassMapping selected || string.IsNullOrWhiteSpace(selected.QrValue))
+        {
+            StatusText = "Select a QR mapping row with a QR Value first.";
+            return;
+        }
+
+        _qrGenSyncing = true;
+        QrGenPayload.Text = selected.QrValue.Trim();
+        _qrGenSyncing = false;
+        UpdateQrGeneratorPreview();
+        StatusText = "Loaded selected QR Value into generator.";
+    }
+
+    private void QrGenerator_CopyZpl(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_qrGenCurrentZpl))
+        {
+            StatusText = "Nothing to copy yet. Generate a label first.";
+            return;
+        }
+
+        Clipboard.SetText(_qrGenCurrentZpl);
+        StatusText = "Copied ZPL to clipboard.";
+    }
+
+    private void QrGenerator_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_qrGenSyncing) return;
+        UpdateQrGeneratorPreview();
+    }
+
+    private void QrGenerator_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_qrGenSyncing) return;
+        UpdateQrGeneratorPreview();
+    }
+
+    private void QrGenerator_PresetChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_qrGenSyncing || QrGenPreset is null) return;
+
+        var preset = QrGenPreset.SelectedIndex;
+        _qrGenSyncing = true;
+        try
+        {
+            switch (preset)
+            {
+                case 0: // 4x6 Shipping (203)
+                    QrGenDpi.SelectedIndex = 0;
+                    QrGenLabelWidthIn.Text = "4.0";
+                    QrGenLabelHeightIn.Text = "6.0";
+                    QrGenMarginX.Text = "24";
+                    QrGenMarginY.Text = "24";
+                    QrGenModuleDots.Text = "4";
+                    QrGenQuietZone.Text = "4";
+                    QrGenBarcodeHeight.Text = "220";
+                    break;
+                case 1: // 2x1 Asset Tag (300)
+                    QrGenDpi.SelectedIndex = 1;
+                    QrGenLabelWidthIn.Text = "2.0";
+                    QrGenLabelHeightIn.Text = "1.0";
+                    QrGenMarginX.Text = "16";
+                    QrGenMarginY.Text = "12";
+                    QrGenModuleDots.Text = "3";
+                    QrGenQuietZone.Text = "2";
+                    QrGenBarcodeHeight.Text = "90";
+                    break;
+                case 2: // 4x2 Product (203)
+                    QrGenDpi.SelectedIndex = 0;
+                    QrGenLabelWidthIn.Text = "4.0";
+                    QrGenLabelHeightIn.Text = "2.0";
+                    QrGenMarginX.Text = "24";
+                    QrGenMarginY.Text = "24";
+                    QrGenModuleDots.Text = "4";
+                    QrGenQuietZone.Text = "4";
+                    QrGenBarcodeHeight.Text = "120";
+                    break;
+                default:
+                    break;
+            }
+
+            SyncQrGeneratorSlidersFromText();
+        }
+        finally
+        {
+            _qrGenSyncing = false;
+        }
+
+        UpdateQrGeneratorPreview();
+    }
+
+    private void QrGenerator_NumberSliderChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_qrGenSyncing) return;
+
+        _qrGenSyncing = true;
+        try
+        {
+            if (sender == QrGenLabelWidthInSlider)
+                QrGenLabelWidthIn.Text = e.NewValue.ToString("0.0", CultureInfo.InvariantCulture);
+            else if (sender == QrGenLabelHeightInSlider)
+                QrGenLabelHeightIn.Text = e.NewValue.ToString("0.0", CultureInfo.InvariantCulture);
+            else if (sender == QrGenMarginXSlider)
+                QrGenMarginX.Text = ((int)Math.Round(e.NewValue)).ToString(CultureInfo.InvariantCulture);
+            else if (sender == QrGenMarginYSlider)
+                QrGenMarginY.Text = ((int)Math.Round(e.NewValue)).ToString(CultureInfo.InvariantCulture);
+            else if (sender == QrGenModuleDotsSlider)
+                QrGenModuleDots.Text = ((int)Math.Round(e.NewValue)).ToString(CultureInfo.InvariantCulture);
+            else if (sender == QrGenQuietZoneSlider)
+                QrGenQuietZone.Text = ((int)Math.Round(e.NewValue)).ToString(CultureInfo.InvariantCulture);
+            else if (sender == QrGenBarcodeHeightSlider)
+                QrGenBarcodeHeight.Text = ((int)Math.Round(e.NewValue)).ToString(CultureInfo.InvariantCulture);
+        }
+        finally
+        {
+            _qrGenSyncing = false;
+        }
+
+        UpdateQrGeneratorPreview();
+    }
+
+    private void QrGenerator_ToggleChanged(object sender, RoutedEventArgs e)
+    {
+        if (_qrGenSyncing) return;
+        UpdateQrGeneratorPreview();
+    }
+
+    private void InitializeQrGenerator()
+    {
+        if (QrGenDpi is null) return;
+
+        _qrGenSyncing = true;
+        QrGenDpi.SelectedIndex = 0;
+        QrGenPreset.SelectedIndex = 2;
+        QrGenTypeQr.IsChecked = true;
+        if (QrMappingsGrid.Items.Count > 0 && QrMappingsGrid.Items[0] is QrClassMapping first && !string.IsNullOrWhiteSpace(first.QrValue))
+            QrGenPayload.Text = first.QrValue.Trim();
+        SyncQrGeneratorSlidersFromText();
+        _qrGenSyncing = false;
+
+        UpdateQrGeneratorPreview();
+    }
+
+    private void SyncQrGeneratorSlidersFromText()
+    {
+        if (QrGenLabelWidthInSlider is null || QrGenLabelHeightInSlider is null ||
+            QrGenMarginXSlider is null || QrGenMarginYSlider is null ||
+            QrGenModuleDotsSlider is null || QrGenQuietZoneSlider is null ||
+            QrGenBarcodeHeightSlider is null)
+            return;
+
+        QrGenLabelWidthInSlider.Value = ParseDoubleOrDefault(QrGenLabelWidthIn.Text, 4.0, 0.5, 12.0);
+        QrGenLabelHeightInSlider.Value = ParseDoubleOrDefault(QrGenLabelHeightIn.Text, 2.0, 0.5, 12.0);
+        QrGenMarginXSlider.Value = ParseIntOrDefault(QrGenMarginX.Text, 24, 0, 400);
+        QrGenMarginYSlider.Value = ParseIntOrDefault(QrGenMarginY.Text, 24, 0, 400);
+        QrGenModuleDotsSlider.Value = ParseIntOrDefault(QrGenModuleDots.Text, 4, 1, 40);
+        QrGenQuietZoneSlider.Value = ParseIntOrDefault(QrGenQuietZone.Text, 4, 0, 20);
+        QrGenBarcodeHeightSlider.Value = ParseIntOrDefault(QrGenBarcodeHeight.Text, 120, 20, 1200);
+    }
+
+    private void UpdateQrGeneratorPreview()
+    {
+        if (QrGenPreview is null || QrGenInfo is null || QrGenZplOutput is null)
+            return;
+
+        _qrGenSyncing = true;
+        try
+        {
+            SyncQrGeneratorSlidersFromText();
+        }
+        finally
+        {
+            _qrGenSyncing = false;
+        }
+
+        var payload = (QrGenPayload.Text ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(payload)) payload = "SCAN_ME";
+
+        var dpi = ParseIntOrDefault(QrGenDpi.Text, 203, 203, 600);
+        var labelWidthIn = ParseDoubleOrDefault(QrGenLabelWidthIn.Text, 4.0, 0.5, 12.0);
+        var labelHeightIn = ParseDoubleOrDefault(QrGenLabelHeightIn.Text, 2.0, 0.5, 12.0);
+        var labelWidthDots = (int)Math.Round(labelWidthIn * dpi);
+        var labelHeightDots = (int)Math.Round(labelHeightIn * dpi);
+
+        var marginX = ParseIntOrDefault(QrGenMarginX.Text, 24, 0, 2000);
+        var marginY = ParseIntOrDefault(QrGenMarginY.Text, 24, 0, 2000);
+        var moduleDots = ParseIntOrDefault(QrGenModuleDots.Text, 4, 1, 40);
+        var quietZone = ParseIntOrDefault(QrGenQuietZone.Text, 4, 0, 20);
+        var barcodeHeight = ParseIntOrDefault(QrGenBarcodeHeight.Text, 120, 20, 3000);
+
+        var isQr = QrGenTypeQr.IsChecked == true;
+        var includeText = QrGenIncludeText.IsChecked == true;
+
+        var canvas = new bool[Math.Max(1, labelWidthDots) * Math.Max(1, labelHeightDots)];
+        var maxCodeWidth = Math.Max(32, labelWidthDots - (marginX * 2));
+        var maxCodeHeight = Math.Max(32, labelHeightDots - (marginY * 2));
+
+        var hints = new Dictionary<EncodeHintType, object>
+        {
+            [EncodeHintType.MARGIN] = Math.Max(0, quietZone)
+        };
+
+        var writer = new MultiFormatWriter();
+
+        try
+        {
+            if (isQr)
+            {
+                var qrBase = writer.encode(payload, BarcodeFormat.QR_CODE, 1, 1, hints);
+                var qrWidth = qrBase.Width * moduleDots;
+                var qrHeight = qrBase.Height * moduleDots;
+
+                if (qrWidth > maxCodeWidth || qrHeight > maxCodeHeight)
+                {
+                    var fitX = Math.Max(1, maxCodeWidth / Math.Max(1, qrBase.Width));
+                    var fitY = Math.Max(1, maxCodeHeight / Math.Max(1, qrBase.Height));
+                    moduleDots = Math.Max(1, Math.Min(fitX, fitY));
+                    qrWidth = qrBase.Width * moduleDots;
+                    qrHeight = qrBase.Height * moduleDots;
+                }
+
+                var offsetX = marginX + Math.Max(0, (maxCodeWidth - qrWidth) / 2);
+                var offsetY = marginY + Math.Max(0, (maxCodeHeight - qrHeight) / 2);
+
+                for (int y = 0; y < qrBase.Height; y++)
+                {
+                    for (int x = 0; x < qrBase.Width; x++)
+                    {
+                        if (!qrBase[x, y]) continue;
+                        PaintRect(canvas, labelWidthDots, labelHeightDots,
+                                  offsetX + (x * moduleDots),
+                                  offsetY + (y * moduleDots),
+                                  moduleDots,
+                                  moduleDots);
+                    }
+                }
+
+                _qrGenCurrentZpl = BuildQrZpl(labelWidthDots, labelHeightDots, marginX, marginY, moduleDots, payload);
+                QrGenInfo.Text = $"QR | {dpi} DPI | {labelWidthDots}x{labelHeightDots} dots | module {moduleDots} dots";
+            }
+            else
+            {
+                var barMatrix = writer.encode(payload, BarcodeFormat.CODE_128, maxCodeWidth, barcodeHeight, hints);
+                var drawWidth = Math.Min(maxCodeWidth, barMatrix.Width);
+                var drawHeight = Math.Min(maxCodeHeight, barMatrix.Height);
+
+                var offsetX = marginX + Math.Max(0, (maxCodeWidth - drawWidth) / 2);
+                var offsetY = marginY + Math.Max(0, (maxCodeHeight - drawHeight) / 2);
+
+                for (int y = 0; y < drawHeight; y++)
+                {
+                    for (int x = 0; x < drawWidth; x++)
+                    {
+                        if (!barMatrix[x, y]) continue;
+                        PaintRect(canvas, labelWidthDots, labelHeightDots,
+                                  offsetX + x,
+                                  offsetY + y,
+                                  1,
+                                  1);
+                    }
+                }
+
+                _qrGenCurrentZpl = BuildCode128Zpl(labelWidthDots, labelHeightDots, marginX, marginY, moduleDots, barcodeHeight, includeText, payload);
+                QrGenInfo.Text = $"Code128 | {dpi} DPI | {labelWidthDots}x{labelHeightDots} dots | height {barcodeHeight} dots";
+            }
+
+            var bmp = BuildMonochromeBitmap(canvas, labelWidthDots, labelHeightDots);
+            QrGenPreview.Source = bmp;
+            QrGenZplOutput.Text = _qrGenCurrentZpl;
+        }
+        catch (Exception ex)
+        {
+            QrGenPreview.Source = null;
+            QrGenInfo.Text = $"Generator error: {ex.Message}";
+            QrGenZplOutput.Text = string.Empty;
+            _qrGenCurrentZpl = string.Empty;
+        }
+    }
+
+    private static int ParseIntOrDefault(string? raw, int fallback, int min, int max)
+    {
+        if (!int.TryParse(raw, out var parsed)) parsed = fallback;
+        return Math.Clamp(parsed, min, max);
+    }
+
+    private static double ParseDoubleOrDefault(string? raw, double fallback, double min, double max)
+    {
+        if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) &&
+            !double.TryParse(raw, NumberStyles.Float, CultureInfo.CurrentCulture, out parsed))
+            parsed = fallback;
+
+        return Math.Clamp(parsed, min, max);
+    }
+
+    private static void PaintRect(bool[] canvas, int canvasWidth, int canvasHeight, int x, int y, int w, int h)
+    {
+        var x0 = Math.Clamp(x, 0, canvasWidth);
+        var y0 = Math.Clamp(y, 0, canvasHeight);
+        var x1 = Math.Clamp(x + w, 0, canvasWidth);
+        var y1 = Math.Clamp(y + h, 0, canvasHeight);
+
+        for (int py = y0; py < y1; py++)
+        {
+            var row = py * canvasWidth;
+            for (int px = x0; px < x1; px++)
+                canvas[row + px] = true;
+        }
+    }
+
+    private static BitmapSource BuildMonochromeBitmap(bool[] canvas, int width, int height)
+    {
+        var stride = width * 4;
+        var pixels = new byte[stride * height];
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                var i = (y * stride) + (x * 4);
+                var on = canvas[(y * width) + x];
+                byte v = on ? (byte)0 : (byte)255;
+                pixels[i + 0] = v;
+                pixels[i + 1] = v;
+                pixels[i + 2] = v;
+                pixels[i + 3] = 255;
+            }
+        }
+
+        var bmp = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, pixels, stride);
+        bmp.Freeze();
+        return bmp;
+    }
+
+    private static string BuildQrZpl(int labelWidthDots, int labelHeightDots, int marginX, int marginY, int moduleDots, string payload)
+    {
+        var safe = payload.Replace("^", " ").Replace("~", " ");
+        return string.Join("\n", new[]
+        {
+            "^XA",
+            $"^PW{labelWidthDots}",
+            $"^LL{labelHeightDots}",
+            $"^FO{marginX},{marginY}",
+            $"^BQN,2,{Math.Max(1, moduleDots)}",
+            $"^FDLA,{safe}^FS",
+            "^XZ"
+        });
+    }
+
+    private static string BuildCode128Zpl(int labelWidthDots, int labelHeightDots, int marginX, int marginY, int moduleDots, int heightDots, bool includeText, string payload)
+    {
+        var safe = payload.Replace("^", " ").Replace("~", " ");
+        var textFlag = includeText ? "Y" : "N";
+        return string.Join("\n", new[]
+        {
+            "^XA",
+            $"^PW{labelWidthDots}",
+            $"^LL{labelHeightDots}",
+            $"^FO{marginX},{marginY}",
+            $"^BY{Math.Max(1, moduleDots)},2,{Math.Max(20, heightDots)}",
+            $"^BCN,{Math.Max(20, heightDots)},{textFlag},N,N",
+            $"^FD{safe}^FS",
+            "^XZ"
+        });
     }
 
     // ── Shipping Supplys handlers ─────────────────────────────────────────────

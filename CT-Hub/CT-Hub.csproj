@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <PackageReference Include="PdfSharp-gdi" Version="6.2.0" />
+    <PackageReference Include="ZXing.Net" Version="0.16.10" />
   </ItemGroup>
 
 </Project>
