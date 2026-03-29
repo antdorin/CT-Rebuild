@@ -9,6 +9,13 @@ struct PdfMeta: Decodable {
     let modified: String   // UTC ISO 8601, e.g. "2024-01-15T10:30:00.0000000Z"
     let sourceCatalog: String?
 
+    init(name: String, modified: String, sourceCatalog: String? = nil) {
+        self.name = name
+        self.modified = modified
+        self.sourceCatalog = sourceCatalog
+    }
+}
+
 // MARK: - Word layout models (returned by /api/pdf-words/{filename})
 
 /// One word token with its PDF-space bounding box.
@@ -30,13 +37,6 @@ struct HubPageWords: Decodable {
 
 struct HubWordDocument: Decodable {
     let pages: [HubPageWords]
-}
-
-    init(name: String, modified: String, sourceCatalog: String? = nil) {
-        self.name = name
-        self.modified = modified
-        self.sourceCatalog = sourceCatalog
-    }
 }
 
 struct PdfContext: Decodable {
