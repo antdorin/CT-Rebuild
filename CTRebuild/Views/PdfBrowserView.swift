@@ -766,14 +766,34 @@ private struct PdfKitView: UIViewRepresentable {
             guard let page = source.page(at: pageIdx),
                   let copy = page.copy() as? PDFPage else { continue }
 
-            applyOverrides(to: copy, pageNumber: pageIdx + 1, overrides: overrides)
-            out.insert(copy, at: out.pageCount)
+            let cropBox = copy.bounds(for: .cropBox)
+            guard cropBox.width > 0, cropBox.height > 0 else {
+                out.insert(copy, at: out.pageCount)
+                continue
+            }
+
+            // Create a genuinely blank page with the same dimensions.
+            // Positions are read from 'copy'; the blank page has no original content to bleed through.
+            let pageSize = CGSize(width: cropBox.width, height: cropBox.height)
+            let renderer = UIGraphicsPDFRenderer(bounds: CGRect(origin: .zero, size: pageSize))
+            let blankData = renderer.pdfData { ctx in ctx.beginPage() }
+            guard let blankDoc = PDFDocument(data: blankData),
+                  let blankPage = blankDoc.page(at: 0) else {
+                out.insert(copy, at: out.pageCount)
+                continue
+            }
+            // Align blank page bounds with source so PDF coordinates match exactly.
+            blankPage.setBounds(cropBox, for: .mediaBox)
+            blankPage.setBounds(cropBox, for: .cropBox)
+
+            applyOverrides(from: copy, to: blankPage, pageNumber: pageIdx + 1, overrides: overrides)
+            out.insert(blankPage, at: out.pageCount)
         }
 
         return out
     }
 
-    private func applyOverrides(to page: PDFPage, pageNumber: Int, overrides: PdfOverridesPayload) {
+    private func applyOverrides(from sourcePage: PDFPage, to targetPage: PDFPage, pageNumber: Int, overrides: PdfOverridesPayload) {
         var pageRuns: [(runIndex: Int, run: PdfRunOverride)] = overrides.runs
             .compactMap { key, value in
                 guard let (pageIdx, runIdx) = parseRunKey(key), pageIdx == pageNumber else { return nil }
@@ -781,7 +801,8 @@ private struct PdfKitView: UIViewRepresentable {
             }
             .sorted { lhs, rhs in lhs.runIndex < rhs.runIndex }
 
-        let runLayouts = pageRunLayouts(from: page)
+        // Extract text positions from the original source page.
+        let runLayouts = pageRunLayouts(from: sourcePage)
 
         if pageRuns.isEmpty {
             guard overrides.global != .defaults else { return }
@@ -792,7 +813,7 @@ private struct PdfKitView: UIViewRepresentable {
             }
         }
 
-        let bounds = page.bounds(for: .cropBox)
+        let bounds = sourcePage.bounds(for: .cropBox)
         guard bounds.width > 0, bounds.height > 0 else { return }
 
         let global = overrides.global
@@ -859,7 +880,7 @@ private struct PdfKitView: UIViewRepresentable {
             annotation.shouldDisplay = true
             annotation.shouldPrint = true
 
-            page.addAnnotation(annotation)
+            targetPage.addAnnotation(annotation)
         }
     }
 
