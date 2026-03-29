@@ -209,7 +209,7 @@ def render_page():
     if not os.path.isfile(pdf_path):
         return jsonify({"error": "not found"}), 404
     try:
-        page_idx = int(page_num) - 1  # API is 1-based, fitz is 0-based
+        page_idx = int(page_num)  # 0-based, same as fitz
         zoom = float(scale)
     except ValueError:
         return jsonify({"error": "invalid page or scale"}), 400

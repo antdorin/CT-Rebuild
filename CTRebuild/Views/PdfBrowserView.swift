@@ -285,6 +285,22 @@ struct PdfBrowserView: View {
                             .foregroundColor(.white.opacity(0.6))
                     }
                 }
+            } else if let gErr = groupError {
+                ZStack {
+                    Color.black.opacity(0.65).ignoresSafeArea()
+                    VStack(spacing: 12) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 36)).foregroundColor(.orange)
+                        Text(gErr)
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center).padding(.horizontal, 24)
+                        Button("Dismiss") { groupError = nil }
+                            .font(.system(size: 13, weight: .medium)).foregroundColor(.white)
+                            .padding(.horizontal, 20).padding(.vertical, 8)
+                            .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                    }
+                }
             }
         }
     }
