@@ -100,8 +100,10 @@ enum GestureTrigger: String, CaseIterable, Identifiable {
         switch self {
         case .swipeRight, .edgeSwipeRight, .longPressSwipeRight:  return .openLeft
         case .swipeLeft,  .edgeSwipeLeft,  .longPressSwipeLeft:   return .openRight
-        case .swipeUp,    .edgeSwipeUp,    .longPressSwipeUp:     return .openBottom
-        case .swipeDown,  .edgeSwipeDown,  .longPressSwipeDown:   return .openTop
+        case .swipeUp,    .longPressSwipeUp:                      return .none
+        case .swipeDown,  .longPressSwipeDown:                    return .none
+        case .edgeSwipeUp:                                        return .openBottom
+        case .edgeSwipeDown:                                      return .openTop
         case .longPress:                                           return .openPagePicker
         default:                                                   return .none
         }

@@ -18,59 +18,17 @@ struct RightPanelView: View {
     @AppStorage("panel_tintRightA")      private var panelTintA: Double = 0
 
     var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                if !isPPOpen && showMaterial {
-                    (PanelMaterialStyle(rawValue: materialStyleRaw) ?? .ultraThin).background()
-                }
-                if !isPPOpen && panelTintA > 0.001 {
-                    Rectangle()
-                        .fill(Color(red: panelTintR, green: panelTintG, blue: panelTintB, opacity: panelTintA))
-                        .ignoresSafeArea()
-                }
-
-                if isPPOpen {
-                    RightWheelSelector(
-                        selectedIndex: $selectedIndex,
-                        isPPOpen: $isPPOpen,
-                        panelSize: geo.size,
-                        safeArea: safeArea
-                    )
-                    .transition(.opacity.animation(.easeInOut(duration: 0.2)))
-                } else {
-                    RightPageContent(index: selectedIndex, safeArea: safeArea)
-                        .frame(width: geo.size.width, height: geo.size.height)
-                }
+        ZStack {
+            if showMaterial {
+                (PanelMaterialStyle(rawValue: materialStyleRaw) ?? .ultraThin).background()
+            }
+            if panelTintA > 0.001 {
+                Rectangle()
+                    .fill(Color(red: panelTintR, green: panelTintG, blue: panelTintB, opacity: panelTintA))
+                    .ignoresSafeArea()
             }
         }
         .ignoresSafeArea()
-        .onAppear {
-            if autoPickerRight { isPPOpen = true }
-            else { selectedIndex = rightStartPage }
-        }
-        .onDisappear {
-            isPPOpen = false
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .gestureActionFired)) { note in
-            guard let raw = note.userInfo?["action"] as? String else { return }
-            switch raw {
-            case GestureAction.openPagePicker.rawValue:
-                withAnimation(.slideBck) { isPPOpen.toggle() }
-            case GestureAction.nextRightPage.rawValue:
-                let total = 7
-                withAnimation(.slideFwd) {
-                    selectedIndex = (selectedIndex + 1) % total
-                    isPPOpen = false
-                }
-            case GestureAction.prevRightPage.rawValue:
-                let total = 7
-                withAnimation(.slideBck) {
-                    selectedIndex = (selectedIndex - 1 + total) % total
-                    isPPOpen = false
-                }
-            default: break
-            }
-        }
     }
 }
 
@@ -89,8 +47,8 @@ struct RightPageContent: View {
 
     var body: some View {
         switch index {
-        case 0:  // Page 1 — PDF Browser
-            PdfBrowserView(safeArea: safeArea)
+        case 0:  // Page 1 — PDF Reader (web)
+            WebReaderView(safeArea: safeArea)
         case 1:  // Page 2 — Bin Locations
             BinLocationsView(safeArea: safeArea)
         case 6:  // Page 7 — App Settings
@@ -116,7 +74,7 @@ struct RightPageContent: View {
 
 /// Human-readable names for right-panel pages (index 0–6).
 private let rightPageTitles: [String] = [
-    "PDF Browser",
+    "PDF Reader",
     "Bin Locations",
     "Page 3",
     "Page 4",
