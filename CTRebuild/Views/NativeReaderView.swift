@@ -356,15 +356,15 @@ private func nrPageRunLayouts(from page: PDFPage) -> [NRTextRun] {
     // This is more reliable than running a regex over the whole string because
     // it respects the PDF's internal character encoding and avoids the
     // "line box fallback" that selection(for:) can trigger on messy OCR PDFs.
-    let ns  = rawText as NSString
-    let len = ns.length
-    var runs = [NRTextRun]()
+    let ns    = rawText as NSString
+    let len   = ns.length
+    let wsSet = CharacterSet.whitespacesAndNewlines as NSCharacterSet
+    var runs  = [NRTextRun]()
     var wordStart = -1
 
     for i in 0...len {
         let isEnd = (i == len)
-        let isWS  = isEnd || NSCharacterSet.whitespacesAndNewlines
-                                .characterIsMember(ns.character(at: i))
+        let isWS  = isEnd || wsSet.characterIsMember(ns.character(at: i))
         if isWS {
             if wordStart >= 0 {
                 let range = NSRange(location: wordStart, length: i - wordStart)
