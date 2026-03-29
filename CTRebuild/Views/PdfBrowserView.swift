@@ -1,6 +1,5 @@
 import SwiftUI
 import PDFKit
-import WebKit
 import UIKit
 
 // MARK: - SO Number Helpers
@@ -135,52 +134,6 @@ private func mergePDFs(from parts: [Data]) -> PDFDocument {
         }
     }
     return out
-}
-
-// MARK: - Reader WebView Cache
-
-final class ReaderWebViewCache: NSObject, ObservableObject, WKNavigationDelegate {
-    let webView: WKWebView
-    private var loadedFilenames: [String] = []
-    @Published var isReady: Bool = false
-
-    override init() {
-        let config = WKWebViewConfiguration()
-        config.allowsInlineMediaPlayback = true
-        let prefs = WKWebpagePreferences()
-        prefs.allowsContentJavaScript = true
-        config.defaultWebpagePreferences = prefs
-
-        webView = WKWebView(frame: .zero, configuration: config)
-        webView.isOpaque = false
-        webView.backgroundColor = .black
-        webView.scrollView.backgroundColor = .black
-        webView.scrollView.contentInsetAdjustmentBehavior = .never
-        super.init()
-        webView.navigationDelegate = self
-    }
-
-    func load(filenames: [String]) {
-        guard filenames != loadedFilenames else { return }
-        loadedFilenames = filenames
-        isReady = false
-
-        let base = HubClient.shared.activeBaseURL
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard !base.isEmpty, let first = filenames.first else { return }
-
-        let encoded = first.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? first
-        let urlString = "\(base)/reader.html?file=\(encoded)"
-        guard let url = URL(string: urlString) else { return }
-
-        let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
-        webView.load(request)
-    }
-
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        DispatchQueue.main.async { self.isReady = true }
-    }
 }
 
 // MARK: - PDF Browser View
@@ -482,12 +435,11 @@ private struct PdfDetailView: View {
     @State private var soTitle: String = ""
     @AppStorage("pdfSinglePageMode") private var singlePageMode = false
     @State private var autoCropEnabled = true
-    @AppStorage("pdfViewMode") private var viewMode: ViewMode = .pdf
+    @AppStorage("pdfViewMode") private var viewMode: ViewMode = .reader
     @State private var isPicked: Bool = false
     @State private var isShipped: Bool = false
     @State private var pdfOverrides: PdfOverridesPayload = .empty
     @AppStorage("panel_showMaterial") private var showMaterial = true
-    @State private var readerFontPercent: Int = 100
 
     init(document: PDFDocument, title: String, safeArea: EdgeInsets,
          filenames: [String] = [],
@@ -528,7 +480,7 @@ private struct PdfDetailView: View {
                                    autoCrop: autoCropEnabled,
                                    overrides: pdfOverrides)
                     } else {
-                        ReflowWebView(document: displayDoc, fontPercent: readerFontPercent)
+                        NativeReaderView(document: displayDoc, filenames: filenames, singlePage: singlePageMode)
                     }
                 }
 
@@ -594,18 +546,11 @@ private struct PdfDetailView: View {
                         }
                         .buttonStyle(.plain)
                     case .reader:
-                        // Font size controls for the reflow reader
-                        Button { readerFontPercent = max(60, readerFontPercent - 10) } label: {
-                            Text("A−")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(readerFontPercent <= 60 ? .white.opacity(0.2) : .white.opacity(0.55))
-                                .padding(.horizontal, 8).padding(.vertical, 10)
-                        }
-                        .buttonStyle(.plain)
-                        Button { readerFontPercent = min(200, readerFontPercent + 10) } label: {
-                            Text("A+")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(readerFontPercent >= 200 ? .white.opacity(0.2) : .white.opacity(0.55))
+                        // Single page toggle (same behaviour as PDF tab)
+                        Button { singlePageMode.toggle() } label: {
+                            Image(systemName: singlePageMode ? "doc" : "doc.on.doc")
+                                .font(.system(size: 13))
+                                .foregroundColor(singlePageMode ? .orange : .white.opacity(0.45))
                                 .padding(.horizontal, 8).padding(.vertical, 10)
                         }
                         .buttonStyle(.plain)
@@ -618,6 +563,8 @@ private struct PdfDetailView: View {
             }
         }
         .onAppear {
+            // Reader is now native; open into READER by default.
+            viewMode = .reader
             soTitle = soDisplayTitle(from: displayDoc)
             isPicked  = UserDefaults.standard.bool(forKey: "docpicked:\(title)")
             isShipped = UserDefaults.standard.bool(forKey: "docshipped:\(title)")
@@ -747,439 +694,6 @@ private func autoCropped(_ source: PDFDocument) -> PDFDocument {
         out.insert(copy, at: i)
     }
     return out
-}
-
-private func htmlEscaped(_ text: String) -> String {
-    text
-        .replacingOccurrences(of: "&", with: "&amp;")
-        .replacingOccurrences(of: "<", with: "&lt;")
-        .replacingOccurrences(of: ">", with: "&gt;")
-        .replacingOccurrences(of: "\"", with: "&quot;")
-        .replacingOccurrences(of: "'", with: "&#39;")
-}
-
-private struct TicketFields {
-    var soNumber: String = ""
-    var date: String = ""
-    var shipToHtml: String = ""
-    var notes: String = ""
-
-    var companyName: String = ""
-    var terms: String = ""
-    var shippingMethod: String = ""
-    var thirdPartyAccount: String = ""
-
-    var binLocation: String = ""
-    var itemCode: String = ""
-    var itemDescription: String = ""
-    var quantity: String = ""
-    var units: String = ""
-    var committed: String = ""
-}
-
-private func firstMatch(_ text: String, _ pattern: String, options: NSRegularExpression.Options = []) -> String {
-    guard let re = try? NSRegularExpression(pattern: pattern, options: options),
-          let match = re.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
-          let range = Range(match.range, in: text)
-    else { return "" }
-    return String(text[range]).trimmingCharacters(in: .whitespacesAndNewlines)
-}
-
-private func firstCapture(_ text: String, _ pattern: String, options: NSRegularExpression.Options = []) -> String {
-    guard let re = try? NSRegularExpression(pattern: pattern, options: options),
-          let match = re.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
-          match.numberOfRanges > 1,
-          let range = Range(match.range(at: 1), in: text)
-    else { return "" }
-    return String(text[range]).trimmingCharacters(in: .whitespacesAndNewlines)
-}
-
-private func splitColumns(_ line: String) -> [String] {
-    let normalized = line.replacingOccurrences(
-        of: #"\s{2,}"#,
-        with: "\t",
-        options: .regularExpression
-    )
-    return normalized
-        .split(separator: "\t")
-        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        .filter { !$0.isEmpty }
-}
-
-private func extractLineAfterHeader(_ text: String, headerPattern: String) -> [String] {
-    guard let re = try? NSRegularExpression(pattern: headerPattern, options: [.anchorsMatchLines, .caseInsensitive]),
-          let match = re.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
-          let full = Range(match.range, in: text)
-    else { return [] }
-
-    let tail = String(text[full.upperBound...])
-    let lines = tail
-        .components(separatedBy: .newlines)
-        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        .filter { !$0.isEmpty }
-    return lines
-}
-
-private func parseTicketFields(from text: String) -> TicketFields {
-    var fields = TicketFields()
-    let lines = text.components(separatedBy: .newlines)
-        .map { $0.trimmingCharacters(in: .whitespaces) }
-
-    // ── SO Number & Date ──
-    fields.soNumber = firstMatch(text, #"SO-[A-Za-z0-9]+-[A-Za-z0-9]+"#)
-    fields.date = firstMatch(text, #"\b(?:0?[1-9]|1[0-2])/(?:0?[1-9]|[12][0-9]|3[01])/\d{4}\b"#)
-
-    // ── Locate section headers by line index ──
-    var shipToIdx: Int?
-    var companyIdx: Int?
-    var binIdx: Int?
-    for (i, line) in lines.enumerated() {
-        let lo = line.lowercased()
-        if shipToIdx == nil && lo.contains("ship to") { shipToIdx = i }
-        if companyIdx == nil && lo.contains("company name") && lo.contains("terms") { companyIdx = i }
-        if binIdx == nil && lo.contains("bin location") && lo.contains("item") { binIdx = i }
-    }
-
-    // ── Ship To / Notes ──
-    // Collect content between the Ship-To/Notes header row and the Company-Name header.
-    // PDFKit often outputs "Ship To" then "Notes" on the next line, followed by the
-    // actual address lines — so we skip past any bare "Notes" label rather than
-    // treating it as a section divider.
-    if let sti = shipToIdx {
-        let endIdx = companyIdx ?? binIdx ?? lines.count
-        var addressLines: [String] = []
-        var noteLines: [String] = []
-        var pastAddress = false
-        var j = sti + 1
-        // Skip standalone "Notes" header that PDFKit puts right after "Ship To"
-        while j < endIdx {
-            let lo = lines[j].lowercased()
-            if lo == "notes" || lo == "notes:" { j += 1; continue }
-            break
-        }
-        while j < endIdx {
-            let l = lines[j]; j += 1
-            if l.isEmpty { continue }
-            if !pastAddress {
-                addressLines.append(l)
-                // Last address line typically contains state abbreviation + zip
-                if l.range(of: #"\b[A-Z]{2}\s+\d{5}"#, options: .regularExpression) != nil {
-                    pastAddress = true
-                }
-            } else {
-                noteLines.append(l)
-            }
-        }
-        fields.shipToHtml = addressLines.map(htmlEscaped).joined(separator: "<br />")
-        fields.notes = noteLines.joined(separator: " ")
-    }
-
-    // ── Company row – semantic splitting ──
-    // PDFKit collapses columns into one line like "Daniel McBride PayPal USPS Ground Advantage".
-    // We identify known terms & carrier keywords to split semantically.
-    if let chi = companyIdx, chi + 1 < lines.count {
-        let row = lines[chi + 1]
-
-        // Find Terms keyword (PayPal, Credit Card, OCC, Net 30, etc.)
-        let termsRe = #"\b(PayPal|Credit\s*Card|OCC|Net\s*\d+|COD|Prepaid|Check|Wire|C\.?O\.?D\.?)\b"#
-        var termsStart: String.Index?
-        var termsEnd: String.Index?
-        if let re = try? NSRegularExpression(pattern: termsRe, options: .caseInsensitive),
-           let m = re.firstMatch(in: row, range: NSRange(row.startIndex..., in: row)),
-           let r = Range(m.range, in: row) {
-            fields.terms = String(row[r]).trimmingCharacters(in: .whitespaces)
-            termsStart = r.lowerBound
-            termsEnd = r.upperBound
-        }
-
-        // Find Carrier keyword (USPS, UPS, FedEx, DHL, etc.)
-        let carrierRe = #"\b(USPS|UPS|FedEx|DHL|Freight|LTL)\b"#
-        var carrierStart: String.Index?
-        if let re = try? NSRegularExpression(pattern: carrierRe, options: .caseInsensitive),
-           let m = re.firstMatch(in: row, range: NSRange(row.startIndex..., in: row)),
-           let r = Range(m.range, in: row) {
-            carrierStart = r.lowerBound
-        }
-
-        // Company name: everything before the first pattern match
-        let firstPatternStart = [termsStart, carrierStart].compactMap { $0 }.min() ?? row.endIndex
-        fields.companyName = String(row[row.startIndex..<firstPatternStart]).trimmingCharacters(in: .whitespaces)
-
-        // Shipping method: from carrier keyword to end (minus possible trailing account #)
-        if let cs = carrierStart {
-            let tail = String(row[cs...]).trimmingCharacters(in: .whitespaces)
-            let acctRe = #"\s+([A-Z0-9]{6,})\s*$"#
-            if let re = try? NSRegularExpression(pattern: acctRe),
-               let m = re.firstMatch(in: tail, range: NSRange(tail.startIndex..., in: tail)),
-               let aRange = Range(m.range(at: 1), in: tail),
-               let fRange = Range(m.range, in: tail) {
-                fields.thirdPartyAccount = String(tail[aRange])
-                fields.shippingMethod = String(tail[tail.startIndex..<fRange.lowerBound]).trimmingCharacters(in: .whitespaces)
-            } else {
-                fields.shippingMethod = tail
-            }
-        } else if let te = termsEnd {
-            // No carrier found — everything after terms is shipping method
-            let remainder = String(row[te...]).trimmingCharacters(in: .whitespaces)
-            if !remainder.isEmpty { fields.shippingMethod = remainder }
-        }
-    }
-
-    // ── Item row – semantic splitting ──
-    // Line like "1-A-1 CT-FORK-LFT 2 PR 2"
-    if let bhi = binIdx, bhi + 1 < lines.count {
-        let row = lines[bhi + 1]
-
-        // Bin location: digit-letter-digit pattern
-        fields.binLocation = firstCapture(row, #"\b(\d+-[A-Za-z]-\d+[A-Za-z]?)\b"#)
-
-        // Item code: CT-XXX-XXX (may have extra segments)
-        fields.itemCode = firstCapture(row, #"\b(CT-[A-Za-z0-9]+-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)\b"#)
-
-        // Trailing: quantity  units  committed
-        let qtyRe = #"\b(\d+)\s+(PR|EA|BX|CS|PK|FT|LB|PC|DZ|CT|RL|ST|SET|GAL|QT|OZ)\s+(\d+)\s*$"#
-        if let re = try? NSRegularExpression(pattern: qtyRe, options: .caseInsensitive),
-           let m = re.firstMatch(in: row, range: NSRange(row.startIndex..., in: row)) {
-            if let r1 = Range(m.range(at: 1), in: row) { fields.quantity = String(row[r1]) }
-            if let r2 = Range(m.range(at: 2), in: row) { fields.units = String(row[r2]) }
-            if let r3 = Range(m.range(at: 3), in: row) { fields.committed = String(row[r3]) }
-        }
-    }
-
-    return fields
-}
-
-private func ticketSectionHTML(fields: TicketFields, page: Int) -> String {
-    let notes = fields.notes.isEmpty ? "" : htmlEscaped(fields.notes)
-    let shipTo = fields.shipToHtml
-
-    return """
-    <section class=\"ticket\">
-      <div class=\"title\">Picking Ticket</div>
-      <div class=\"so\">#\(htmlEscaped(fields.soNumber))</div>
-      <div class=\"date\">\(htmlEscaped(fields.date))</div>
-
-      <div class=\"address-head\"><span>Ship To</span><span>Notes:</span></div>
-      <div class=\"address-row\">
-        <div class=\"ship-block\">\(shipTo)</div>
-        <div class=\"notes\">\(notes)</div>
-      </div>
-
-      <table class=\"band-table meta-band\" cellspacing=\"0\" cellpadding=\"0\">
-        <tr><th>Company Name</th><th>Terms</th><th>Shipping Method</th><th>3rd Party Account #</th></tr>
-        <tr>
-          <td>\(htmlEscaped(fields.companyName))</td>
-          <td>\(htmlEscaped(fields.terms))</td>
-          <td>\(htmlEscaped(fields.shippingMethod))</td>
-          <td>\(htmlEscaped(fields.thirdPartyAccount))</td>
-        </tr>
-      </table>
-
-      <table class=\"band-table item-band\" cellspacing=\"0\" cellpadding=\"0\">
-        <tr><th>Bin Location</th><th>Item</th><th>Quantity</th><th>Units</th><th>Committed</th></tr>
-        <tr>
-          <td>\(htmlEscaped(fields.binLocation))</td>
-          <td class=\"item-code\">\(htmlEscaped(fields.itemCode))</td>
-          <td>\(htmlEscaped(fields.quantity))</td>
-          <td>\(htmlEscaped(fields.units))</td>
-          <td>\(htmlEscaped(fields.committed))</td>
-        </tr>
-      </table>
-
-      <div class=\"page-label\">Page \(page)</div>
-    </section>
-    """
-}
-
-private func buildReflowHTML(from doc: PDFDocument, fontPercent: Int) -> String {
-    var pages: [String] = []
-    for i in 0..<doc.pageCount {
-        let raw = (doc.page(at: i)?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !raw.isEmpty else { continue }
-        let fields = parseTicketFields(from: raw)
-        pages.append(ticketSectionHTML(fields: fields, page: i + 1))
-    }
-
-    let content = pages.isEmpty
-        ? "<section class=\"empty\">No selectable text found in this PDF.</section>"
-        : pages.joined(separator: "\n")
-
-    return """
-    <!doctype html>
-    <html>
-    <head>
-      <meta charset=\"utf-8\" />
-      <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0\" />
-      <style>
-        :root { --fontScale: \(fontPercent); }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-          background: #111;
-          font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;
-          padding: 12px;
-          color: #111;
-        }
-        .ticket {
-          background: #fff;
-          border-radius: 8px;
-          margin-bottom: 12px;
-          padding: 20px 18px 18px;
-        }
-        .title {
-          font-size: calc(20px * var(--fontScale) / 100);
-          font-weight: 400;
-          line-height: 1.15;
-          color: #111;
-        }
-        .so {
-          font-size: calc(16px * var(--fontScale) / 100);
-          font-weight: 700;
-          margin-top: 3px;
-          color: #111;
-        }
-        .date {
-          font-size: calc(12px * var(--fontScale) / 100);
-          color: #444;
-          margin-top: 2px;
-          margin-bottom: 18px;
-        }
-        .address-head {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          font-size: calc(12px * var(--fontScale) / 100);
-          font-weight: 700;
-          margin-bottom: 5px;
-        }
-        .address-row {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 12px;
-          margin-bottom: 16px;
-          min-height: 52px;
-        }
-        .ship-block, .notes {
-          font-size: calc(12px * var(--fontScale) / 100);
-          line-height: 1.45;
-          color: #222;
-          white-space: pre-wrap;
-          word-break: break-word;
-        }
-        .band-table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-bottom: 14px;
-        }
-        .band-table th {
-          background: #ffffff;
-          font-size: calc(10px * var(--fontScale) / 100);
-          font-weight: 700;
-          padding: 6px 6px;
-          text-align: left;
-          vertical-align: bottom;
-          line-height: 1.25;
-        }
-        .band-table td {
-          font-size: calc(12px * var(--fontScale) / 100);
-          padding: 6px 6px;
-          vertical-align: top;
-          line-height: 1.4;
-          word-break: break-word;
-        }
-        .meta-band th:nth-child(1), .meta-band td:nth-child(1) { width: 30%; }
-        .meta-band th:nth-child(2), .meta-band td:nth-child(2) { width: 18%; }
-        .meta-band th:nth-child(3), .meta-band td:nth-child(3) { width: 28%; }
-        .meta-band th:nth-child(4), .meta-band td:nth-child(4) { width: 24%; }
-        .item-band th:nth-child(1), .item-band td:nth-child(1) { width: 14%; }
-        .item-band th:nth-child(2), .item-band td:nth-child(2) { width: 44%; }
-        .item-band th:nth-child(3), .item-band td:nth-child(3) { width: 14%; text-align: right; }
-        .item-band th:nth-child(4), .item-band td:nth-child(4) { width: 14%; text-align: right; }
-        .item-band th:nth-child(5), .item-band td:nth-child(5) { width: 14%; text-align: right; }
-        .item-band td:nth-child(3),
-        .item-band td:nth-child(4),
-        .item-band td:nth-child(5) { text-align: right; }
-        .item-code { font-weight: 700; color: #111; }
-        .page-label {
-          text-align: right;
-          font-size: calc(10px * var(--fontScale) / 100);
-          color: #888;
-          margin-top: 6px;
-        }
-        .empty { color: #ccc; padding: 20px; }
-      </style>
-    </head>
-    <body>
-      \(content)
-    </body>
-    </html>
-    """
-}
-
-// MARK: - Reflow Web View
-
-private struct ReflowWebView: UIViewRepresentable {
-        let document: PDFDocument
-        let fontPercent: Int
-
-        func makeCoordinator() -> Coordinator { Coordinator() }
-
-        func makeUIView(context: Context) -> WKWebView {
-                let config = WKWebViewConfiguration()
-                let view = WKWebView(frame: .zero, configuration: config)
-                view.isOpaque = false
-                view.backgroundColor = .black
-                view.scrollView.backgroundColor = .black
-                view.scrollView.contentInsetAdjustmentBehavior = .never
-
-                context.coordinator.sourceDoc = document
-                context.coordinator.fontPercent = fontPercent
-                view.loadHTMLString(buildReflowHTML(from: document, fontPercent: fontPercent), baseURL: nil)
-                return view
-        }
-
-        func updateUIView(_ uiView: WKWebView, context: Context) {
-                let c = context.coordinator
-                let docChanged = c.sourceDoc !== document
-                let fontChanged = c.fontPercent != fontPercent
-                guard docChanged || fontChanged else { return }
-
-                c.fontPercent = fontPercent
-
-                if docChanged {
-                        c.sourceDoc = document
-                        uiView.loadHTMLString(buildReflowHTML(from: document, fontPercent: fontPercent), baseURL: nil)
-                } else {
-                        // Update CSS variable via JS — no full reload, keeps scroll position
-                        uiView.evaluateJavaScript("document.documentElement.style.setProperty('--fontScale','\(fontPercent)')")
-                }
-        }
-
-        final class Coordinator {
-                weak var sourceDoc: PDFDocument?
-                var fontPercent: Int = 100
-        }
-}
-
-// MARK: - Reader Container View (hosts the long-lived cached WKWebView)
-
-private struct ReaderContainerView: UIViewRepresentable {
-    let cache: ReaderWebViewCache
-
-    func makeUIView(context: Context) -> UIView {
-        let container = UIView()
-        container.backgroundColor = .black
-        let wv = cache.webView
-        wv.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(wv)
-        NSLayoutConstraint.activate([
-            wv.topAnchor.constraint(equalTo: container.topAnchor),
-            wv.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            wv.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            wv.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-        ])
-        return container
-    }
-
-    func updateUIView(_ uiView: UIView, context: Context) {}
 }
 
 // MARK: - PDFKit View

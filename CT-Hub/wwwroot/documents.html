@@ -228,7 +228,8 @@
 
           const a = document.createElement('a');
           a.className = 'doc-row';
-          a.href = '/reader.html?file=' + encodeURIComponent(doc.name);
+          // reader.html has been retired; open the PDF stream directly.
+          a.href = '/api/pdfs/' + encodeURIComponent(doc.name);
 
           const badges = (picked ? '<span class="status-badge badge-picked">✔ Picked</span>' : '') +
                          (shipped ? '<span class="status-badge badge-shipped">✔ Shipped</span>' : '');

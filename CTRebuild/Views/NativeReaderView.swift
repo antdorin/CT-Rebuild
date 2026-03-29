@@ -5,7 +5,7 @@ import UIKit
 // MARK: - Global overrides model (mirrors Hub override schema)
 
 struct PdfGlobalOverrides: Equatable {
-    var textSizeY:    Double = 1.75   // font size multiplier
+    var textSizeY:    Double = 1.45   // font size multiplier
     var forceBold:    Bool   = false
     var fontOverride: String = ""     // empty = system font
 }
@@ -39,26 +39,15 @@ struct NativeReaderView: View {
 
     private func fetchOverrides() async {
         guard let filename = filenames.first else { return }
-
-        let base = HubClient.shared.activeBaseURL
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard !base.isEmpty else { return }
-
-        let encoded = filename.addingPercentEncoding(
-            withAllowedCharacters: .urlQueryAllowed) ?? filename
-        guard let url = URL(string: "\(base)/api/pdf-overrides/\(encoded)") else { return }
-
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            guard let json   = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let global = json["global"] as? [String: Any]
-            else { return }
-
+            let payload = try await HubClient.shared.fetchPdfOverrides(filename: filename)
+            // Empty payloads decode to legacy defaults; keep a saner native baseline.
+            let fallback = PdfGlobalOverrides()
+            let rawSizeY = payload.hasEdits ? payload.global.textSizeY : fallback.textSizeY
             let newOverrides = PdfGlobalOverrides(
-                textSizeY:    global["textSizeY"]    as? Double ?? 1.75,
-                forceBold:    global["forceBold"]    as? Bool   ?? false,
-                fontOverride: global["fontOverride"] as? String ?? ""
+                textSizeY:    min(2.0, max(0.75, rawSizeY)),
+                forceBold:    payload.global.forceBold,
+                fontOverride: payload.global.fontOverride
             )
             await MainActor.run { overrides = newOverrides }
         } catch {
@@ -273,11 +262,24 @@ private final class NRCoordinatePageView: UIView {
 private func nrDeduplicatedRuns(_ runs: [(text: String, bounds: CGRect)]) -> [(text: String, bounds: CGRect)] {
     var kept: [(text: String, bounds: CGRect)] = []
     for run in runs {
+        let normalized = run.text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalized.isEmpty else { continue }
+
         let isDuplicate = kept.contains { existing in
-            guard existing.text == run.text else { return false }
+            let existingNormalized = existing.text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard existingNormalized == normalized else { return false }
+
             let dx = abs(existing.bounds.midX - run.bounds.midX)
             let dy = abs(existing.bounds.midY - run.bounds.midY)
-            return dx < 4 && dy < 4
+            if dx <= 12 && dy <= 8 { return true }
+
+            let overlap = existing.bounds.intersection(run.bounds)
+            guard !overlap.isNull else { return false }
+            let overlapArea = overlap.width * overlap.height
+            let minArea = min(existing.bounds.width * existing.bounds.height,
+                              run.bounds.width * run.bounds.height)
+            guard minArea > 0 else { return false }
+            return (overlapArea / minArea) > 0.75
         }
         if !isDuplicate { kept.append(run) }
     }
