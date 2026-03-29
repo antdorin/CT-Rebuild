@@ -57,7 +57,9 @@ def _extract(pdf_path: str) -> bytes:
     """Extract word layout from pdf_path using pdfplumber. Returns JSON bytes."""
     pages_out = []
     try:
-        with pdfplumber.open(pdf_path) as pdf:
+        with open(pdf_path, "rb") as f:
+            raw = f.read()
+        with pdfplumber.open(io.BytesIO(raw)) as pdf:
             for page in pdf.pages:
                 page_h = page.height
                 page_w = page.width
@@ -191,7 +193,7 @@ def page_count():
     if not os.path.isfile(pdf_path):
         return jsonify({"error": "not found"}), 404
     try:
-        doc = fitz.open(pdf_path)
+        doc = fitz.open(pdf_path, filetype="pdf")
         count = doc.page_count
         doc.close()
         return jsonify({"pageCount": count})
@@ -215,7 +217,7 @@ def render_page():
         return jsonify({"error": "invalid page or scale"}), 400
 
     try:
-        doc = fitz.open(pdf_path)
+        doc = fitz.open(pdf_path, filetype="pdf")
         if page_idx < 0 or page_idx >= doc.page_count:
             doc.close()
             return jsonify({"error": "page out of range"}), 400
