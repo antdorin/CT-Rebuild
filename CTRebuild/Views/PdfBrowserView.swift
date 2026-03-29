@@ -433,7 +433,7 @@ private struct PdfDetailView: View {
 
     @State private var displayDoc: PDFDocument
     @State private var soTitle: String = ""
-    @AppStorage("pdfSinglePageMode") private var singlePageMode = false
+    @AppStorage("pdfSinglePageMode") private var singlePageMode = true
     @State private var autoCropEnabled = true
     @AppStorage("pdfViewMode") private var viewMode: ViewMode = .pdf
     @State private var isPicked: Bool = false

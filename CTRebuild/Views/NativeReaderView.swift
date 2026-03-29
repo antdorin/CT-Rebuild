@@ -86,10 +86,14 @@ private struct NativeReaderScrollable: UIViewRepresentable {
 
 final class NativeReaderHostView: UIScrollView {
 
-    private let stack       = UIStackView()
+    private let stack           = UIStackView()
     private var lastDoc: PDFDocument? = nil
     private var lastOverrides   = PdfGlobalOverrides()
     private var lastSinglePage  = false
+
+    // Mutable constraints swapped between continuous/paged layouts.
+    private var stackPadConstraints: [NSLayoutConstraint] = []
+    private var stackWidthConstraint: NSLayoutConstraint!
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -102,13 +106,24 @@ final class NativeReaderHostView: UIScrollView {
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
 
+        // Fixed edges — always pinned edge-to-edge on content guide.
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: contentLayoutGuide.topAnchor,       constant: 14),
-            stack.leadingAnchor.constraint(equalTo: contentLayoutGuide.leadingAnchor,   constant: 14),
-            stack.trailingAnchor.constraint(equalTo: contentLayoutGuide.trailingAnchor, constant: -14),
-            stack.bottomAnchor.constraint(equalTo: contentLayoutGuide.bottomAnchor,    constant: -14),
-            stack.widthAnchor.constraint(equalTo: frameLayoutGuide.widthAnchor, constant: -28),
+            stack.topAnchor.constraint(equalTo: contentLayoutGuide.topAnchor),
+            stack.leadingAnchor.constraint(equalTo: contentLayoutGuide.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: contentLayoutGuide.trailingAnchor),
+            stack.bottomAnchor.constraint(equalTo: contentLayoutGuide.bottomAnchor),
         ])
+
+        // Width constraint — starts with continuous padding, updated on mode change.
+        stackWidthConstraint = stack.widthAnchor.constraint(
+            equalTo: frameLayoutGuide.widthAnchor, constant: -28)
+        stackWidthConstraint.isActive = true
+
+        // Padding constraints for continuous mode.
+        stackPadConstraints = [
+            stack.topAnchor.constraint(equalTo: contentLayoutGuide.topAnchor, constant: 14),
+            stack.bottomAnchor.constraint(equalTo: contentLayoutGuide.bottomAnchor, constant: -14),
+        ]
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -122,12 +137,25 @@ final class NativeReaderHostView: UIScrollView {
         lastOverrides  = overrides
         lastSinglePage = singlePage
 
-        // Single-page mode: snap to full-width pages horizontally, one per screen.
-        // Continuous mode: vertical stack with a card per page.
-        isPagingEnabled                    = singlePage
-        stack.axis                         = singlePage ? .horizontal : .vertical
-        showsHorizontalScrollIndicator     = singlePage
-        showsVerticalScrollIndicator       = !singlePage
+        if singlePage {
+            // Full-page vertical paging: zero spacing, zero insets, snap one page per swipe.
+            stack.axis    = .vertical
+            stack.spacing = 0
+            isPagingEnabled = true
+            showsVerticalScrollIndicator   = false
+            showsHorizontalScrollIndicator = false
+            stackPadConstraints.forEach { $0.isActive = false }
+            stackWidthConstraint.constant = 0   // full width
+        } else {
+            // Continuous scroll: vertical with margins.
+            stack.axis    = .vertical
+            stack.spacing = 14
+            isPagingEnabled = false
+            showsVerticalScrollIndicator   = true
+            showsHorizontalScrollIndicator = false
+            stackPadConstraints.forEach { $0.isActive = true }
+            stackWidthConstraint.constant = -28
+        }
 
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
@@ -143,41 +171,63 @@ final class NativeReaderHostView: UIScrollView {
         let runs    = nrPageRunLayouts(from: page)
 
         let card = UIView()
-        card.backgroundColor  = .white
-        card.layer.cornerRadius = singlePage ? 0 : 10
+        card.backgroundColor  = UIColor(white: 0.07, alpha: 1)
         card.clipsToBounds    = true
+        card.translatesAutoresizingMaskIntoConstraints = false
 
         let canvas = NRCoordinatePageView(runs: runs, cropBox: cropBox, overrides: overrides)
+        canvas.layer.cornerRadius = singlePage ? 0 : 10
+        canvas.clipsToBounds      = true
         canvas.translatesAutoresizingMaskIntoConstraints = false
         card.addSubview(canvas)
 
         let pageLabel = UILabel()
-        pageLabel.text          = "Page \(pageNumber)"
-        pageLabel.font          = .monospacedSystemFont(ofSize: 10, weight: .regular)
-        pageLabel.textColor     = UIColor(white: 0.6, alpha: 1)
+        pageLabel.text          = "\(pageNumber) / \(page.document?.pageCount ?? 0)"
+        pageLabel.font          = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        pageLabel.textColor     = UIColor(white: 0.9, alpha: 0.55)
         pageLabel.textAlignment = .right
         pageLabel.translatesAutoresizingMaskIntoConstraints = false
         card.addSubview(pageLabel)
 
         let aspectRatio = cropBox.width > 0 ? cropBox.height / cropBox.width : 1.4142
-        card.translatesAutoresizingMaskIntoConstraints = false
 
-        var constraints: [NSLayoutConstraint] = [
-            canvas.topAnchor.constraint(equalTo: card.topAnchor),
-            canvas.leadingAnchor.constraint(equalTo: card.leadingAnchor),
-            canvas.trailingAnchor.constraint(equalTo: card.trailingAnchor),
-            canvas.heightAnchor.constraint(equalTo: canvas.widthAnchor, multiplier: aspectRatio),
-            pageLabel.topAnchor.constraint(equalTo: canvas.bottomAnchor, constant: 4),
-            pageLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 8),
-            pageLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -10),
-            pageLabel.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -8),
-        ]
+        var constraints: [NSLayoutConstraint]
 
         if singlePage {
-            // In paging mode each card must be exactly one screen-width wide so that
-            // UIScrollView.isPagingEnabled snaps one page per swipe.
-            constraints += [
+            // Full-page mode: card fills the viewport exactly.
+            // Canvas is aspect-fit centred inside the card — text never clips on
+            // landscape screens and always fills portrait screens edge-to-edge.
+            let canvasWidth  = canvas.widthAnchor.constraint(equalTo: card.widthAnchor)
+            canvasWidth.priority = .defaultHigh
+
+            constraints = [
+                // Card = one full viewport page (drives vertical paging snap).
                 card.widthAnchor.constraint(equalTo: frameLayoutGuide.widthAnchor),
+                card.heightAnchor.constraint(equalTo: frameLayoutGuide.heightAnchor),
+                // Canvas: centred, aspect-fit.
+                canvas.centerXAnchor.constraint(equalTo: card.centerXAnchor),
+                canvas.centerYAnchor.constraint(equalTo: card.centerYAnchor),
+                canvas.widthAnchor.constraint(lessThanOrEqualTo: card.widthAnchor),
+                canvas.heightAnchor.constraint(lessThanOrEqualTo: card.heightAnchor),
+                canvas.heightAnchor.constraint(equalTo: canvas.widthAnchor, multiplier: aspectRatio),
+                canvasWidth,
+                // Page indicator overlay — bottom-right corner.
+                pageLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -12),
+                pageLabel.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -12),
+            ]
+        } else {
+            // Continuous scroll mode: card sized to page aspect ratio with rounded corners.
+            card.backgroundColor = .white
+            canvas.layer.cornerRadius = 10
+            constraints = [
+                canvas.topAnchor.constraint(equalTo: card.topAnchor),
+                canvas.leadingAnchor.constraint(equalTo: card.leadingAnchor),
+                canvas.trailingAnchor.constraint(equalTo: card.trailingAnchor),
+                canvas.heightAnchor.constraint(equalTo: canvas.widthAnchor, multiplier: aspectRatio),
+                pageLabel.topAnchor.constraint(equalTo: canvas.bottomAnchor, constant: 4),
+                pageLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 8),
+                pageLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -10),
+                pageLabel.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -8),
             ]
         }
 
