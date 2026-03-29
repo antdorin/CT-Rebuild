@@ -435,7 +435,7 @@ private struct PdfDetailView: View {
     @State private var soTitle: String = ""
     @AppStorage("pdfSinglePageMode") private var singlePageMode = false
     @State private var autoCropEnabled = true
-    @AppStorage("pdfViewMode") private var viewMode: ViewMode = .reader
+    @AppStorage("pdfViewMode") private var viewMode: ViewMode = .pdf
     @State private var isPicked: Bool = false
     @State private var isShipped: Bool = false
     @State private var pdfOverrides: PdfOverridesPayload = .empty
@@ -563,8 +563,6 @@ private struct PdfDetailView: View {
             }
         }
         .onAppear {
-            // Reader is now native; open into READER by default.
-            viewMode = .reader
             soTitle = soDisplayTitle(from: displayDoc)
             isPicked  = UserDefaults.standard.bool(forKey: "docpicked:\(title)")
             isShipped = UserDefaults.standard.bool(forKey: "docshipped:\(title)")

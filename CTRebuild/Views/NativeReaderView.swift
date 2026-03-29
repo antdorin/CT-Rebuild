@@ -6,6 +6,11 @@ import UIKit
 
 struct PdfGlobalOverrides: Equatable {
     var textSizeY:    Double = 1.45   // font size multiplier
+    var textSizeX:    Double = 1.0    // horizontal text width scale
+    var pageZoomX:    Double = 1.0    // zoom from crop centre (X)
+    var pageZoomY:    Double = 1.0    // zoom from crop centre (Y)
+    var pageSizeX:    Double = 1.0    // position scale from crop edge (X)
+    var pageSizeY:    Double = 1.0    // position scale from crop edge (Y)
     var forceBold:    Bool   = false
     var fontOverride: String = ""     // empty = system font
 }
@@ -46,6 +51,11 @@ struct NativeReaderView: View {
             let rawSizeY = payload.hasEdits ? payload.global.textSizeY : fallback.textSizeY
             let newOverrides = PdfGlobalOverrides(
                 textSizeY:    min(2.0, max(0.75, rawSizeY)),
+                textSizeX:    max(0.4, payload.global.textSizeX),
+                pageZoomX:    max(0.1, payload.global.pageZoomX),
+                pageZoomY:    max(0.1, payload.global.pageZoomY),
+                pageSizeX:    max(0.1, payload.global.pageSizeX),
+                pageSizeY:    max(0.1, payload.global.pageSizeY),
                 forceBold:    payload.global.forceBold,
                 fontOverride: payload.global.fontOverride
             )
@@ -210,6 +220,11 @@ private final class NRCoordinatePageView: UIView {
         let scale = w / cropBox.width
         let pageH = cropBox.height * scale
         let sizeY = CGFloat(overrides.textSizeY)
+        let sizeX = CGFloat(overrides.textSizeX)
+        let zoomX = CGFloat(overrides.pageZoomX)
+        let zoomY = CGFloat(overrides.pageZoomY)
+        let pSclX = CGFloat(overrides.pageSizeX)
+        let pSclY = CGFloat(overrides.pageSizeY)
         let bold  = overrides.forceBold
         let fName = overrides.fontOverride
 
@@ -221,9 +236,14 @@ private final class NRCoordinatePageView: UIView {
         for run in deduped {
             // Convert PDF coords (bottom-left origin, Y increases upward)
             // to UIKit coords (top-left origin, Y increases downward).
+            // Apply zoom from crop centre then scale from crop edge — mirrors Hub annotation path.
             let runH = run.bounds.height * scale
-            let runX = (run.bounds.minX - cropBox.minX) * scale
-            let runY = pageH - ((run.bounds.maxY - cropBox.minY) * scale)
+            let zoomedMinX = ((run.bounds.minX - cropBox.midX) * zoomX) + cropBox.midX
+            let scaledMinX = cropBox.minX + ((zoomedMinX - cropBox.minX) * pSclX)
+            let runX = (scaledMinX - cropBox.minX) * scale
+            let zoomedMaxY = ((run.bounds.maxY - cropBox.midY) * zoomY) + cropBox.midY
+            let scaledMaxY = cropBox.minY + ((zoomedMaxY - cropBox.minY) * pSclY)
+            let runY = pageH - ((scaledMaxY - cropBox.minY) * scale)
 
             let fontSize = max(8, runH * sizeY)
             let labelH   = fontSize * 1.35
@@ -244,9 +264,10 @@ private final class NRCoordinatePageView: UIView {
 
             // Size the label to its natural text width so it never truncates,
             // then pin its origin back to the PDF-coordinate position.
+            // Apply textSizeX to scale the label width (matches Hub horizontal scale control).
             label.sizeToFit()
             label.frame = CGRect(x: runX, y: runY,
-                                 width: label.frame.width,
+                                 width: label.frame.width * sizeX,
                                  height: max(label.frame.height, labelH))
 
             addSubview(label)
