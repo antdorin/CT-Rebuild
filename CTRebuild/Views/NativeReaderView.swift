@@ -186,6 +186,15 @@ final class NativeReaderHostView: UIScrollView {
     }
 }
 
+// MARK: - Word run model
+
+/// A single extracted word token with its PDF-space bounding box.
+private struct NRTextRun {
+    let text:               String
+    let bounds:             CGRect  // PDF-space: bottom-left origin, Y increases upward
+    let originalFontHeight: CGFloat // bounds.height in PDF points
+}
+
 // MARK: - Coordinate-accurate page canvas
 
 /// Positions each word token as a UILabel using its PDF-coordinate bounding box,
@@ -193,12 +202,12 @@ final class NativeReaderHostView: UIScrollView {
 /// text rendering issue seen when PDFKit renders the raw document.
 private final class NRCoordinatePageView: UIView {
 
-    private let runs:      [(text: String, bounds: CGRect)]
+    private let runs:      [NRTextRun]
     private let cropBox:   CGRect
     private let overrides: PdfGlobalOverrides
     private var lastLayoutWidth: CGFloat = 0
 
-    init(runs: [(text: String, bounds: CGRect)], cropBox: CGRect, overrides: PdfGlobalOverrides) {
+    init(runs: [NRTextRun], cropBox: CGRect, overrides: PdfGlobalOverrides) {
         self.runs      = runs
         self.cropBox   = cropBox
         self.overrides = overrides
@@ -217,8 +226,6 @@ private final class NRCoordinatePageView: UIView {
 
         subviews.forEach { $0.removeFromSuperview() }
 
-        let scale = w / cropBox.width
-        let pageH = cropBox.height * scale
         let sizeY = CGFloat(overrides.textSizeY)
         let sizeX = CGFloat(overrides.textSizeX)
         let zoomX = CGFloat(overrides.pageZoomX)
@@ -228,24 +235,44 @@ private final class NRCoordinatePageView: UIView {
         let bold  = overrides.forceBold
         let fName = overrides.fontOverride
 
-        // Deduplicate runs that come from overlapping PDF text layers.
-        // Two runs are considered duplicates when they share the same text and
-        // their centre points are within 4 PDF-points of each other.
+        // Build an authoritative CGAffineTransform that maps PDF-space
+        // (bottom-left origin, Y increases upward) to UIKit view-space
+        // (top-left origin, Y increases downward), scaled to fit cropBox in bounds.
+        // Using a transform matrix handles non-zero CropBox origins automatically
+        // and eliminates the manual runY = pageH - ... drift-prone calculation.
+        //   x' = (px - cropBox.minX) * scale
+        //   y' = (cropBox.maxY  - py) * scale
+        let scale = w / cropBox.width
+        let baseTransform = CGAffineTransform(
+            a: scale,  b: 0,
+            c: 0,      d: -scale,
+            tx: -cropBox.minX * scale,
+            ty: (cropBox.minY + cropBox.height) * scale
+        )
+
         let deduped = nrDeduplicatedRuns(runs)
 
         for run in deduped {
-            // Convert PDF coords (bottom-left origin, Y increases upward)
-            // to UIKit coords (top-left origin, Y increases downward).
-            // Apply zoom from crop centre then scale from crop edge — mirrors Hub annotation path.
-            let runH = run.bounds.height * scale
-            let zoomedMinX = ((run.bounds.minX - cropBox.midX) * zoomX) + cropBox.midX
-            let scaledMinX = cropBox.minX + ((zoomedMinX - cropBox.minX) * pSclX)
-            let runX = (scaledMinX - cropBox.minX) * scale
-            let zoomedMaxY = ((run.bounds.maxY - cropBox.midY) * zoomY) + cropBox.midY
-            let scaledMaxY = cropBox.minY + ((zoomedMaxY - cropBox.minY) * pSclY)
-            let runY = pageH - ((scaledMaxY - cropBox.minY) * scale)
+            // Apply overrides in PDF space (mirrors Hub annotation path):
+            // 1. Zoom from crop centre.
+            let zMinX = (run.bounds.minX - cropBox.midX) * zoomX + cropBox.midX
+            let zMinY = (run.bounds.minY - cropBox.midY) * zoomY + cropBox.midY
+            let zoomedRect = CGRect(x: zMinX, y: zMinY,
+                                    width:  run.bounds.width  * zoomX,
+                                    height: run.bounds.height * zoomY)
+            // 2. Position scale from crop edge.
+            let adjMinX = cropBox.minX + (zoomedRect.minX - cropBox.minX) * pSclX
+            let adjMinY = cropBox.minY + (zoomedRect.minY - cropBox.minY) * pSclY
+            let adjRect = CGRect(x: adjMinX, y: adjMinY,
+                                 width: zoomedRect.width, height: zoomedRect.height)
 
-            let fontSize = max(8, runH * sizeY)
+            // 3. Apply the authoritative transform.
+            //    CGRect.applying returns the smallest enclosing rect of all
+            //    4 transformed corners, so the Y-flip produces a correct
+            //    positive-height rect with origin at the UIKit top edge.
+            let uiRect = adjRect.applying(baseTransform)
+
+            let fontSize = max(8, uiRect.height * sizeY)
             let labelH   = fontSize * 1.35
 
             let label = UILabel()
@@ -266,7 +293,7 @@ private final class NRCoordinatePageView: UIView {
             // then pin its origin back to the PDF-coordinate position.
             // Apply textSizeX to scale the label width (matches Hub horizontal scale control).
             label.sizeToFit()
-            label.frame = CGRect(x: runX, y: runY,
+            label.frame = CGRect(x: uiRect.minX, y: uiRect.minY,
                                  width: label.frame.width * sizeX,
                                  height: max(label.frame.height, labelH))
 
@@ -277,79 +304,107 @@ private final class NRCoordinatePageView: UIView {
 
 // MARK: - PDF run-layout extraction (mirrors PdfKitView.pageRunLayouts)
 
-/// Removes duplicate word runs that arise from PDFs with two overlapping text layers.
-/// Two runs are duplicates when they have the same text and their centre points
-/// are within 4 PDF-points of each other.
-private func nrDeduplicatedRuns(_ runs: [(text: String, bounds: CGRect)]) -> [(text: String, bounds: CGRect)] {
-    var kept: [(text: String, bounds: CGRect)] = []
-    for run in runs {
-        let normalized = run.text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !normalized.isEmpty else { continue }
-
-        let isDuplicate = kept.contains { existing in
-            let existingNormalized = existing.text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            guard existingNormalized == normalized else { return false }
-
-            let dx = abs(existing.bounds.midX - run.bounds.midX)
-            let dy = abs(existing.bounds.midY - run.bounds.midY)
-            if dx <= 12 && dy <= 8 { return true }
-
-            let overlap = existing.bounds.intersection(run.bounds)
-            guard !overlap.isNull else { return false }
-            let overlapArea = overlap.width * overlap.height
-            let minArea = min(existing.bounds.width * existing.bounds.height,
-                              run.bounds.width * run.bounds.height)
-            guard minArea > 0 else { return false }
-            return (overlapArea / minArea) > 0.75
-        }
-        if !isDuplicate { kept.append(run) }
-    }
-    return kept
+/// Returns true when two runs are considered the same word from overlapping text layers.
+/// Uses a dynamic tolerance based on line height rather than fixed magic numbers,
+/// making the check robust across font sizes and OCR resolutions.
+private func nrRunsAreDuplicate(_ a: NRTextRun, _ b: NRTextRun) -> Bool {
+    guard a.text.lowercased() == b.text.lowercased() else { return false }
+    let tolerance = max(a.bounds.height, b.bounds.height) * 0.5
+    return abs(a.bounds.midX - b.bounds.midX) < tolerance &&
+           abs(a.bounds.midY - b.bounds.midY) < tolerance
 }
 
-private func nrPageRunLayouts(from page: PDFPage) -> [(text: String, bounds: CGRect)] {
-    guard let rawText = page.string else { return [] }
+/// Removes duplicate word runs that arise from PDFs with two overlapping text layers.
+/// Uses a spatial hash so each run is compared only against the ~9 nearby grid cells
+/// instead of the entire list, reducing complexity from O(n²) to near O(n).
+private func nrDeduplicatedRuns(_ runs: [NRTextRun]) -> [NRTextRun] {
+    let gridSize: CGFloat = 25.0
+    var spatialMap = [String: [NRTextRun]]()
+    var unique     = [NRTextRun]()
 
-    let nsText    = rawText as NSString
-    let fullRange = NSRange(location: 0, length: nsText.length)
-    guard let wordRegex = try? NSRegularExpression(pattern: #"\S+"#) else {
+    for run in runs {
+        let gx = Int(run.bounds.midX / gridSize)
+        let gy = Int(run.bounds.midY / gridSize)
+
+        var isDup = false
+        outer: for dx in -1...1 {
+            for dy in -1...1 {
+                let key = "\(gx + dx),\(gy + dy)"
+                guard let candidates = spatialMap[key] else { continue }
+                for existing in candidates where nrRunsAreDuplicate(run, existing) {
+                    isDup = true
+                    break outer
+                }
+            }
+        }
+
+        if !isDup {
+            unique.append(run)
+            let key = "\(gx),\(gy)"
+            spatialMap[key, default: []].append(run)
+        }
+    }
+    return unique
+}
+
+private func nrPageRunLayouts(from page: PDFPage) -> [NRTextRun] {
+    guard let rawText = page.string, !rawText.isEmpty else {
         return nrPageLineLayouts(from: page)
     }
 
-    var runLayouts: [(text: String, bounds: CGRect)] = []
-    for match in wordRegex.matches(in: rawText, options: [], range: fullRange) {
-        let token = nsText.substring(with: match.range).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !token.isEmpty,
-              let sel = page.selection(for: match.range) else { continue }
-        let b = sel.bounds(for: page)
-        guard b.width > 0, b.height > 0 else { continue }
-        runLayouts.append((text: token, bounds: b))
-    }
+    // Character-by-character pass to build tight per-word NSRanges.
+    // This is more reliable than running a regex over the whole string because
+    // it respects the PDF's internal character encoding and avoids the
+    // "line box fallback" that selection(for:) can trigger on messy OCR PDFs.
+    let ns  = rawText as NSString
+    let len = ns.length
+    var runs = [NRTextRun]()
+    var wordStart = -1
 
-    if !runLayouts.isEmpty {
-        return runLayouts.sorted { lhs, rhs in
-            let yDelta = abs(lhs.bounds.midY - rhs.bounds.midY)
-            if yDelta > 2.0 { return lhs.bounds.midY > rhs.bounds.midY }
-            return lhs.bounds.minX < rhs.bounds.minX
+    for i in 0...len {
+        let isEnd = (i == len)
+        let isWS  = isEnd || NSCharacterSet.whitespacesAndNewlines
+                                .characterIsMember(ns.character(at: i))
+        if isWS {
+            if wordStart >= 0 {
+                let range = NSRange(location: wordStart, length: i - wordStart)
+                let token = ns.substring(with: range)
+                if let sel = page.selection(for: range) {
+                    let b = sel.bounds(for: page)
+                    if b.width > 0, b.height > 0 {
+                        runs.append(NRTextRun(text: token, bounds: b,
+                                             originalFontHeight: b.height))
+                    }
+                }
+                wordStart = -1
+            }
+        } else {
+            if wordStart < 0 { wordStart = i }
         }
     }
 
-    return nrPageLineLayouts(from: page)
+    if runs.isEmpty { return nrPageLineLayouts(from: page) }
+
+    return runs.sorted { lhs, rhs in
+        let yDelta = abs(lhs.bounds.midY - rhs.bounds.midY)
+        if yDelta > 2.0 { return lhs.bounds.midY > rhs.bounds.midY }
+        return lhs.bounds.minX < rhs.bounds.minX
+    }
 }
 
-private func nrPageLineLayouts(from page: PDFPage) -> [(text: String, bounds: CGRect)] {
+private func nrPageLineLayouts(from page: PDFPage) -> [NRTextRun] {
     let cropBounds = page.bounds(for: .cropBox)
     guard cropBounds.width > 0, cropBounds.height > 0,
           let selection = page.selection(for: cropBounds) else { return [] }
 
     return selection
         .selectionsByLine()
-        .compactMap { ls -> (text: String, bounds: CGRect)? in
+        .compactMap { ls -> NRTextRun? in
             guard let raw = ls.string?.trimmingCharacters(in: .whitespacesAndNewlines),
                   !raw.isEmpty else { return nil }
             let b = ls.bounds(for: page)
             guard b.width > 0, b.height > 0 else { return nil }
-            return (text: raw, bounds: b)
+            return NRTextRun(text: raw, bounds: b, originalFontHeight: b.height)
         }
         .sorted { lhs, rhs in
             let yDelta = abs(lhs.bounds.minY - rhs.bounds.minY)
