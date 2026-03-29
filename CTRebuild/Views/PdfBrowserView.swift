@@ -795,9 +795,6 @@ private struct PdfKitView: UIViewRepresentable {
         let bounds = page.bounds(for: .cropBox)
         guard bounds.width > 0, bounds.height > 0 else { return }
 
-        // Edited-only mode: hide the original PDF content and render only override text.
-        addFullPageWhiteout(to: page, bounds: bounds)
-
         let global = overrides.global
         let zoomX = max(0.1, global.pageZoomX)
         let zoomY = max(0.1, global.pageZoomY)
@@ -864,23 +861,6 @@ private struct PdfKitView: UIViewRepresentable {
 
             page.addAnnotation(annotation)
         }
-    }
-
-    private func addFullPageWhiteout(to page: PDFPage, bounds: CGRect) {
-        let whiteout = PDFAnnotation(bounds: bounds, forType: .square, withProperties: nil)
-        // Use white for both fill and border so any border fallback is invisible.
-        whiteout.color = .white
-        whiteout.interiorColor = .white
-        let border = PDFBorder()
-        border.lineWidth = 0
-        whiteout.border = border
-        whiteout.setValue([0.0, 0.0, 0.0] as NSArray,
-                          forAnnotationKey: PDFAnnotationKey(rawValue: "/Border"))
-        whiteout.setValue(["W": 0, "S": "S"] as NSDictionary,
-                          forAnnotationKey: PDFAnnotationKey(rawValue: "/BS"))
-        whiteout.shouldDisplay = true
-        whiteout.shouldPrint = true
-        page.addAnnotation(whiteout)
     }
 
     private func parseRunKey(_ key: String) -> (Int, Int)? {
