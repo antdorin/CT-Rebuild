@@ -70,7 +70,7 @@ struct NativeReaderView: View {
             await MainActor.run { overrides = newOverrides }
         }
 
-        // Word layout — nil when Hub is unreachable; iOS falls back to PDFKit extraction.
+        // Word layout from Hub (reader-only path).
         let wordDoc = try? await wordLayoutTask
         await MainActor.run { hubWordDoc = wordDoc }
     }
@@ -99,6 +99,7 @@ private struct NativeReaderScrollable: UIViewRepresentable {
 final class NativeReaderHostView: UIScrollView {
 
     private let stack           = UIStackView()
+    private let maxRunsPerPage  = 2500
     private var lastDoc: PDFDocument? = nil
     private var lastOverrides   = PdfGlobalOverrides()
     private var lastHubWordDoc: HubWordDocument? = nil
@@ -192,12 +193,20 @@ final class NativeReaderHostView: UIScrollView {
                                singlePage: Bool) -> UIView {
         let cropBox = page.bounds(for: .cropBox)
         let runs: [NRTextRun] = hubPage.map { hp in
-            hp.words.map { w in
-                NRTextRun(
+            hp.words.compactMap { w in
+                let width = w.x1 - w.x0
+                let height = w.y1 - w.y0
+                guard !w.text.isEmpty,
+                      w.x0.isFinite, w.y0.isFinite, w.x1.isFinite, w.y1.isFinite,
+                      width.isFinite, height.isFinite,
+                      width > 0, height > 0 else {
+                    return nil
+                }
+
+                return NRTextRun(
                     text: w.text,
-                    bounds: CGRect(x: w.x0, y: w.y0,
-                                   width: w.x1 - w.x0, height: w.y1 - w.y0),
-                    originalFontHeight: w.y1 - w.y0
+                    bounds: CGRect(x: w.x0, y: w.y0, width: width, height: height),
+                    originalFontHeight: height
                 )
             }
         } ?? []
@@ -207,7 +216,12 @@ final class NativeReaderHostView: UIScrollView {
         card.clipsToBounds    = true
         card.translatesAutoresizingMaskIntoConstraints = false
 
-        let canvas = NRCoordinatePageView(runs: runs, cropBox: cropBox, overrides: overrides)
+        let canvas = NRCoordinatePageView(
+            runs: runs,
+            cropBox: cropBox,
+            overrides: overrides,
+            maxRunsToRender: maxRunsPerPage
+        )
         canvas.layer.cornerRadius = singlePage ? 0 : 10
         canvas.clipsToBounds      = true
         canvas.translatesAutoresizingMaskIntoConstraints = false
@@ -221,7 +235,8 @@ final class NativeReaderHostView: UIScrollView {
         pageLabel.translatesAutoresizingMaskIntoConstraints = false
         card.addSubview(pageLabel)
 
-        let aspectRatio = cropBox.width > 0 ? cropBox.height / cropBox.width : 1.4142
+        let rawAspectRatio = cropBox.width > 0 ? cropBox.height / cropBox.width : 1.4142
+        let aspectRatio = rawAspectRatio.isFinite && rawAspectRatio > 0 ? rawAspectRatio : 1.4142
 
         var constraints: [NSLayoutConstraint]
 
@@ -287,12 +302,14 @@ private final class NRCoordinatePageView: UIView {
     private let runs:      [NRTextRun]
     private let cropBox:   CGRect
     private let overrides: PdfGlobalOverrides
+    private let maxRunsToRender: Int
     private var lastLayoutWidth: CGFloat = 0
 
-    init(runs: [NRTextRun], cropBox: CGRect, overrides: PdfGlobalOverrides) {
+    init(runs: [NRTextRun], cropBox: CGRect, overrides: PdfGlobalOverrides, maxRunsToRender: Int) {
         self.runs      = runs
         self.cropBox   = cropBox
         self.overrides = overrides
+        self.maxRunsToRender = maxRunsToRender
         super.init(frame: .zero)
         backgroundColor = .white
     }
@@ -333,8 +350,9 @@ private final class NRCoordinatePageView: UIView {
         )
 
         let deduped = nrDeduplicatedRuns(runs)
+        let renderRuns = deduped.prefix(maxRunsToRender)
 
-        for run in deduped {
+        for run in renderRuns {
             // Apply overrides in PDF space (mirrors Hub annotation path):
             // 1. Zoom from crop centre.
             let zMinX = (run.bounds.minX - cropBox.midX) * zoomX + cropBox.midX
@@ -353,6 +371,14 @@ private final class NRCoordinatePageView: UIView {
             //    4 transformed corners, so the Y-flip produces a correct
             //    positive-height rect with origin at the UIKit top edge.
             let uiRect = adjRect.applying(baseTransform)
+                        guard uiRect.minX.isFinite,
+                                    uiRect.minY.isFinite,
+                                    uiRect.width.isFinite,
+                                    uiRect.height.isFinite,
+                                    uiRect.width > 0,
+                                    uiRect.height > 0 else {
+                                continue
+                        }
 
             let fontSize = max(8, uiRect.height * sizeY)
             let labelH   = fontSize * 1.35
@@ -405,6 +431,16 @@ private func nrDeduplicatedRuns(_ runs: [NRTextRun]) -> [NRTextRun] {
     var unique     = [NRTextRun]()
 
     for run in runs {
+        guard !run.text.isEmpty,
+              run.bounds.midX.isFinite,
+              run.bounds.midY.isFinite,
+              run.bounds.width.isFinite,
+              run.bounds.height.isFinite,
+              run.bounds.width > 0,
+              run.bounds.height > 0 else {
+            continue
+        }
+
         let gx = Int(run.bounds.midX / gridSize)
         let gy = Int(run.bounds.midY / gridSize)
 

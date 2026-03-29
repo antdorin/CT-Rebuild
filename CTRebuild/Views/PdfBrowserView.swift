@@ -89,9 +89,13 @@ private func groupFiles(_ metas: [PdfMeta]) -> [PdfDateGroup] {
 
         if let date {
             let comps = Calendar.current.dateComponents([.year, .month, .day], from: date)
-            let key = String(format: "%04d-%02d-%02d", comps.year!, comps.month!, comps.day!)
-            if byKey[key] == nil { byKey[key] = (date, []) }
-            byKey[key]!.1.append(meta)
+            if let year = comps.year, let month = comps.month, let day = comps.day {
+                let key = String(format: "%04d-%02d-%02d", year, month, day)
+                if byKey[key] == nil { byKey[key] = (date, []) }
+                byKey[key]!.1.append(meta)
+            } else {
+                byKey["z_\(meta.name)"] = (Date.distantPast, [meta])
+            }
         } else {
             byKey["z_\(meta.name)"] = (Date.distantPast, [meta])
         }
@@ -107,7 +111,12 @@ private func groupFiles(_ metas: [PdfMeta]) -> [PdfDateGroup] {
             switch orderedSOs.count {
             case 0:  soLabel = ""
             case 1:  soLabel = orderedSOs[0]
-            default: soLabel = "\(orderedSOs.first!) \u{2013} \(orderedSOs.last!)"
+            default:
+                if let first = orderedSOs.first, let last = orderedSOs.last {
+                    soLabel = "\(first) \u{2013} \(last)"
+                } else {
+                    soLabel = ""
+                }
             }
             return PdfDateGroup(id: key,
                                 dateLabel: v.0 == .distantPast ? "No Date" : df.string(from: v.0),
