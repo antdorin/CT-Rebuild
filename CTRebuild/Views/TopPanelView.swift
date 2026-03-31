@@ -45,8 +45,8 @@ struct TopPanelView: View {
                         if tab == 0 {
                             CalculatorContentView(safeArea: safeArea)
                         } else if tab == 1 {
-                            NotesContentView(safeArea: safeArea)
-                        } else {
+                            NotesContentView(safeArea: safeArea)                        } else if tab == 2 {
+                            WebReaderView(safeArea: safeArea)                        } else {
                             Spacer()
                         }
                     }
@@ -66,7 +66,7 @@ struct TopPanelView: View {
 private struct TopTabBar: View {
     @Binding var selected: Int?
 
-    private let labels = ["CALC", "NOTES", "—"]
+    private let labels = ["CALC", "NOTES", "PICKING TICKET"]
 
     var body: some View {
         HStack(spacing: 10) {
@@ -75,6 +75,8 @@ private struct TopTabBar: View {
                     Text(labels[i])
                         .font(.system(size: 14, weight: .semibold, design: .monospaced))
                         .tracking(2)
+                        .minimumScaleFactor(0.55)
+                        .lineLimit(1)
                         .foregroundColor(selected == i ? .black : .secondary)
                         .frame(maxWidth: .infinity)
                         .frame(height: 44)

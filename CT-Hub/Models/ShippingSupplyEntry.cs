@@ -15,4 +15,7 @@ public class ShippingSupplyEntry
 
     [JsonPropertyName("single")]
     public int Single { get; set; } = 0;
+
+    [JsonPropertyName("stockThreshold")]
+    public int StockThreshold { get; set; } = 0;
 }

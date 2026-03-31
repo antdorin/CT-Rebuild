@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Globalization;
 using System.Windows;
@@ -13,6 +14,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Net.Http;
 using CTHub.Models;
 using CTHub.Services;
@@ -25,6 +27,10 @@ namespace CTHub;
 
 public partial class MainWindow : Window, INotifyPropertyChanged
 {
+    private const double PdfEditorWebZoomMin = 0.20;
+    private const double PdfEditorWebZoomMax = 4.0;
+    private const double PdfEditorWebZoomDefault = 0.50;
+
     private readonly HubServer _hub = App.Hub;
     private readonly CdpDevToolsService _cdp = new();
     private readonly AppSettings _settings = AppSettings.Instance;
@@ -36,10 +42,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private DataGridColumnHeader? _activeHeader;
     private DataGrid? _activeGrid;
     private readonly List<string> _devCdpRawEvents = [];
+    private readonly System.Windows.Threading.DispatcherTimer _chadHoldTimer;
     private bool _chadHandled = false;
-    private bool _isDevToolsVisible = true;
+    private bool _isDevToolsVisible = false;
     private bool _qrGenSyncing;
     private string _qrGenCurrentZpl = string.Empty;
+    private double _pdfEditorWebZoomFactor = PdfEditorWebZoomDefault;
+    private bool _applyingPdfEditorLayout;
 
     // ── Bindable properties ───────────────────────────────────────────────────
 
@@ -310,7 +319,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public Visibility EndpointEditorVisibility => IsPrivacyModeOn ? Visibility.Collapsed : Visibility.Visible;
     public Visibility EndpointMaskedVisibility => IsPrivacyModeOn ? Visibility.Visible : Visibility.Collapsed;
 
-    private bool _isPrivacyModeOn;
+    private bool _isPrivacyModeOn = true;
     public bool IsPrivacyModeOn
     {
         get => _isPrivacyModeOn;
@@ -449,6 +458,27 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         InitializeComponent();
 
+        _chadHoldTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(3)
+        };
+        _chadHoldTimer.Tick += (_, _) =>
+        {
+            _chadHoldTimer.Stop();
+            if (!IsChadComboPressed() || _chadHandled)
+                return;
+
+            _chadHandled = true;
+            _isDevToolsVisible = !_isDevToolsVisible;
+            UpdateDevToolsVisibility();
+            AddDevCdpLog(_isDevToolsVisible
+                ? "Dev Tools tab revealed via CHAD hold."
+                : "Dev Tools tab hidden via CHAD hold.");
+            StatusText = _isDevToolsVisible
+                ? "Dev Tools revealed via CHAD hold."
+                : "Dev Tools hidden via CHAD hold.";
+        };
+
         _devChromeEndpoint = string.IsNullOrWhiteSpace(_settings.DevChromeEndpoint)
             ? "http://127.0.0.1:9222"
             : _settings.DevChromeEndpoint;
@@ -466,6 +496,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         DataContext = this;
         PreviewKeyDown += MainWindow_PreviewKeyDown;
+    PreviewKeyUp += MainWindow_PreviewKeyUp;
+    Deactivated += (_, _) => CancelChadHold();
         UpdateDevToolsVisibility();
 
         _cdp.Log += msg => Dispatcher.InvokeAsync(() => AddDevCdpLog(msg));
@@ -516,6 +548,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         InitializeSearchFilters();
         UpdatePdfEditorModeUi();
         InitializeQrGenerator();
+        Loaded += (_, _) => Dispatcher.BeginInvoke(new Action(ApplySavedPdfEditorLayout), System.Windows.Threading.DispatcherPriority.Loaded);
 
         // Populate server info panel
         RefreshServerInfo();
@@ -559,25 +592,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        bool c = System.Windows.Input.Keyboard.IsKeyDown(Key.C);
-        bool h = System.Windows.Input.Keyboard.IsKeyDown(Key.H);
-        bool a = System.Windows.Input.Keyboard.IsKeyDown(Key.A);
-        bool d = System.Windows.Input.Keyboard.IsKeyDown(Key.D);
+        UpdateChadHoldState();
+    }
 
-        if (c && h && a && d)
-        {
-            if (!_chadHandled)
-            {
-                _chadHandled = true;
-                _isDevToolsVisible = !_isDevToolsVisible;
-                UpdateDevToolsVisibility();
-                AddDevCdpLog(_isDevToolsVisible ? "Dev Tools tab revealed via CHAD combo." : "Dev Tools tab hidden via CHAD combo.");
-            }
-        }
-        else
-        {
-            _chadHandled = false;
-        }
+    private void MainWindow_PreviewKeyUp(object sender, KeyEventArgs e)
+    {
+        UpdateChadHoldState();
     }
 
     private static char? KeyToUpperChar(Key key)
@@ -585,6 +605,32 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (key >= Key.A && key <= Key.Z)
             return (char)('A' + (key - Key.A));
         return null;
+    }
+
+    private bool IsChadComboPressed()
+    {
+        return Keyboard.IsKeyDown(Key.C)
+            && Keyboard.IsKeyDown(Key.H)
+            && Keyboard.IsKeyDown(Key.A)
+            && Keyboard.IsKeyDown(Key.D);
+    }
+
+    private void UpdateChadHoldState()
+    {
+        if (IsChadComboPressed())
+        {
+            if (!_chadHandled && !_chadHoldTimer.IsEnabled)
+                _chadHoldTimer.Start();
+            return;
+        }
+
+        CancelChadHold();
+    }
+
+    private void CancelChadHold()
+    {
+        _chadHoldTimer.Stop();
+        _chadHandled = false;
     }
 
     private void UpdateDevToolsVisibility()
@@ -631,7 +677,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             || ContainsText(entry.Label, term)
             || ContainsText(entry.Notes, term)
             || ContainsText(entry.Id, term)
-            || entry.Qty.ToString().Contains(term, StringComparison.OrdinalIgnoreCase);
+            || entry.Qty.ToString().Contains(term, StringComparison.OrdinalIgnoreCase)
+            || entry.StockThreshold.ToString().Contains(term, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string BuildClassId(ChaseTacticalEntry entry)
@@ -676,7 +723,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             || ContainsText(entry.Sku, term)
             || ContainsText(entry.Description, term)
             || ContainsText(entry.Id, term)
-            || entry.Qty.ToString().Contains(term, StringComparison.OrdinalIgnoreCase);
+            || entry.Qty.ToString().Contains(term, StringComparison.OrdinalIgnoreCase)
+            || entry.StockThreshold.ToString().Contains(term, StringComparison.OrdinalIgnoreCase);
     }
 
     private bool FilterQrMapping(QrClassMapping? entry)
@@ -700,6 +748,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         return ContainsText(entry.Dimensions, term)
             || entry.Bundle.ToString().Contains(term, StringComparison.OrdinalIgnoreCase)
             || entry.Single.ToString().Contains(term, StringComparison.OrdinalIgnoreCase)
+            || entry.StockThreshold.ToString().Contains(term, StringComparison.OrdinalIgnoreCase)
             || ContainsText(entry.Id, term);
     }
 
@@ -1025,7 +1074,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             Bin = "—",
             ClassName = ClassNames[0],
             ClassLetter = "A",
-            Label = "New item"
+            Label = "New item",
+            StockThreshold = 0
         };
         entry.ClassId = BuildClassId(entry);
         _ = _hub.ChaseTactical.UpsertAsync(entry);
@@ -1175,7 +1225,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void ToughHooks_Add(object sender, RoutedEventArgs e)
     {
-        var entry = new ToughHookEntry { Bin = "—", Sku = "NEW" };
+        var entry = new ToughHookEntry { Bin = "—", Sku = "NEW", StockThreshold = 0 };
         _ = _hub.ToughHooks.UpsertAsync(entry);
         Touch();
         ToughHooksGrid.ScrollIntoView(entry);
@@ -1383,6 +1433,146 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         StatusText = "Copied ZPL to clipboard.";
     }
 
+    private void QrGenerator_Print(object sender, RoutedEventArgs e)
+    {
+        if (QrGenPreview is null)
+            return;
+
+        BitmapSource? preview = QrGenPreview.Source as BitmapSource;
+        if (preview is null)
+        {
+            UpdateQrGeneratorPreview();
+            preview = QrGenPreview.Source as BitmapSource;
+        }
+
+        if (preview is null)
+        {
+            StatusText = "Nothing to print yet. Generate a label first.";
+            return;
+        }
+
+        var labelWidthIn = ParseDoubleOrDefault(QrGenLabelWidthIn?.Text, 4.0, 0.5, 12.0);
+        var labelHeightIn = ParseDoubleOrDefault(QrGenLabelHeightIn?.Text, 2.0, 0.5, 12.0);
+        var description = $"CT Hub label {(QrGenTypeQr?.IsChecked == true ? "QR" : "Code128")}";
+
+        ShowQrPrintPreview(preview, labelWidthIn, labelHeightIn, description);
+    }
+
+    private void ShowQrPrintPreview(BitmapSource preview, double labelWidthIn, double labelHeightIn, string description)
+    {
+        var document = BuildQrPrintDocument(preview, labelWidthIn, labelHeightIn);
+        var viewer = new DocumentViewer
+        {
+            Document = document,
+            Margin = new Thickness(0, 0, 0, 12),
+            Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A))
+        };
+
+        var printButton = new Button
+        {
+            Content = "Print...",
+            Width = 92,
+            Margin = new Thickness(0, 0, 8, 0),
+            IsDefault = true
+        };
+        var closeButton = new Button
+        {
+            Content = "Close",
+            Width = 92,
+            IsCancel = true
+        };
+
+        var window = new Window
+        {
+            Title = "Print Preview",
+            Owner = this,
+            Width = 860,
+            Height = 720,
+            MinWidth = 640,
+            MinHeight = 480,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Background = new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E)),
+            Content = new DockPanel
+            {
+                LastChildFill = true,
+                Margin = new Thickness(12)
+            }
+        };
+
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { printButton, closeButton }
+        };
+        DockPanel.SetDock(buttons, Dock.Bottom);
+
+        var root = (DockPanel)window.Content;
+        root.Children.Add(buttons);
+        root.Children.Add(viewer);
+
+        closeButton.Click += (_, _) => window.Close();
+        printButton.Click += (_, _) =>
+        {
+            var dialog = new PrintDialog();
+            ConfigureQrPrintDialog(dialog, labelWidthIn, labelHeightIn);
+            if (dialog.ShowDialog() != true)
+                return;
+
+            ConfigureQrPrintDialog(dialog, labelWidthIn, labelHeightIn);
+            dialog.PrintDocument(document.DocumentPaginator, description);
+            StatusText = $"Printed label to {dialog.PrintQueue?.FullName ?? "selected printer"}.";
+            window.Close();
+        };
+
+        window.Loaded += (_, _) => viewer.FitToMaxPagesAcross(1);
+        window.ShowDialog();
+    }
+
+    private static void ConfigureQrPrintDialog(PrintDialog dialog, double labelWidthIn, double labelHeightIn)
+    {
+        if (dialog.PrintTicket is null)
+            return;
+
+        dialog.PrintTicket.PageOrientation = labelWidthIn > labelHeightIn
+            ? System.Printing.PageOrientation.Landscape
+            : System.Printing.PageOrientation.Portrait;
+        dialog.PrintTicket.PageMediaSize = new System.Printing.PageMediaSize(
+            labelWidthIn * 96.0,
+            labelHeightIn * 96.0);
+    }
+
+    private System.Windows.Documents.FixedDocument BuildQrPrintDocument(BitmapSource preview, double labelWidthIn, double labelHeightIn)
+    {
+        var pageWidth = Math.Max(1.0, labelWidthIn * 96.0);
+        var pageHeight = Math.Max(1.0, labelHeightIn * 96.0);
+        var fixedPage = new System.Windows.Documents.FixedPage
+        {
+            Width = pageWidth,
+            Height = pageHeight,
+            Background = Brushes.White
+        };
+
+        var image = new Image
+        {
+            Source = preview,
+            Width = pageWidth,
+            Height = pageHeight,
+            Stretch = Stretch.Fill
+        };
+        System.Windows.Documents.FixedPage.SetLeft(image, 0);
+        System.Windows.Documents.FixedPage.SetTop(image, 0);
+        fixedPage.Children.Add(image);
+
+        var pageContent = new System.Windows.Documents.PageContent();
+        ((System.Windows.Markup.IAddChild)pageContent).AddChild(fixedPage);
+
+        var document = new System.Windows.Documents.FixedDocument();
+        document.DocumentPaginator.PageSize = new Size(pageWidth, pageHeight);
+        document.Pages.Add(pageContent);
+        return document;
+    }
+
     private void QrGenerator_TextChanged(object sender, TextChangedEventArgs e)
     {
         if (_qrGenSyncing) return;
@@ -1546,7 +1736,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var marginY = ParseIntOrDefault(QrGenMarginY.Text, 24, 0, 2000);
         var moduleDots = ParseIntOrDefault(QrGenModuleDots.Text, 4, 1, 40);
         var quietZone = ParseIntOrDefault(QrGenQuietZone.Text, 4, 0, 20);
-        var barcodeHeight = ParseIntOrDefault(QrGenBarcodeHeight.Text, 120, 20, 3000);
+        var barcodeHeight = ParseIntOrDefault(QrGenBarcodeHeight.Text, 120, 20, 1200);
 
         var isQr = QrGenTypeQr.IsChecked == true;
         var includeText = QrGenIncludeText.IsChecked == true;
@@ -1603,7 +1793,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 var barMatrix = writer.encode(payload, BarcodeFormat.CODE_128, maxCodeWidth, barcodeHeight, hints);
                 var drawWidth = Math.Min(maxCodeWidth, barMatrix.Width);
                 var drawHeight = Math.Min(maxCodeHeight, barMatrix.Height);
-
                 var offsetX = marginX + Math.Max(0, (maxCodeWidth - drawWidth) / 2);
                 var offsetY = marginY + Math.Max(0, (maxCodeHeight - drawHeight) / 2);
 
@@ -1727,7 +1916,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void ShippingSupplys_Add(object sender, RoutedEventArgs e)
     {
-        var entry = new ShippingSupplyEntry { Dimensions = "New box", Bundle = 0, Single = 0 };
+        var entry = new ShippingSupplyEntry { Dimensions = "New box", Bundle = 0, Single = 0, StockThreshold = 0 };
         _ = _hub.ShippingSupplys.UpsertAsync(entry);
         Touch();
         ShippingSupplysGrid.ScrollIntoView(entry);
@@ -1911,19 +2100,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
             Process.Start(psi);
             DevCdpStatus = $"Launched debug {DevBrowserKind} on port {debugPort}. Refreshing tabs...";
-            AddDevCdpLog($"Launched {DevBrowserKind}: {browserExe}");
-            AddDevCdpLog($"Using browser data: {userDataDir} / {profileName}");
-
-            // Wait until endpoint is up, then refresh tabs.
-            bool endpointUp = await WaitForDebugEndpointAsync(DevChromeEndpoint);
-            if (!endpointUp)
-            {
-                DevCdpStatus = "Browser launched, but debug endpoint is not reachable.";
-                AddDevCdpLog($"Endpoint did not open: {DevChromeEndpoint}");
-                AddDevCdpLog("Tip: close all browser windows and relaunch from CT-Hub.");
-                return;
-            }
-
+            AddDevCdpLog($"Launched debug {DevBrowserKind} on port {debugPort}. Refreshing tabs...");
             await ReloadDevCdpTabsAsync(autoConnect: true);
         }
         catch (Exception ex)
@@ -2524,6 +2701,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         await LoadPdfOverridesAsync(row.Name);
         await RenderPdfPreviewAsync(folder, row.Name);
+
+        if (_pdfEditorIsWebMode)
+            await NavigatePdfEditorWebViewAsync(row.Name);
     }
 
     private async Task LoadPdfOverridesAsync(string filename)
@@ -2636,7 +2816,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var sldSpacingY  = GetSpacingYSlider();
         var txtSpacingX  = GetSpacingXTextBox();
         var txtSpacingY  = GetSpacingYTextBox();
-        SetSliderAndText(SldSizeY, TxtSizeY, 175);
+        SetSliderAndText(SldSizeY, TxtSizeY, 100);
         SetSliderAndText(SldSizeX, TxtSizeX, 100);
         SetSliderAndText(SldZoomX, TxtZoomX, 100);
         SetSliderAndText(SldZoomY, TxtZoomY, 100);
@@ -2651,12 +2831,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
         if (sldSpacingY is not null && txtSpacingY is not null)
             SetSliderAndText(sldSpacingY, txtSpacingY, 100);
-        TxtFont.Text      = string.Empty;
+        TxtFont.Text      = "Verdana";
         ChkBold.IsChecked = false;
-        _runOverrides.Clear();
-        RunOverridesGrid.ItemsSource = _runOverrides;
         _pdfEditorSyncing = false;
         RefreshPdfEditorSurface();
+    }
+
+    private void PdfEditorResetDefaults_Click(object sender, RoutedEventArgs e)
+    {
+        ResetEditorToDefaults();
     }
 
     private void SetSliderAndText(Slider sld, TextBox txt, double value)
@@ -2718,6 +2901,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             _pdfEditorSyncing = false;
         }
+
+        if (tb == TxtZoomX || tb == TxtZoomY)
+            _ = CaptureWebViewViewportReferenceAsync();
 
         RefreshPdfEditorSurface();
     }
@@ -2817,21 +3003,324 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         RefreshPdfEditorSurface();
     }
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
+
+    private System.Windows.Controls.Primitives.Popup? _webZoomPopup;
+    private System.Windows.Controls.TextBlock? _webZoomLabel;
+    private System.Windows.Threading.DispatcherTimer? _webZoomTimer;
+    private System.Windows.Threading.DispatcherTimer? _pdfLayoutTimer;
+
+    private void EnsureWebZoomPopup()
+    {
+        if (_webZoomPopup is not null) return;
+        if (PdfEditorScroll is null || PdfEditorWebView is null)
+            return;
+
+        _webZoomLabel = new System.Windows.Controls.TextBlock
+        {
+            Foreground = System.Windows.Media.Brushes.White,
+            FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+            FontSize = 16,
+            FontWeight = FontWeights.Bold
+        };
+        var border = new System.Windows.Controls.Border
+        {
+            Background = new System.Windows.Media.SolidColorBrush(
+                System.Windows.Media.Color.FromArgb(0xCC, 0x0D, 0x0D, 0x0D)),
+            BorderBrush = new System.Windows.Media.SolidColorBrush(
+                System.Windows.Media.Color.FromArgb(0x44, 0xFF, 0xFF, 0xFF)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(12, 6, 12, 6),
+            Child = _webZoomLabel
+        };
+        _webZoomPopup = new System.Windows.Controls.Primitives.Popup
+        {
+            AllowsTransparency = true,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.RelativePoint,
+            PlacementTarget = PdfEditorScroll,
+            HorizontalOffset = 16,
+            VerticalOffset = 16,
+            IsHitTestVisible = false,
+            Child = border
+        };
+        _webZoomPopup.Opened += (_, _) =>
+        {
+            if (System.Windows.PresentationSource.FromVisual(_webZoomPopup.Child)
+                is System.Windows.Interop.HwndSource src)
+                SetWindowPos(src.Handle, new IntPtr(-1), 0, 0, 0, 0, 0x0003);
+        };
+    }
+
+    private void PositionWebZoomPopup()
+    {
+        if (_webZoomPopup is null)
+            return;
+
+        FrameworkElement target = _pdfEditorIsWebMode ? PdfEditorWebView : PdfEditorScroll;
+        _webZoomPopup.PlacementTarget = target;
+        var hostHeight = target.ActualHeight;
+        _webZoomPopup.HorizontalOffset = 16;
+        _webZoomPopup.VerticalOffset = Math.Max(16, hostHeight - 52);
+    }
+
+    private void ShowWebZoomPopup(string label)
+    {
+        EnsureWebZoomPopup();
+        if (_webZoomPopup is null || _webZoomLabel is null)
+            return;
+
+        _webZoomLabel!.Text = label;
+        PositionWebZoomPopup();
+        _webZoomPopup!.IsOpen = true;
+        _webZoomTimer?.Stop();
+        _webZoomTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1500) };
+        _webZoomTimer.Tick += (_, _) => { _webZoomPopup.IsOpen = false; _webZoomTimer?.Stop(); };
+        _webZoomTimer.Start();
+    }
+
+    private void ShowWebZoomPopup(int pct)
+    {
+        ShowWebZoomPopup($"{pct}%");
+    }
+
+    private void ShowPdfLayoutIndicator(string label, FrameworkElement? anchor = null, bool autoHide = false)
+    {
+        if (PdfEditorResizeIndicatorBorder is null || PdfEditorResizeIndicatorText is null)
+            return;
+
+        PdfEditorResizeIndicatorText.Text = label;
+        PdfEditorResizeIndicatorBorder.Visibility = Visibility.Visible;
+        PositionPdfLayoutIndicator(anchor);
+        _pdfLayoutTimer?.Stop();
+
+        if (!autoHide)
+            return;
+
+        _pdfLayoutTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
+        _pdfLayoutTimer.Tick += (_, _) =>
+        {
+            if (PdfEditorResizeIndicatorBorder is not null)
+                PdfEditorResizeIndicatorBorder.Visibility = Visibility.Collapsed;
+            _pdfLayoutTimer?.Stop();
+        };
+        _pdfLayoutTimer.Start();
+    }
+
+    private void PositionPdfLayoutIndicator(FrameworkElement? anchor)
+    {
+        if (anchor is null || PdfEditorResizeIndicatorBorder is null)
+            return;
+
+        if (PdfEditorResizeIndicatorBorder.Parent is not Canvas indicatorLayer)
+            return;
+
+        PdfEditorResizeIndicatorBorder.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var desired = PdfEditorResizeIndicatorBorder.DesiredSize;
+        var center = anchor.TranslatePoint(
+            new Point(anchor.ActualWidth / 2, anchor.ActualHeight / 2),
+            indicatorLayer);
+
+        var left = center.X - (desired.Width / 2);
+        var top = center.Y - (desired.Height / 2);
+        var maxLeft = Math.Max(0, indicatorLayer.ActualWidth - desired.Width);
+        var maxTop = Math.Max(0, indicatorLayer.ActualHeight - desired.Height);
+
+        Canvas.SetLeft(PdfEditorResizeIndicatorBorder, Math.Clamp(left, 0, maxLeft));
+        Canvas.SetTop(PdfEditorResizeIndicatorBorder, Math.Clamp(top, 0, maxTop));
+    }
+
+    private static string FormatSplitLabel(double firstRatio)
+    {
+        var firstPct = (int)Math.Round(firstRatio * 100);
+        firstPct = Math.Clamp(firstPct, 0, 100);
+        return $"{firstPct}% / {100 - firstPct}%";
+    }
+
+    private double GetPdfEditorFileListRatio()
+    {
+        var total = PdfEditorFileListRow.ActualHeight + PdfEditorWorkspaceRow.ActualHeight;
+        if (total <= 0)
+            return 0.5;
+        return Math.Clamp(PdfEditorFileListRow.ActualHeight / total, 0.1, 0.9);
+    }
+
+    private double GetPdfEditorPanelRatio()
+    {
+        var total = PdfEditorSettingsColumn.ActualWidth + PdfEditorPreviewColumn.ActualWidth;
+        if (total <= 0)
+            return 0.5;
+        return Math.Clamp(PdfEditorSettingsColumn.ActualWidth / total, 0.1, 0.9);
+    }
+
+    private void ApplySavedPdfEditorLayout()
+    {
+        if (PdfEditorTabGrid is null || PdfEditorSurfaceGrid is null)
+            return;
+
+        _applyingPdfEditorLayout = true;
+        try
+        {
+            var fileListRatio = _settings.PdfEditorFileListRatio;
+            if (fileListRatio > 0 && fileListRatio < 1)
+            {
+                PdfEditorFileListRow.Height = new GridLength(fileListRatio, GridUnitType.Star);
+                PdfEditorWorkspaceRow.Height = new GridLength(1 - fileListRatio, GridUnitType.Star);
+            }
+
+            var panelRatio = _settings.PdfEditorPanelRatio;
+            if (panelRatio > 0 && panelRatio < 1)
+            {
+                PdfEditorSettingsColumn.Width = new GridLength(panelRatio, GridUnitType.Star);
+                PdfEditorPreviewColumn.Width = new GridLength(1 - panelRatio, GridUnitType.Star);
+            }
+        }
+        finally
+        {
+            _applyingPdfEditorLayout = false;
+        }
+    }
+
+    private void SavePdfEditorLayout()
+    {
+        if (_applyingPdfEditorLayout)
+            return;
+
+        _settings.PdfEditorFileListRatio = GetPdfEditorFileListRatio();
+        _settings.PdfEditorPanelRatio = GetPdfEditorPanelRatio();
+        _settings.Save();
+    }
+
+    private void PdfEditorRowSplitter_DragStarted(object sender, DragStartedEventArgs e)
+    {
+        ShowPdfLayoutIndicator(FormatSplitLabel(GetPdfEditorFileListRatio()), sender as FrameworkElement);
+    }
+
+    private void PdfEditorRowSplitter_DragDelta(object sender, DragDeltaEventArgs e)
+    {
+        ShowPdfLayoutIndicator(FormatSplitLabel(GetPdfEditorFileListRatio()), sender as FrameworkElement);
+    }
+
+    private void PdfEditorRowSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        var ratio = GetPdfEditorFileListRatio();
+        PdfEditorFileListRow.Height = new GridLength(ratio, GridUnitType.Star);
+        PdfEditorWorkspaceRow.Height = new GridLength(1 - ratio, GridUnitType.Star);
+        SavePdfEditorLayout();
+        ShowPdfLayoutIndicator(FormatSplitLabel(ratio), sender as FrameworkElement, autoHide: true);
+    }
+
+    private void PdfEditorColumnSplitter_DragStarted(object sender, DragStartedEventArgs e)
+    {
+        ShowPdfLayoutIndicator(FormatSplitLabel(GetPdfEditorPanelRatio()), sender as FrameworkElement);
+    }
+
+    private void PdfEditorColumnSplitter_DragDelta(object sender, DragDeltaEventArgs e)
+    {
+        ShowPdfLayoutIndicator(FormatSplitLabel(GetPdfEditorPanelRatio()), sender as FrameworkElement);
+    }
+
+    private void PdfEditorColumnSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        var ratio = GetPdfEditorPanelRatio();
+        PdfEditorSettingsColumn.Width = new GridLength(ratio, GridUnitType.Star);
+        PdfEditorPreviewColumn.Width = new GridLength(1 - ratio, GridUnitType.Star);
+        SavePdfEditorLayout();
+        ShowPdfLayoutIndicator(FormatSplitLabel(ratio), sender as FrameworkElement, autoHide: true);
+    }
+
+    private Task PushWebZoomFactorToReader()
+    {
+        if (!_pdfEditorIsWebMode || PdfEditorWebView?.CoreWebView2 is null)
+            return Task.CompletedTask;
+
+        var zoom = _pdfEditorWebZoomFactor.ToString("0.####", CultureInfo.InvariantCulture);
+        return PdfEditorWebView.ExecuteScriptAsync(
+            $"window._readerSetHostZoomFactor && window._readerSetHostZoomFactor({zoom});");
+    }
+
+    private async Task CaptureWebViewViewportReferenceAsync()
+    {
+        if (!_pdfEditorIsWebMode || PdfEditorWebView?.CoreWebView2 is null)
+            return;
+
+        try
+        {
+            await PdfEditorWebView.ExecuteScriptAsync(
+                "window._readerCaptureViewportReference && window._readerCaptureViewportReference();");
+        }
+        catch
+        {
+            // Ignore navigation timing issues; the reader will establish a baseline on render.
+        }
+    }
+
+    private async Task NavigatePdfEditorWebViewAsync(string filename)
+    {
+        if (!_pdfEditorIsWebMode || string.IsNullOrWhiteSpace(filename))
+            return;
+
+        await PdfEditorWebView.EnsureCoreWebView2Async();
+        PdfEditorWebView.ZoomFactor = _pdfEditorWebZoomFactor;
+        PdfEditorWebView.CoreWebView2.WebMessageReceived -= OnWebZoomMessage;
+        PdfEditorWebView.CoreWebView2.WebMessageReceived += OnWebZoomMessage;
+        PdfEditorWebView.ZoomFactorChanged -= OnWebViewZoomFactorChanged;
+        PdfEditorWebView.ZoomFactorChanged += OnWebViewZoomFactorChanged;
+        PdfEditorWebView.CoreWebView2.NavigationCompleted -= OnPdfEditorWebViewNavigated;
+        PdfEditorWebView.CoreWebView2.NavigationCompleted += OnPdfEditorWebViewNavigated;
+        PdfEditorWebView.Source = new Uri(
+            $"http://localhost:{HubServer.Port}/reader.html?file={Uri.EscapeDataString(filename)}");
+    }
+
     private async void PdfEditorWebMode_Click(object sender, RoutedEventArgs e)
     {
         _pdfEditorIsWebMode = !_pdfEditorIsWebMode;
         PdfEditorScroll.Visibility = _pdfEditorIsWebMode ? Visibility.Collapsed : Visibility.Visible;
         PdfEditorWebView.Visibility = _pdfEditorIsWebMode ? Visibility.Visible : Visibility.Collapsed;
+        if (!_pdfEditorIsWebMode) { if (_webZoomPopup is not null) _webZoomPopup.IsOpen = false; }
 
         if (_pdfEditorIsWebMode && !string.IsNullOrEmpty(_pdfEditorCurrentFile))
-        {
-            await PdfEditorWebView.EnsureCoreWebView2Async();
-            PdfEditorWebView.CoreWebView2.NavigationCompleted += OnPdfEditorWebViewNavigated;
-            PdfEditorWebView.Source = new Uri(
-                $"http://localhost:{HubServer.Port}/reader.html?file={Uri.EscapeDataString(_pdfEditorCurrentFile)}");
-        }
+            await NavigatePdfEditorWebViewAsync(_pdfEditorCurrentFile);
 
         UpdatePdfEditorModeUi();
+    }
+
+    private void OnWebViewZoomFactorChanged(object? sender, object e)
+    {
+        _pdfEditorWebZoomFactor = PdfEditorWebView.ZoomFactor;
+        _ = PushWebZoomFactorToReader();
+        var pct = (int)Math.Round(_pdfEditorWebZoomFactor * 100);
+        Dispatcher.Invoke(() => ShowWebZoomPopup(pct));
+    }
+
+    private void OnWebZoomMessage(object? sender, Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        try
+        {
+            var outer = System.Text.Json.JsonDocument.Parse(e.WebMessageAsJson).RootElement;
+            var inner = outer.ValueKind == System.Text.Json.JsonValueKind.String
+                ? outer.GetString()!
+                : e.WebMessageAsJson;
+            using var doc = System.Text.Json.JsonDocument.Parse(inner);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("type", out var t) && t.GetString() == "ctrlscroll"
+                && root.TryGetProperty("delta", out var d))
+            {
+                const double step = 0.1;
+                var dir = d.GetInt32();
+                Dispatcher.Invoke(() =>
+                {
+                    var next = Math.Round(PdfEditorWebView.ZoomFactor + dir * step, 2);
+                    next = Math.Clamp(next, PdfEditorWebZoomMin, PdfEditorWebZoomMax);
+                    _pdfEditorWebZoomFactor = next;
+                    PdfEditorWebView.ZoomFactor = next;
+                    _ = PushWebZoomFactorToReader();
+                    ShowWebZoomPopup((int)Math.Round(_pdfEditorWebZoomFactor * 100));
+                });
+            }
+        }
+        catch { }
     }
 
     private async void OnPdfEditorWebViewNavigated(object? sender, CoreWebView2NavigationCompletedEventArgs e)
@@ -2849,7 +3338,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var txtSpacingX = GetSpacingXTextBox();
         var txtSpacingY = GetSpacingYTextBox();
 
-        double sizeY    = ParsePercentOrDefault(TxtSizeY?.Text, 175) / 100.0;
+        double sizeY    = ParsePercentOrDefault(TxtSizeY?.Text, 100) / 100.0;
         double sizeX    = ParsePercentOrDefault(TxtSizeX?.Text, 100) / 100.0;
         double zoomX    = ParsePercentOrDefault(TxtZoomX?.Text, 100) / 100.0;
         double zoomY    = ParsePercentOrDefault(TxtZoomY?.Text, 100) / 100.0;
@@ -2873,25 +3362,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var json = JsonSerializer.Serialize(bundle);
         var jsJson = json.Replace("\\", "\\\\").Replace("'", "\\'");
         await PdfEditorWebView.ExecuteScriptAsync(
-            $"window._readerApplySettings && window._readerApplySettings(JSON.parse('{jsJson}'))");
+            $"window._readerSetHostZoomFactor && window._readerSetHostZoomFactor({_pdfEditorWebZoomFactor.ToString("0.####", CultureInfo.InvariantCulture)});window._readerApplySettings && window._readerApplySettings(JSON.parse('{jsJson}'))");
     }
 
     private async void PdfEditorSave_Click(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrEmpty(_pdfEditorCurrentFile)) return;
 
-        var payload = BuildOverridesPayload();
-        var json    = JsonSerializer.Serialize(payload,
-            new JsonSerializerOptions { WriteIndented = true });
-
         try
         {
-            using var http    = new System.Net.Http.HttpClient();
-            var url           = $"http://localhost:{HubServer.Port}/api/pdf-overrides/{Uri.EscapeDataString(_pdfEditorCurrentFile)}";
-            var content       = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
-            var response      = await http.PostAsync(url, content);
+            var response = await SavePdfGlobalOverridesAsync(_pdfEditorCurrentFile);
             StatusText = response.IsSuccessStatusCode
-                ? $"Saved: {_pdfEditorCurrentFile}"
+                ? $"Saved global settings: {_pdfEditorCurrentFile}"
                 : $"Save failed: {(int)response.StatusCode}";
         }
         catch (Exception ex)
@@ -2900,13 +3382,102 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
 
-    private object BuildOverridesPayload()
+    private async void PdfEditorSaveAll_Click(object sender, RoutedEventArgs e)
+    {
+        if (PdfFileRows.Count == 0)
+        {
+            StatusText = "Save all skipped: no PDF files are loaded.";
+            return;
+        }
+
+        var savedCount = 0;
+        var failed = new List<string>();
+
+        foreach (var row in PdfFileRows)
+        {
+            if (string.IsNullOrWhiteSpace(row?.Name))
+                continue;
+
+            try
+            {
+                var response = await SavePdfGlobalOverridesAsync(row.Name);
+                if (response.IsSuccessStatusCode)
+                {
+                    savedCount++;
+                }
+                else
+                {
+                    failed.Add($"{row.Name} ({(int)response.StatusCode})");
+                }
+            }
+            catch (Exception ex)
+            {
+                failed.Add($"{row.Name} ({ex.Message})");
+            }
+        }
+
+        if (failed.Count == 0)
+        {
+            StatusText = $"Saved global settings for {savedCount} PDF file(s).";
+            return;
+        }
+
+        var failedPreview = string.Join(", ", failed.Take(3));
+        if (failed.Count > 3)
+            failedPreview += ", ...";
+
+        StatusText = $"Save all finished: {savedCount} saved, {failed.Count} failed. {failedPreview}";
+    }
+
+    private async Task<HttpResponseMessage> SavePdfGlobalOverridesAsync(string filename)
+    {
+        var json = await BuildGlobalOverridesJsonAsync(filename);
+        return await SavePdfOverridesAsync(filename, json);
+    }
+
+    private async Task<HttpResponseMessage> SavePdfOverridesAsync(string filename, string json)
+    {
+        using var http = new System.Net.Http.HttpClient();
+        var url = $"http://localhost:{HubServer.Port}/api/pdf-overrides/{Uri.EscapeDataString(filename)}";
+        using var content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        return await http.PostAsync(url, content);
+    }
+
+    private async Task<string> BuildGlobalOverridesJsonAsync(string filename)
+    {
+        JsonNode? preservedRuns = null;
+
+        try
+        {
+            using var http = new System.Net.Http.HttpClient();
+            var url = $"http://localhost:{HubServer.Port}/api/pdf-overrides/{Uri.EscapeDataString(filename)}";
+            var response = await http.GetAsync(url);
+            if (response.IsSuccessStatusCode)
+            {
+                var existingJson = await response.Content.ReadAsStringAsync();
+                if (!string.IsNullOrWhiteSpace(existingJson))
+                {
+                    var existingRoot = JsonNode.Parse(existingJson) as JsonObject;
+                    preservedRuns = existingRoot?["runs"]?.DeepClone();
+                }
+            }
+        }
+        catch
+        {
+            preservedRuns = null;
+        }
+
+        var payload = BuildGlobalOverridesPayload(preservedRuns);
+        return payload.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    private JsonObject BuildGlobalOverridesPayload(JsonNode? preservedRuns = null)
     {
         var txtPageSizeX = GetPageSizeXTextBox();
         var txtPageSizeY = GetPageSizeYTextBox();
         var txtSpacingX  = GetSpacingXTextBox();
         var txtSpacingY  = GetSpacingYTextBox();
-        double sizeY     = double.TryParse(TxtSizeY.Text, out var v1)  ? v1 / 100.0 : 1.75;
+        double sizeY     = double.TryParse(TxtSizeY.Text, out var v1)  ? v1 / 100.0 : 1.0;
         double sizeX     = double.TryParse(TxtSizeX.Text, out var v2)  ? v2 / 100.0 : 1.0;
         double zoomX     = double.TryParse(TxtZoomX.Text, out var v3)  ? v3 / 100.0 : 1.0;
         double zoomY     = double.TryParse(TxtZoomY.Text, out var v4)  ? v4 / 100.0 : 1.0;
@@ -2915,32 +3486,27 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         double spacingX  = double.TryParse(txtSpacingX?.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var v7) ? v7 : 0.0;
         double spacingY  = double.TryParse(txtSpacingY?.Text, out var v8)  ? v8 / 100.0 : 1.0;
 
-        var runsDict = new Dictionary<string, object>();
-        foreach (RunOverrideRow row in _runOverrides)
-            runsDict[$"p{row.Page}:r{row.RunIndex}"] = new
-            {
-                dx        = row.NudgeX,
-                dy        = row.NudgeY,
-                sizeScale = row.SizeScale / 100.0
-            };
-
-        return new
+        var payload = new JsonObject
         {
-            global = new
+            ["global"] = new JsonObject
             {
-                textSizeY    = sizeY,
-                textSizeX    = sizeX,
-                pageZoomX    = zoomX,
-                pageZoomY    = zoomY,
-                pageSizeX    = pageSizeX,
-                pageSizeY    = pageSizeY,
-                textSpacingX = spacingX,
-                textSpacingY = spacingY,
-                forceBold    = ChkBold.IsChecked == true,
-                fontOverride = TxtFont.Text.Trim()
-            },
-            runs = runsDict
+                ["textSizeY"] = sizeY,
+                ["textSizeX"] = sizeX,
+                ["pageZoomX"] = zoomX,
+                ["pageZoomY"] = zoomY,
+                ["pageSizeX"] = pageSizeX,
+                ["pageSizeY"] = pageSizeY,
+                ["textSpacingX"] = spacingX,
+                ["textSpacingY"] = spacingY,
+                ["forceBold"] = ChkBold.IsChecked == true,
+                ["fontOverride"] = TxtFont.Text.Trim()
+            }
         };
+
+        if (preservedRuns is not null)
+            payload["runs"] = preservedRuns;
+
+        return payload;
     }
 
     private async Task RenderPdfPreviewAsync(string folder, string filename)
@@ -3037,7 +3603,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
             double zoomX = Math.Clamp(ParsePercentOrDefault(TxtZoomX?.Text, 100), 10, 1000) / 100.0;
             double zoomY = Math.Clamp(ParsePercentOrDefault(TxtZoomY?.Text, 100), 10, 1000) / 100.0;
-            double sizeY = Math.Clamp(ParsePercentOrDefault(TxtSizeY?.Text, 175), 10, 1000) / 100.0;
+            double sizeY = Math.Clamp(ParsePercentOrDefault(TxtSizeY?.Text, 100), 10, 1000) / 100.0;
             double sizeX = Math.Clamp(ParsePercentOrDefault(TxtSizeX?.Text, 100), 10, 1000) / 100.0;
 
             var visual = new DrawingVisual();
@@ -3095,7 +3661,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     double maxX = Math.Max(0, width - runText.Width);
                     double maxY = Math.Max(0, height - runText.Height);
                     drawX = Math.Clamp(drawX, 0, maxX);
-                    drawY = Math.Clamp(drawY, 0, maxY);
+                        drawY = Math.Clamp(drawY, 0, maxY);
 
                     if (Math.Abs(sizeX - 1.0) > 0.001)
                     {
@@ -3183,7 +3749,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         // Visual guide only: this does not rewrite PDF text yet.
         double sizeX = Math.Clamp(ParsePercentOrDefault(TxtSizeX?.Text, 100), 10, 1000) / 100.0;
-        double sizeY = Math.Clamp(ParsePercentOrDefault(TxtSizeY?.Text, 175), 10, 1000) / 100.0;
+        double sizeY = Math.Clamp(ParsePercentOrDefault(TxtSizeY?.Text, 100), 10, 1000) / 100.0;
         double zoomX = Math.Clamp(ParsePercentOrDefault(TxtZoomX?.Text, 100), 10, 1000) / 100.0;
         double zoomY = Math.Clamp(ParsePercentOrDefault(TxtZoomY?.Text, 100), 10, 1000) / 100.0;
 

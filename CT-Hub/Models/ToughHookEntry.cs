@@ -18,4 +18,7 @@ public class ToughHookEntry
 
     [JsonPropertyName("qty")]
     public int Qty { get; set; } = 0;
+
+    [JsonPropertyName("stockThreshold")]
+    public int StockThreshold { get; set; } = 0;
 }

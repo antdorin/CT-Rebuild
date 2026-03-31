@@ -208,7 +208,7 @@
       -webkit-overflow-scrolling:touch;
       display:flex;
       align-items:flex-start;
-      justify-content:flex-start;
+      justify-content:center;
     }
     body.light-mode .text-view{background:transparent}
     .text-page{
@@ -479,8 +479,8 @@
       </div>
       <div class="panel-control">
         <label for="textSizeYRange">Text Size Y (Height)</label>
-        <input id="textSizeYRange" type="range" min="0.50" max="3.00" step="0.05" value="1.45" />
-        <div id="textSizeYValue" class="panel-value">145%</div>
+        <input id="textSizeYRange" type="range" min="0.50" max="3.00" step="0.05" value="1.00" />
+        <div id="textSizeYValue" class="panel-value">100%</div>
       </div>
       <div class="panel-control">
         <label for="textSizeXRange">Text Size X (Width)</label>
@@ -833,13 +833,33 @@
       const textViewSettings = {
         pageZoomX: parseFloat(localStorage.getItem('readerPageZoomX') || '1.00'),
         pageZoomY: parseFloat(localStorage.getItem('readerPageZoomY') || '1.00'),
-        textSizeY: parseFloat(localStorage.getItem('readerTextSizeY') || '1.45'),
+        textSizeY: parseFloat(localStorage.getItem('readerTextSizeY') || '1.00'),
         textSizeX: parseFloat(localStorage.getItem('readerTextSizeX') || '1.00'),
         textSpacingX: parseFloat(localStorage.getItem('readerTextSpacingX') || '0'),
         textSpacingY: parseFloat(localStorage.getItem('readerTextSpacingY') || '1'),
         forceBold: localStorage.getItem('readerForceBold') === '1',
         fontOverride: localStorage.getItem('readerFont') || ''
       };
+      const READER_VIEWPORT_BASE_WIDTH_KEY = 'readerViewportBaseWidth';
+      let hostZoomFactor = 0.5;
+      let referenceViewerWidth = parseFloat(localStorage.getItem(READER_VIEWPORT_BASE_WIDTH_KEY) || '0');
+
+      function getReferenceViewerWidth() {
+        if (Number.isFinite(referenceViewerWidth) && referenceViewerWidth > 0) return referenceViewerWidth;
+        const currentWidth = Math.max(1, viewerWrap?.clientWidth || 0);
+        referenceViewerWidth = currentWidth;
+        localStorage.setItem(READER_VIEWPORT_BASE_WIDTH_KEY, String(referenceViewerWidth));
+        return referenceViewerWidth;
+      }
+
+      function captureReferenceViewerWidth() {
+        const currentWidth = Math.max(1, viewerWrap?.clientWidth || 0);
+        if (!Number.isFinite(currentWidth) || currentWidth <= 0) return getReferenceViewerWidth();
+        referenceViewerWidth = currentWidth;
+        localStorage.setItem(READER_VIEWPORT_BASE_WIDTH_KEY, String(referenceViewerWidth));
+        return referenceViewerWidth;
+      }
+
       // Preload saved Google Font on startup
       textOverrideFonts.forEach(name => {
         if (textViewSettings.fontOverride.includes(name)) loadGoogleFont(name);
@@ -847,7 +867,7 @@
       const textCache = new Map();
       // Per-run overrides: key = `p${pageNum}:r${runIndex}`, value = { dx, dy, sizeScale }
       // Persisted per file in localStorage
-      const RUN_OVERRIDES_KEY = 'runOverrides:global';
+      const RUN_OVERRIDES_KEY = 'runOverrides:' + file;
       const runOverrides = new Map(
         Object.entries(JSON.parse(localStorage.getItem(RUN_OVERRIDES_KEY) || '{}'))
       );
@@ -1086,17 +1106,20 @@
           return;
         }
 
-        const wrapW = Math.max(1, viewerWrap.clientWidth);
-        // fitScale: base scale to fit PDF width to viewport
-        const fitScale = wrapW / Math.max(1, layout.bounds.width);
-        // Independent X and Y layout scales
+        const wrapW = Math.max(1, viewerWrap?.clientWidth || window.innerWidth);
+        const wrapH = Math.max(1, viewerWrap?.clientHeight || window.innerHeight);
+        // contain-fit: use the smaller of width-fit and height-fit so the whole page fits
+        const fitScaleW = wrapW / Math.max(1, layout.pageWidth);
+        const fitScaleH = wrapH / Math.max(1, layout.pageHeight);
+        const fitScale = Math.min(fitScaleW, fitScaleH);
+        // Independent X and Y layout scales — 1.00/1.00 is now a neutral full-page fit
         const scaleX = fitScale * textViewSettings.pageZoomX;
         const scaleY = fitScale * textViewSettings.pageZoomY;
         // fontScaleY: controls font-size (glyph height); fontScaleX: applied via scaleX transform (glyph width)
         const fontScaleY = Math.sqrt(scaleX * scaleY) * textViewSettings.textSizeY;
         const fontScaleX = textViewSettings.textSizeX;
-        const outW = Math.max(1, Math.floor(layout.bounds.width * scaleX));
-        const outH = Math.max(1, Math.floor(layout.bounds.height * scaleY));
+        const outW = Math.max(1, Math.floor(layout.pageWidth * scaleX));
+        const outH = Math.max(1, Math.floor(layout.pageHeight * scaleY));
 
         const pageEl = document.createElement('div');
         pageEl.className = 'text-page';
@@ -1105,14 +1128,14 @@
 
         for (let ri = 0; ri < layout.runs.length; ri++) {
           const run = layout.runs[ri];
-          const overrideKey = 'r' + ri;
+          const overrideKey = 'p' + currentPage + ':r' + ri;
           const ov = runOverrides.get(overrideKey) || { dx: 0, dy: 0, sizeScale: 1 };
           const span = document.createElement('span');
           span.className = 'text-run';
           span.dataset.runKey = overrideKey;
           span.textContent = run.text;
-          const baseLeft = (run.left - layout.bounds.left) * scaleX;
-          const baseTop  = (run.top  - layout.bounds.top)  * scaleY * textViewSettings.textSpacingY;
+          const baseLeft = run.left * scaleX;
+          const baseTop  = run.top  * scaleY * textViewSettings.textSpacingY;
           const baseFs   = Math.max(6, run.fontSize * fontScaleY);
           span.dataset.origLeft     = baseLeft + 'px';
           span.dataset.origTop      = baseTop  + 'px';
@@ -1212,6 +1235,32 @@
         textView.appendChild(div);
       }
 
+      async function loadHubOverrides() {
+        try {
+          const resp = await fetch('/api/pdf-overrides/' + encodeURIComponent(file));
+          if (!resp.ok) return;
+          const data = await resp.json();
+          const bundle = {};
+          if (data && data.global) {
+            const g = data.global;
+            if (typeof g.textSizeY   === 'number')  bundle['readerTextSizeY']  = String(g.textSizeY);
+            if (typeof g.textSizeX   === 'number')  bundle['readerTextSizeX']  = String(g.textSizeX);
+            if (typeof g.pageZoomX   === 'number')  bundle['readerPageZoomX']  = String(g.pageZoomX);
+            if (typeof g.pageZoomY   === 'number')  bundle['readerPageZoomY']  = String(g.pageZoomY);
+            if (typeof g.forceBold   === 'boolean') bundle['readerForceBold']  = g.forceBold ? '1' : '0';
+            if (typeof g.fontOverride === 'string') bundle['readerFont']       = g.fontOverride;
+          }
+          applySettingsBundle(bundle);
+          runOverrides.clear();
+          if (data && data.runs && typeof data.runs === 'object') {
+            Object.entries(data.runs).forEach(([k, v]) => runOverrides.set(k, v));
+          }
+          saveRunOverrides();
+        } catch {
+          // fall back to localStorage defaults silently
+        }
+      }
+
       async function loadPdf() {
         showTextViewError('Loading\u2026');
         try {
@@ -1220,6 +1269,7 @@
           const loadingTask = pdfjsLib.getDocument({ url: src, withCredentials: false });
           pdfDoc = await loadingTask.promise;
           currentPage = 1;
+          await loadHubOverrides();
           updatePager();
           await renderPage();
           await buildPageList();
@@ -1233,6 +1283,7 @@
       }
 
       pageZoomXRange?.addEventListener('input', async () => {
+        captureReferenceViewerWidth();
         const next = Number(pageZoomXRange.value);
         if (!Number.isFinite(next)) return;
         textViewSettings.pageZoomX = Math.max(0.5, Math.min(3, next));
@@ -1242,6 +1293,7 @@
       });
 
       pageZoomYRange?.addEventListener('input', async () => {
+        captureReferenceViewerWidth();
         const next = Number(pageZoomYRange.value);
         if (!Number.isFinite(next)) return;
         textViewSettings.pageZoomY = Math.max(0.5, Math.min(3, next));
@@ -1453,8 +1505,7 @@
 
       const SETTINGS_KEYS = [
         'readerPageZoomX','readerPageZoomY','readerTextSizeY','readerTextSizeX',
-        'readerTextSpacingX','readerTextSpacingY','readerFont','readerForceBold',
-        'runOverrides:global'
+        'readerTextSpacingX','readerTextSpacingY','readerFont','readerForceBold'
       ];
 
       function applySettingsBundle(bundle) {
@@ -1465,16 +1516,12 @@
         // Reload in-memory settings
         textViewSettings.pageZoomX   = parseFloat(localStorage.getItem('readerPageZoomX')   || '1.00');
         textViewSettings.pageZoomY   = parseFloat(localStorage.getItem('readerPageZoomY')   || '1.00');
-        textViewSettings.textSizeY   = parseFloat(localStorage.getItem('readerTextSizeY')   || '1.45');
+        textViewSettings.textSizeY   = parseFloat(localStorage.getItem('readerTextSizeY')   || '1.00');
         textViewSettings.textSizeX   = parseFloat(localStorage.getItem('readerTextSizeX')   || '1.00');
         textViewSettings.textSpacingX= parseFloat(localStorage.getItem('readerTextSpacingX')|| '0');
         textViewSettings.textSpacingY= parseFloat(localStorage.getItem('readerTextSpacingY')|| '1');
         textViewSettings.forceBold   = localStorage.getItem('readerForceBold') === '1';
         textViewSettings.fontOverride= localStorage.getItem('readerFont') || '';
-        runOverrides.clear();
-        try {
-          Object.entries(JSON.parse(localStorage.getItem('runOverrides:global') || '{}')).forEach(([k,v]) => runOverrides.set(k, v));
-        } catch {}
         updateTextControlsUi();
         const fontSel = document.getElementById('fontPickerSelect');
         if (fontSel) fontSel.value = textViewSettings.fontOverride;
@@ -1513,6 +1560,8 @@
       document.getElementById('resetAllBtn')?.addEventListener('click', async () => {
         if (!confirm('Reset all reader settings and run edits to default?')) return;
         SETTINGS_KEYS.forEach(k => localStorage.removeItem(k));
+        localStorage.removeItem(READER_VIEWPORT_BASE_WIDTH_KEY);
+        referenceViewerWidth = 0;
         applySettingsBundle({});
         await renderPage();
       });
@@ -1595,6 +1644,11 @@
 
       // Expose live-settings API for Hub desktop integration.
       // Called via ExecuteScriptAsync when the Hub PDF editor settings change.
+      // These Hub callbacks are kept for API compatibility but are no-ops:
+      // fitScale now uses live viewport dimensions directly (no stored reference needed).
+      window._readerSetHostZoomFactor = function() {};
+      window._readerCaptureViewportReference = function() {};
+
       window._readerApplySettings = function(bundle) {
         applySettingsBundle(bundle);
         renderPage();
@@ -1602,6 +1656,15 @@
 
       updateTextControlsUi();
       await loadPdf();
+
+      // -- Intercept Ctrl+scroll, hand zoom control to WPF Hub -------------
+      window.addEventListener('wheel', e => {
+        if (!e.ctrlKey) return;
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 1 : -1;
+        try { window.chrome.webview.postMessage(JSON.stringify({ type: 'ctrlscroll', delta })); } catch {}
+      }, { passive: false });
+
     })();
   </script>
 </body>

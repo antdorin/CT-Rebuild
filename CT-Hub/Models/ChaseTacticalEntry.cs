@@ -13,6 +13,7 @@ public class ChaseTacticalEntry : INotifyPropertyChanged
     private string _classId = string.Empty;
     private string _label = string.Empty;
     private int _qty;
+    private int _stockThreshold;
     private string _notes = string.Empty;
 
     [JsonPropertyName("id")]
@@ -62,6 +63,13 @@ public class ChaseTacticalEntry : INotifyPropertyChanged
     {
         get => _qty;
         set => SetField(ref _qty, value);
+    }
+
+    [JsonPropertyName("stockThreshold")]
+    public int StockThreshold
+    {
+        get => _stockThreshold;
+        set => SetField(ref _stockThreshold, value);
     }
 
     [JsonPropertyName("notes")]

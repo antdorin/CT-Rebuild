@@ -26,6 +26,8 @@ public sealed class AppSettings
     public string DevBrowserProfileDirectory { get; set; } = "Default";
     public bool DevAutoConnectFirstTab { get; set; } = true;
     public bool DevUseProfileSnapshot { get; set; } = true;
+    public double PdfEditorFileListRatio { get; set; }
+    public double PdfEditorPanelRatio { get; set; }
 
     // ── Singleton ─────────────────────────────────────────────────────────────
 

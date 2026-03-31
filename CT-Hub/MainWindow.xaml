@@ -9,6 +9,8 @@
         Background="#1E1E1E">
 
     <Window.Resources>
+        <SolidColorBrush x:Key="DropDownTextBrush" Color="#303030"/>
+
         <!-- Shared DataGrid style -->
         <Style TargetType="DataGrid">
             <Setter Property="Background" Value="#252526"/>
@@ -86,6 +88,22 @@
             <Setter Property="FontFamily" Value="Consolas"/>
             <Setter Property="FontSize" Value="12"/>
         </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Foreground" Value="{StaticResource DropDownTextBrush}"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Padding" Value="6,3"/>
+            <Style.Resources>
+                <Style TargetType="TextBox">
+                    <Setter Property="Foreground" Value="{StaticResource DropDownTextBrush}"/>
+                </Style>
+            </Style.Resources>
+        </Style>
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Foreground" Value="{StaticResource DropDownTextBrush}"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
     </Window.Resources>
 
     <DockPanel LastChildFill="True">
@@ -150,7 +168,7 @@
                     <Border DockPanel.Dock="Top" Background="#252526" BorderBrush="#3C3C3C" BorderThickness="0,0,0,1" Padding="8,6">
                         <TextBox Style="{StaticResource SearchBox}"
                                  Text="{Binding ChaseSearchText, UpdateSourceTrigger=PropertyChanged}"
-                                 ToolTip="Search bin, label, qty, notes, id"/>
+                                 ToolTip="Search bin, label, qty, stock threshold, notes, id"/>
                     </Border>
                     <DataGrid x:Name="ChaseTacticalGrid"
                               ItemsSource="{Binding ChaseTacticalItems}"
@@ -178,6 +196,7 @@
                             <DataGridTextColumn Header="Class ID"    Binding="{Binding ClassId}"     Width="180" IsReadOnly="True"/>
                             <DataGridTextColumn Header="Label"       Binding="{Binding Label}"       Width="200"/>
                             <DataGridTextColumn Header="Qty"         Binding="{Binding Qty}"         Width="80"/>
+                            <DataGridTextColumn Header="Stock Threshhold" Binding="{Binding StockThreshold}" Width="130"/>
                             <DataGridTextColumn Header="Notes"       Binding="{Binding Notes}"       Width="*"/>
                             <DataGridTextColumn Header="ID"          Binding="{Binding Id}"          Width="220" IsReadOnly="True">
                                 <DataGridTextColumn.ElementStyle>
@@ -209,7 +228,7 @@
                     <Border DockPanel.Dock="Top" Background="#252526" BorderBrush="#3C3C3C" BorderThickness="0,0,0,1" Padding="8,6">
                         <TextBox Style="{StaticResource SearchBox}"
                                  Text="{Binding ToughHooksSearchText, UpdateSourceTrigger=PropertyChanged}"
-                                 ToolTip="Search bin, sku, description, qty, id"/>
+                                 ToolTip="Search bin, sku, description, qty, stock threshold, id"/>
                     </Border>
                     <DataGrid x:Name="ToughHooksGrid"
                               ItemsSource="{Binding ToughHookItems}"
@@ -226,6 +245,7 @@
                             <DataGridTextColumn Header="SKU"         Binding="{Binding Sku}"         Width="140"/>
                             <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*"/>
                             <DataGridTextColumn Header="Qty"         Binding="{Binding Qty}"         Width="80"/>
+                            <DataGridTextColumn Header="Stock Threshhold" Binding="{Binding StockThreshold}" Width="130"/>
                             <DataGridTextColumn Header="ID"          Binding="{Binding Id}"          Width="220" IsReadOnly="True">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock">
@@ -253,7 +273,7 @@
                     <Border DockPanel.Dock="Top" Background="#252526" BorderBrush="#3C3C3C" BorderThickness="0,0,0,1" Padding="8,6">
                         <TextBox Style="{StaticResource SearchBox}"
                                  Text="{Binding ShippingSupplysSearchText, UpdateSourceTrigger=PropertyChanged}"
-                                 ToolTip="Search dimensions, bundle, single, id"/>
+                                 ToolTip="Search dimensions, bundle, single, stock threshold, id"/>
                     </Border>
                     <DataGrid x:Name="ShippingSupplysGrid"
                               ItemsSource="{Binding ShippingSupplysItems}"
@@ -268,6 +288,7 @@
                             <DataGridTextColumn Header="Dimensions" Binding="{Binding Dimensions}" Width="*"/>
                             <DataGridTextColumn Header="Bundle"     Binding="{Binding Bundle}"     Width="120"/>
                             <DataGridTextColumn Header="Single"     Binding="{Binding Single}"     Width="120"/>
+                            <DataGridTextColumn Header="Stock Threshhold" Binding="{Binding StockThreshold}" Width="130"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </DockPanel>
@@ -292,6 +313,9 @@
                                 Content="✕  Delete"
                                 Click="QrMappings_Delete"/>
                         <Separator/>
+                        <Button Style="{StaticResource ToolbarButton}"
+                            Content="🖨  Print"
+                            Click="QrGenerator_Print"/>
                         <Button Style="{StaticResource ToolbarButton}"
                                 Content="Use Selected QR Value"
                                 Click="QrGenerator_UseSelected"/>
@@ -380,7 +404,7 @@
                                     <TextBlock Text="Printer DPI" Foreground="#9CDCFE"
                                                FontFamily="Consolas" FontSize="11" Margin="0,4,0,3"/>
                                     <ComboBox x:Name="QrGenDpi"
-                                              Background="#2A2A2A" Foreground="#D4D4D4"
+                                              Background="#2A2A2A" Foreground="{StaticResource DropDownTextBrush}"
                                               BorderBrush="#4A4A4A"
                                               SelectionChanged="QrGenerator_SelectionChanged">
                                         <ComboBoxItem Content="203"/>
@@ -391,7 +415,7 @@
                                     <TextBlock Text="Label Preset" Foreground="#9CDCFE"
                                                FontFamily="Consolas" FontSize="11" Margin="0,8,0,3"/>
                                     <ComboBox x:Name="QrGenPreset"
-                                              Background="#2A2A2A" Foreground="#D4D4D4"
+                                              Background="#2A2A2A" Foreground="{StaticResource DropDownTextBrush}"
                                               BorderBrush="#4A4A4A"
                                               SelectionChanged="QrGenerator_PresetChanged">
                                         <ComboBoxItem Content="4x6 Shipping (203 DPI)"/>
@@ -583,13 +607,13 @@
 
             <!-- ── PDF Editor ─────────────────────────────────────────────── -->
             <TabItem Header="PDF Editor">
-                <Grid>
+                <Grid x:Name="PdfEditorTabGrid">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="240" MinHeight="160"/>
+                        <RowDefinition x:Name="PdfEditorFileListRow" Height="240" MinHeight="160"/>
                         <RowDefinition Height="6"/>
-                        <RowDefinition Height="*"/>
+                        <RowDefinition x:Name="PdfEditorWorkspaceRow" Height="*"/>
                     </Grid.RowDefinitions>
 
                     <ToolBar Grid.Row="0" Background="#252526">
@@ -640,17 +664,27 @@
                         </DataGrid.Columns>
                     </DataGrid>
 
-                    <GridSplitter Grid.Row="3"
+                    <GridSplitter x:Name="PdfEditorRowSplitter"
+                                  Grid.Row="3"
                                   Height="6"
                                   HorizontalAlignment="Stretch"
                                   VerticalAlignment="Stretch"
                                   ResizeDirection="Rows"
+                                  DragStarted="PdfEditorRowSplitter_DragStarted"
+                                  DragDelta="PdfEditorRowSplitter_DragDelta"
+                                  DragCompleted="PdfEditorRowSplitter_DragCompleted"
                                   Background="#3C3C3C"/>
 
                     <DockPanel Grid.Row="4">
                         <Border DockPanel.Dock="Top" Background="#252526" BorderBrush="#3C3C3C"
                                 BorderThickness="0,0,0,1" Padding="10,8">
                             <DockPanel>
+                            <Button x:Name="PdfEditorSaveAllBtn"
+                                DockPanel.Dock="Right"
+                                Style="{StaticResource ToolbarButton}"
+                                Content="Save All"
+                                Margin="8,0,0,0"
+                                Click="PdfEditorSaveAll_Click"/>
                                 <Button x:Name="PdfEditorSaveBtn"
                                         DockPanel.Dock="Right"
                                         Style="{StaticResource ToolbarButton}"
@@ -686,11 +720,11 @@
                             </DockPanel>
                         </Border>
 
-                        <Grid>
+                        <Grid x:Name="PdfEditorSurfaceGrid">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition x:Name="PdfEditorSettingsColumn" Width="*"/>
                                 <ColumnDefinition Width="4"/>
-                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition x:Name="PdfEditorPreviewColumn" Width="*"/>
                             </Grid.ColumnDefinitions>
 
                             <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto"
@@ -705,7 +739,8 @@
                                                FontFamily="Consolas" FontSize="11" Margin="0,0,0,3"/>
                                     <ComboBox x:Name="TxtFont"
                                               IsEditable="True"
-                                              Background="#3C3C3C" Foreground="#999999"
+                                              Text="Verdana"
+                                              Background="#3C3C3C" Foreground="{StaticResource DropDownTextBrush}"
                                               BorderBrush="#555555"
                                               FontFamily="Consolas" FontSize="12"
                                               Margin="0,0,0,10"
@@ -738,9 +773,9 @@
                                         <TextBox x:Name="TxtSizeY" DockPanel.Dock="Right"
                                                  Width="60" Margin="8,0,0,0"
                                                  Style="{StaticResource SearchBox}"
-                                                 Text="175" TextChanged="GlobalSetting_Changed"/>
+                                                 Text="100" TextChanged="GlobalSetting_Changed"/>
                                         <Slider x:Name="SldSizeY" Minimum="50" Maximum="300"
-                                                Value="175" TickFrequency="5"
+                                                Value="100" TickFrequency="5"
                                                 ValueChanged="SldSizeY_ValueChanged"/>
                                     </DockPanel>
 
@@ -836,6 +871,13 @@
                                               Checked="GlobalSetting_Changed"
                                               Unchecked="GlobalSetting_Changed"/>
 
+                                        <Button Content="Reset To Default"
+                                            HorizontalAlignment="Right"
+                                            Margin="0,0,0,16"
+                                            Padding="14,6"
+                                            Style="{StaticResource ToolbarButton}"
+                                            Click="PdfEditorResetDefaults_Click"/>
+
                                     <TextBlock Text="RUN OVERRIDES"
                                                FontFamily="Consolas" FontSize="11" FontWeight="SemiBold"
                                                Foreground="#569CD6" Margin="0,0,0,10"/>
@@ -866,7 +908,11 @@
                                 </StackPanel>
                             </ScrollViewer>
 
-                            <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"
+                            <GridSplitter x:Name="PdfEditorColumnSplitter"
+                                          Grid.Column="1" Width="4" HorizontalAlignment="Stretch"
+                                          DragStarted="PdfEditorColumnSplitter_DragStarted"
+                                          DragDelta="PdfEditorColumnSplitter_DragDelta"
+                                          DragCompleted="PdfEditorColumnSplitter_DragCompleted"
                                           Background="#3C3C3C"/>
 
                             <Grid Grid.Column="2" Background="#111" ClipToBounds="True">
@@ -888,6 +934,24 @@
 
                         </Grid>
                     </DockPanel>
+
+                        <Canvas Grid.RowSpan="5"
+                            IsHitTestVisible="False"
+                            Panel.ZIndex="1000">
+                        <Border x:Name="PdfEditorResizeIndicatorBorder"
+                                Visibility="Collapsed"
+                                Padding="10,4"
+                                Background="#CC0D0D0D"
+                                BorderBrush="#44FFFFFF"
+                                BorderThickness="1"
+                                CornerRadius="6">
+                            <TextBlock x:Name="PdfEditorResizeIndicatorText"
+                                       Foreground="White"
+                                       FontFamily="Consolas"
+                                       FontSize="13"
+                                       FontWeight="Bold"/>
+                        </Border>
+                    </Canvas>
                 </Grid>
             </TabItem>
 
@@ -1053,7 +1117,7 @@
                                   ItemsSource="{Binding DevBrowserOptions}"
                                   SelectedItem="{Binding DevBrowserKind, UpdateSourceTrigger=PropertyChanged}"
                                   Background="#1E1E1E"
-                                  Foreground="#D4D4D4"
+                                  Foreground="{StaticResource DropDownTextBrush}"
                                   BorderBrush="#3C3C3C"
                                   BorderThickness="1"
                                   Margin="0,0,8,0"/>
@@ -1134,7 +1198,7 @@
                                       ItemsSource="{Binding DevDetectedBrowserProfiles}"
                                       Text="{Binding DevBrowserProfileDirectory, UpdateSourceTrigger=PropertyChanged}"
                                       Background="#1E1E1E"
-                                      Foreground="#D4D4D4"
+                                      Foreground="{StaticResource DropDownTextBrush}"
                                       BorderBrush="#3C3C3C"
                                       BorderThickness="1"
                                       Margin="0,0,8,0"/>
@@ -1154,7 +1218,7 @@
                                       ItemsSource="{Binding DevCdpTabs}"
                                       SelectedItem="{Binding DevSelectedCdpTab}"
                                       Background="#1E1E1E"
-                                      Foreground="#D4D4D4"
+                                      Foreground="{StaticResource DropDownTextBrush}"
                                       BorderBrush="#3C3C3C"
                                       BorderThickness="1"/>
                         </StackPanel>

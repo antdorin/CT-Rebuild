@@ -6,8 +6,10 @@
     "pageZoomY": 1,
     "pageSizeX": 1,
     "pageSizeY": 1,
+    "textSpacingX": 0,
+    "textSpacingY": 1,
     "forceBold": false,
-    "fontOverride": ""
+    "fontOverride": "Verdana"
   },
   "runs": {}
 }
