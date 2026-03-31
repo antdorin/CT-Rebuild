@@ -1,5 +1,4 @@
 import Foundation
-import UIKit
 import Combine
 
 // MARK: - Models
@@ -17,138 +16,8 @@ struct PdfMeta: Decodable {
     }
 }
 
-// MARK: - Word layout models (returned by /api/pdf-words/{filename})
-
-/// One word token with its PDF-space bounding box.
-/// Coordinates are bottom-left origin, Y increases upward (raw PDF space).
-struct HubWordBox: Decodable {
-    let text: String
-    let x0: Double
-    let y0: Double
-    let x1: Double
-    let y1: Double
-}
-
-struct HubPageWords: Decodable {
-    let page:   Int
-    let width:  Double
-    let height: Double
-    let words:  [HubWordBox]
-}
-
-struct HubWordDocument: Decodable {
-    let pages: [HubPageWords]
-}
-
 struct PdfContext: Decodable {
     let sourceCatalog: String
-}
-
-struct PdfOverrideGlobal: Codable, Equatable {
-    var textSizeY: Double
-    var textSizeX: Double
-    var pageZoomX: Double
-    var pageZoomY: Double
-    var pageSizeX: Double
-    var pageSizeY: Double
-    var forceBold: Bool
-    var fontOverride: String
-
-    static let defaults = PdfOverrideGlobal(
-        textSizeY: 1.75,
-        textSizeX: 1.0,
-        pageZoomX: 1.0,
-        pageZoomY: 1.0,
-        pageSizeX: 1.0,
-        pageSizeY: 1.0,
-        forceBold: false,
-        fontOverride: ""
-    )
-
-    init(
-        textSizeY: Double = 1.75,
-        textSizeX: Double = 1.0,
-        pageZoomX: Double = 1.0,
-        pageZoomY: Double = 1.0,
-        pageSizeX: Double = 1.0,
-        pageSizeY: Double = 1.0,
-        forceBold: Bool = false,
-        fontOverride: String = ""
-    ) {
-        self.textSizeY = textSizeY
-        self.textSizeX = textSizeX
-        self.pageZoomX = pageZoomX
-        self.pageZoomY = pageZoomY
-        self.pageSizeX = pageSizeX
-        self.pageSizeY = pageSizeY
-        self.forceBold = forceBold
-        self.fontOverride = fontOverride
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case textSizeY, textSizeX, pageZoomX, pageZoomY, pageSizeX, pageSizeY, forceBold, fontOverride
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        textSizeY = try container.decodeIfPresent(Double.self, forKey: .textSizeY) ?? 1.75
-        textSizeX = try container.decodeIfPresent(Double.self, forKey: .textSizeX) ?? 1.0
-        pageZoomX = try container.decodeIfPresent(Double.self, forKey: .pageZoomX) ?? 1.0
-        pageZoomY = try container.decodeIfPresent(Double.self, forKey: .pageZoomY) ?? 1.0
-        pageSizeX = try container.decodeIfPresent(Double.self, forKey: .pageSizeX) ?? 1.0
-        pageSizeY = try container.decodeIfPresent(Double.self, forKey: .pageSizeY) ?? 1.0
-        forceBold = try container.decodeIfPresent(Bool.self, forKey: .forceBold) ?? false
-        fontOverride = try container.decodeIfPresent(String.self, forKey: .fontOverride) ?? ""
-    }
-}
-
-struct PdfRunOverride: Codable, Equatable {
-    var dx: Double
-    var dy: Double
-    var sizeScale: Double
-
-    init(dx: Double = 0, dy: Double = 0, sizeScale: Double = 1.0) {
-        self.dx = dx
-        self.dy = dy
-        self.sizeScale = sizeScale
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case dx, dy, sizeScale
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        dx = try container.decodeIfPresent(Double.self, forKey: .dx) ?? 0
-        dy = try container.decodeIfPresent(Double.self, forKey: .dy) ?? 0
-        sizeScale = try container.decodeIfPresent(Double.self, forKey: .sizeScale) ?? 1.0
-    }
-}
-
-struct PdfOverridesPayload: Codable, Equatable {
-    var global: PdfOverrideGlobal
-    var runs: [String: PdfRunOverride]
-
-    static let empty = PdfOverridesPayload()
-
-    var hasEdits: Bool {
-        !runs.isEmpty || global != .defaults
-    }
-
-    init(global: PdfOverrideGlobal = .defaults, runs: [String: PdfRunOverride] = [:]) {
-        self.global = global
-        self.runs = runs
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case global, runs
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        global = try container.decodeIfPresent(PdfOverrideGlobal.self, forKey: .global) ?? .defaults
-        runs = try container.decodeIfPresent([String: PdfRunOverride].self, forKey: .runs) ?? [:]
-    }
 }
 
 enum SourceCatalog: String, Codable, CaseIterable, Identifiable {
@@ -365,9 +234,7 @@ final class HubClient: ObservableObject {
     /// Fetch name + last-modified for each PDF (server must support /api/pdfs/meta).
     func fetchPdfMeta() async throws -> [PdfMeta] {
         let url = try endpoint("/api/pdfs/meta")
-        let (data, response) = try await URLSession.shared.data(from: url)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode)
-        else { throw HubError.serverError }
+        let (data, _) = try await URLSession.shared.data(from: url)
         return try JSONDecoder().decode([PdfMeta].self, from: data)
     }
 
@@ -393,58 +260,6 @@ final class HubClient: ObservableObject {
         let url = try endpoint("/api/pdfs/context")
         let (data, _) = try await URLSession.shared.data(from: url)
         return try JSONDecoder().decode(PdfContext.self, from: data)
-    }
-
-    func fetchPdfOverrides(filename: String) async throws -> PdfOverridesPayload {
-        guard let encoded = filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
-        else { throw HubError.invalidFilename }
-
-        let url = try endpoint("/api/pdf-overrides/\(encoded)")
-        let (data, response) = try await URLSession.shared.data(from: url)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode)
-        else { throw HubError.serverError }
-        guard !data.isEmpty else { return .empty }
-
-        return (try? JSONDecoder().decode(PdfOverridesPayload.self, from: data)) ?? .empty
-    }
-
-    func fetchPdfWords(filename: String) async throws -> HubWordDocument {
-        guard let encoded = filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
-        else { throw HubError.invalidFilename }
-
-        let url = try endpoint("/api/pdf-words/\(encoded)")
-        let (data, response) = try await URLSession.shared.data(from: url)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200
-        else { throw HubError.serverError }
-        return try JSONDecoder().decode(HubWordDocument.self, from: data)
-    }
-
-    // MARK: - PDF page rendering (server-side)
-
-    struct PdfPageCount: Decodable { let pageCount: Int }
-
-    /// Returns the total page count for a PDF file on the Hub.
-    func fetchPdfPageCount(filename: String) async throws -> Int {
-        guard let encoded = filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
-        else { throw HubError.invalidFilename }
-        let url = try endpoint("/api/pdf-pages/\(encoded)")
-        let (data, response) = try await URLSession.shared.data(from: url)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200
-        else { throw HubError.serverError }
-        let result = try JSONDecoder().decode(PdfPageCount.self, from: data)
-        return result.pageCount
-    }
-
-    /// Downloads a single PDF page rendered as a JPEG image by the Hub.
-    func fetchPdfPageImage(filename: String, page: Int, scale: Double = 2.0) async throws -> UIImage {
-        guard let encoded = filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
-        else { throw HubError.invalidFilename }
-        let url = try endpoint("/api/pdf-render/\(encoded)?page=\(page)&scale=\(scale)")
-        let (data, response) = try await URLSession.shared.data(from: url)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
-              let image = UIImage(data: data)
-        else { throw HubError.serverError }
-        return image
     }
 
     func fetchChaseTactical() async throws -> [ChaseCatalogItem] {

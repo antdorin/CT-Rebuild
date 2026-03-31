@@ -22,8 +22,7 @@ struct AssignedItemModal: View {
 
     private var heroCode: String {
         if let record { return record.id }
-        let code = catalogLink?.linkCode.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return code.isEmpty ? ScanStore.defaultLinkCode : code
+        return catalogLink?.linkCode ?? "LINK"
     }
 
     private var scannedBarcode: String {

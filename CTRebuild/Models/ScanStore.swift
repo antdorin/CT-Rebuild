@@ -35,7 +35,6 @@ private struct PendingLinkWrite: Codable, Identifiable {
 final class ScanStore: ObservableObject {
 
     static let shared = ScanStore()
-    static let defaultLinkCode = "?-000"
 
     @Published private(set) var records: [BarcodeRecord] = []
     @Published private(set) var catalogLinks: [CatalogLinkCacheEntry] = []
@@ -132,7 +131,7 @@ final class ScanStore: ObservableObject {
                     sourceItemId: $0.sourceItemId,
                     sourceItemLabelSnapshot: $0.sourceItemLabelSnapshot,
                     scannedCode: $0.scannedCode,
-                    linkCode: normalizeLinkCode($0.linkCode),
+                    linkCode: $0.linkCode,
                     createdAtUtc: $0.createdAtUtc
                 )
             }
@@ -152,7 +151,7 @@ final class ScanStore: ObservableObject {
             sourceItemId: item.sourceItemId,
             sourceItemLabelSnapshot: "\(item.label) | \(item.subtitle)",
             scannedCode: scannedCode,
-            linkCode: Self.defaultLinkCode,
+            linkCode: "",
             createdAtUtc: ISO8601DateFormatter().string(from: Date())
         )
 
@@ -168,7 +167,7 @@ final class ScanStore: ObservableObject {
                     sourceItemId: payload.sourceItemId,
                     sourceItemLabelSnapshot: payload.sourceItemLabelSnapshot,
                     scannedCode: payload.scannedCode,
-                    linkCode: normalizeLinkCode(payload.linkCode),
+                    linkCode: payload.linkCode.isEmpty ? "PENDING" : payload.linkCode,
                     createdAtUtc: payload.createdAtUtc
                 )
             )
@@ -184,7 +183,7 @@ final class ScanStore: ObservableObject {
             sourceItemId: link.sourceItemId,
             sourceItemLabelSnapshot: link.sourceItemLabelSnapshot,
             scannedCode: newBarcode,
-            linkCode: Self.defaultLinkCode,
+            linkCode: "",
             createdAtUtc: ISO8601DateFormatter().string(from: Date())
         )
 
@@ -281,7 +280,7 @@ final class ScanStore: ObservableObject {
                 sourceItemId: record.sourceItemId,
                 sourceItemLabelSnapshot: record.sourceItemLabelSnapshot,
                 scannedCode: record.scannedCode,
-                linkCode: normalizeLinkCode(record.linkCode),
+                linkCode: record.linkCode,
                 createdAtUtc: record.createdAtUtc
             )
         )
@@ -298,10 +297,5 @@ final class ScanStore: ObservableObject {
               let catalog = SourceCatalog(rawValue: raw)
         else { return }
         activeTicketCatalog = catalog
-    }
-
-    private func normalizeLinkCode(_ linkCode: String?) -> String {
-        let trimmed = linkCode?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return trimmed.isEmpty ? Self.defaultLinkCode : trimmed
     }
 }

@@ -31,20 +31,51 @@ struct LeftPanelView: View {
     }
 
     var body: some View {
-        GeometryReader { _ in
+        GeometryReader { geo in
             ZStack {
-                if showMaterial {
+                // Background — only when content is visible
+                if !isPPOpen && showMaterial {
                     (PanelMaterialStyle(rawValue: materialStyleRaw) ?? .ultraThin).background()
                 }
-                if panelTintA > 0.001 {
+                if !isPPOpen && panelTintA > 0.001 {
                     Rectangle()
                         .fill(Color(red: panelTintR, green: panelTintG, blue: panelTintB, opacity: panelTintA))
                         .ignoresSafeArea()
                 }
 
+                // Grid content — below wheel in z-order
+                if !isPPOpen {
+                    leftPageContent(geo: geo)
+                        .transition(.pageTransition)
+                }
+
+                // Wheel picker — always on top
+                if isPPOpen {
+                    LeftWheelSelector(
+                        columnPage: $columnPage,
+                        isPPOpen: $isPPOpen,
+                        panelSize: geo.size,
+                        safeArea: safeArea,
+                        totalColumns: max(1, storedColumns),
+                        colNum: colNum,
+                        binQuantities: binStore.binQuantities
+                    )
+                    .transition(.opacity.animation(.easeInOut(duration: 0.2)))
+                }
             }
         }
         .ignoresSafeArea()
+        .onAppear {
+            if autoPickerLeft { isPPOpen = true }
+        }
+        .onDisappear {
+            isPPOpen = false
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .gestureActionFired)) { note in
+            guard let raw = note.userInfo?["action"] as? String,
+                  raw == GestureAction.openPagePicker.rawValue else { return }
+            withAnimation(.slideBck) { isPPOpen.toggle() }
+        }
     }
 
     // MARK: - Full page content (used both in-panel and as thumbnail source)
