@@ -1,0 +1,13 @@
+﻿{
+  "global": {
+    "textSizeY": 2.4,
+    "textSizeX": 1,
+    "pageZoomX": 0.5,
+    "pageZoomY": 1.08,
+    "pageSizeX": 1.32,
+    "pageSizeY": 0.99,
+    "forceBold": false,
+    "fontOverride": ""
+  },
+  "runs": {}
+}

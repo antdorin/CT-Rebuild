@@ -975,9 +975,8 @@
       }
 
       async function importPdfJs() {
-        const lib = await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
-        const worker = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
-        lib.GlobalWorkerOptions.workerSrc = worker;
+        const lib = await import('/pdf.min.mjs');
+        lib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
         return lib;
       }
 
@@ -1205,7 +1204,16 @@
         loadDocState();
       }
 
+      function showTextViewError(msg) {
+        textView.innerHTML = '';
+        const div = document.createElement('div');
+        div.style.cssText = 'padding:32px 24px;color:#f97316;font-size:15px;font-weight:700;line-height:1.5;white-space:pre-wrap;word-break:break-word;';
+        div.textContent = '\u26A0\uFE0F ' + msg;
+        textView.appendChild(div);
+      }
+
       async function loadPdf() {
+        showTextViewError('Loading\u2026');
         try {
           const pdfjsLib = await importPdfJs();
           const src = '/api/pdfs/' + encodeURIComponent(file);
@@ -1217,7 +1225,9 @@
           await buildPageList();
           setStatus('Loaded. Swipe up from bottom to open controls.');
         } catch (err) {
-          setStatus('Failed to load PDF. ' + (err && err.message ? err.message : 'Unknown error'));
+          const msg = 'Failed to load PDF.\n' + (err && err.message ? err.message : 'Unknown error');
+          setStatus(msg);
+          showTextViewError(msg);
           if (fullscreenBtn) fullscreenBtn.disabled = true;
         }
       }
@@ -1582,6 +1592,13 @@
         const isDownSwipe = dy > 45 && Math.abs(dy) > Math.abs(dx);
         if (isDownSwipe) setPanelOpen(false);
       }, { passive: true });
+
+      // Expose live-settings API for Hub desktop integration.
+      // Called via ExecuteScriptAsync when the Hub PDF editor settings change.
+      window._readerApplySettings = function(bundle) {
+        applySettingsBundle(bundle);
+        renderPage();
+      };
 
       updateTextControlsUi();
       await loadPdf();

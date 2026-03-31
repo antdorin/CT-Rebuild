@@ -39,7 +39,8 @@ public sealed class HubServer
 
     private static readonly JsonSerializerOptions _jsonOpts = new()
     {
-        PropertyNameCaseInsensitive = true
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
     public HubServer()

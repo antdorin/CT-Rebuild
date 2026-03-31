@@ -17,6 +17,7 @@ using System.Net.Http;
 using CTHub.Models;
 using CTHub.Services;
 using Microsoft.Win32;
+using Microsoft.Web.WebView2.Core;
 using ZXing;
 using ZXing.Common;
 
@@ -2491,6 +2492,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private bool _pdfEditorSyncing;
     private string? _pdfEditorCurrentFile;
     private bool _pdfEditorIsEditMode = true;
+    private bool _pdfEditorIsWebMode;
     private System.Windows.Media.Imaging.BitmapSource? _pdfEditorBasePreview;
     private readonly System.Collections.ObjectModel.ObservableCollection<RunOverrideRow> _runOverrides = new();
     private List<string> _pdfEditorPageLines = [];
@@ -2572,6 +2574,20 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     TxtFont.Text = vf.GetString() ?? string.Empty;
                 if (global.TryGetProperty("forceBold",   out var vb))
                     ChkBold.IsChecked = vb.GetBoolean();
+
+                var sldSpacingX = GetSpacingXSlider();
+                var sldSpacingY = GetSpacingYSlider();
+                var txtSpacingX = GetSpacingXTextBox();
+                var txtSpacingY = GetSpacingYTextBox();
+                if (sldSpacingX is not null && txtSpacingX is not null
+                    && global.TryGetProperty("textSpacingX", out var vs1) && vs1.TryGetDouble(out var ds1))
+                {
+                    txtSpacingX.Text   = ds1.ToString("0.#", CultureInfo.InvariantCulture);
+                    sldSpacingX.Value  = Math.Clamp(ds1, sldSpacingX.Minimum, sldSpacingX.Maximum);
+                }
+                if (sldSpacingY is not null && txtSpacingY is not null
+                    && global.TryGetProperty("textSpacingY", out var vs2) && vs2.TryGetDouble(out var ds2))
+                    SetSliderAndText(sldSpacingY, txtSpacingY, ds2 * 100);
             }
 
             _runOverrides.Clear();
@@ -2616,6 +2632,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var sldPageSizeY = GetPageSizeYSlider();
         var txtPageSizeX = GetPageSizeXTextBox();
         var txtPageSizeY = GetPageSizeYTextBox();
+        var sldSpacingX  = GetSpacingXSlider();
+        var sldSpacingY  = GetSpacingYSlider();
+        var txtSpacingX  = GetSpacingXTextBox();
+        var txtSpacingY  = GetSpacingYTextBox();
         SetSliderAndText(SldSizeY, TxtSizeY, 175);
         SetSliderAndText(SldSizeX, TxtSizeX, 100);
         SetSliderAndText(SldZoomX, TxtZoomX, 100);
@@ -2624,6 +2644,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             SetSliderAndText(sldPageSizeX, txtPageSizeX, 100);
         if (sldPageSizeY is not null && txtPageSizeY is not null)
             SetSliderAndText(sldPageSizeY, txtPageSizeY, 100);
+        if (sldSpacingX is not null && txtSpacingX is not null)
+        {
+            txtSpacingX.Text  = "0";
+            sldSpacingX.Value = 0;
+        }
+        if (sldSpacingY is not null && txtSpacingY is not null)
+            SetSliderAndText(sldSpacingY, txtSpacingY, 100);
         TxtFont.Text      = string.Empty;
         ChkBold.IsChecked = false;
         _runOverrides.Clear();
@@ -2642,6 +2669,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private Slider? GetPageSizeYSlider() => FindName("SldPageSizeY") as Slider;
     private TextBox? GetPageSizeXTextBox() => FindName("TxtPageSizeX") as TextBox;
     private TextBox? GetPageSizeYTextBox() => FindName("TxtPageSizeY") as TextBox;
+    private Slider? GetSpacingXSlider() => FindName("SldSpacingX") as Slider;
+    private Slider? GetSpacingYSlider() => FindName("SldSpacingY") as Slider;
+    private TextBox? GetSpacingXTextBox() => FindName("TxtSpacingX") as TextBox;
+    private TextBox? GetSpacingYTextBox() => FindName("TxtSpacingY") as TextBox;
 
     private void FontCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -2655,7 +2686,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var sldPageSizeY = GetPageSizeYSlider();
         var txtPageSizeX = GetPageSizeXTextBox();
         var txtPageSizeY = GetPageSizeYTextBox();
-        if (_pdfEditorSyncing || SldSizeY is null || SldSizeX is null || SldZoomX is null || SldZoomY is null || sldPageSizeX is null || sldPageSizeY is null || txtPageSizeX is null || txtPageSizeY is null) return;
+        var sldSpacingX  = GetSpacingXSlider();
+        var sldSpacingY  = GetSpacingYSlider();
+        var txtSpacingX  = GetSpacingXTextBox();
+        var txtSpacingY  = GetSpacingYTextBox();
+        if (_pdfEditorSyncing || SldSizeY is null || SldSizeX is null || SldZoomX is null || SldZoomY is null
+            || sldPageSizeX is null || sldPageSizeY is null || txtPageSizeX is null || txtPageSizeY is null
+            || sldSpacingX is null || sldSpacingY is null || txtSpacingX is null || txtSpacingY is null) return;
         if (sender is not TextBox tb) return;
         _pdfEditorSyncing = true;
         try
@@ -2672,6 +2709,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 sldPageSizeX.Value = Math.Clamp(v5, sldPageSizeX.Minimum, sldPageSizeX.Maximum);
             else if (tb == txtPageSizeY && double.TryParse(tb.Text, out var v6))
                 sldPageSizeY.Value = Math.Clamp(v6, sldPageSizeY.Minimum, sldPageSizeY.Maximum);
+            else if (tb == txtSpacingX && double.TryParse(tb.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var v7))
+                sldSpacingX.Value = Math.Clamp(v7, sldSpacingX.Minimum, sldSpacingX.Maximum);
+            else if (tb == txtSpacingY && double.TryParse(tb.Text, out var v8))
+                sldSpacingY.Value = Math.Clamp(v8, sldSpacingY.Minimum, sldSpacingY.Maximum);
         }
         finally
         {
@@ -2737,6 +2778,26 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         RefreshPdfEditorSurface();
     }
 
+    private void SldSpacingX_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        var txtSpacingX = GetSpacingXTextBox();
+        if (_pdfEditorSyncing || txtSpacingX is null) return;
+        _pdfEditorSyncing = true;
+        txtSpacingX.Text = e.NewValue.ToString("0.#", CultureInfo.InvariantCulture);
+        _pdfEditorSyncing = false;
+        RefreshPdfEditorSurface();
+    }
+
+    private void SldSpacingY_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        var txtSpacingY = GetSpacingYTextBox();
+        if (_pdfEditorSyncing || txtSpacingY is null) return;
+        _pdfEditorSyncing = true;
+        txtSpacingY.Text = ((int)Math.Round(e.NewValue)).ToString();
+        _pdfEditorSyncing = false;
+        RefreshPdfEditorSurface();
+    }
+
     private void RunOverrides_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
     {
         Dispatcher.InvokeAsync(RefreshPdfEditorSurface);
@@ -2754,6 +2815,65 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _pdfEditorIsEditMode = false;
         UpdatePdfEditorModeUi();
         RefreshPdfEditorSurface();
+    }
+
+    private async void PdfEditorWebMode_Click(object sender, RoutedEventArgs e)
+    {
+        _pdfEditorIsWebMode = !_pdfEditorIsWebMode;
+        PdfEditorScroll.Visibility = _pdfEditorIsWebMode ? Visibility.Collapsed : Visibility.Visible;
+        PdfEditorWebView.Visibility = _pdfEditorIsWebMode ? Visibility.Visible : Visibility.Collapsed;
+
+        if (_pdfEditorIsWebMode && !string.IsNullOrEmpty(_pdfEditorCurrentFile))
+        {
+            await PdfEditorWebView.EnsureCoreWebView2Async();
+            PdfEditorWebView.CoreWebView2.NavigationCompleted += OnPdfEditorWebViewNavigated;
+            PdfEditorWebView.Source = new Uri(
+                $"http://localhost:{HubServer.Port}/reader.html?file={Uri.EscapeDataString(_pdfEditorCurrentFile)}");
+        }
+
+        UpdatePdfEditorModeUi();
+    }
+
+    private async void OnPdfEditorWebViewNavigated(object? sender, CoreWebView2NavigationCompletedEventArgs e)
+    {
+        PdfEditorWebView.CoreWebView2.NavigationCompleted -= OnPdfEditorWebViewNavigated;
+        if (e.IsSuccess)
+            await PushSettingsToWebView();
+    }
+
+    private async Task PushSettingsToWebView()
+    {
+        if (!_pdfEditorIsWebMode || PdfEditorWebView?.CoreWebView2 is null)
+            return;
+
+        var txtSpacingX = GetSpacingXTextBox();
+        var txtSpacingY = GetSpacingYTextBox();
+
+        double sizeY    = ParsePercentOrDefault(TxtSizeY?.Text, 175) / 100.0;
+        double sizeX    = ParsePercentOrDefault(TxtSizeX?.Text, 100) / 100.0;
+        double zoomX    = ParsePercentOrDefault(TxtZoomX?.Text, 100) / 100.0;
+        double zoomY    = ParsePercentOrDefault(TxtZoomY?.Text, 100) / 100.0;
+        double spacingX = ParseDoubleOrDefault(txtSpacingX?.Text, 0, -2, 12);
+        double spacingY = ParsePercentOrDefault(txtSpacingY?.Text, 100) / 100.0;
+        bool   bold     = ChkBold?.IsChecked == true;
+        string font     = TxtFont?.Text?.Trim() ?? string.Empty;
+
+        var bundle = new
+        {
+            readerTextSizeY    = sizeY.ToString("0.####", CultureInfo.InvariantCulture),
+            readerTextSizeX    = sizeX.ToString("0.####", CultureInfo.InvariantCulture),
+            readerPageZoomX    = zoomX.ToString("0.####", CultureInfo.InvariantCulture),
+            readerPageZoomY    = zoomY.ToString("0.####", CultureInfo.InvariantCulture),
+            readerTextSpacingX = spacingX.ToString("0.####", CultureInfo.InvariantCulture),
+            readerTextSpacingY = spacingY.ToString("0.####", CultureInfo.InvariantCulture),
+            readerForceBold    = bold ? "1" : "0",
+            readerFont         = font
+        };
+
+        var json = JsonSerializer.Serialize(bundle);
+        var jsJson = json.Replace("\\", "\\\\").Replace("'", "\\'");
+        await PdfEditorWebView.ExecuteScriptAsync(
+            $"window._readerApplySettings && window._readerApplySettings(JSON.parse('{jsJson}'))");
     }
 
     private async void PdfEditorSave_Click(object sender, RoutedEventArgs e)
@@ -2784,12 +2904,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         var txtPageSizeX = GetPageSizeXTextBox();
         var txtPageSizeY = GetPageSizeYTextBox();
-        double sizeY = double.TryParse(TxtSizeY.Text, out var v1) ? v1 / 100.0 : 1.75;
-        double sizeX = double.TryParse(TxtSizeX.Text, out var v2) ? v2 / 100.0 : 1.0;
-        double zoomX = double.TryParse(TxtZoomX.Text, out var v3) ? v3 / 100.0 : 1.0;
-        double zoomY = double.TryParse(TxtZoomY.Text, out var v4) ? v4 / 100.0 : 1.0;
+        var txtSpacingX  = GetSpacingXTextBox();
+        var txtSpacingY  = GetSpacingYTextBox();
+        double sizeY     = double.TryParse(TxtSizeY.Text, out var v1)  ? v1 / 100.0 : 1.75;
+        double sizeX     = double.TryParse(TxtSizeX.Text, out var v2)  ? v2 / 100.0 : 1.0;
+        double zoomX     = double.TryParse(TxtZoomX.Text, out var v3)  ? v3 / 100.0 : 1.0;
+        double zoomY     = double.TryParse(TxtZoomY.Text, out var v4)  ? v4 / 100.0 : 1.0;
         double pageSizeX = double.TryParse(txtPageSizeX?.Text, out var v5) ? v5 / 100.0 : 1.0;
         double pageSizeY = double.TryParse(txtPageSizeY?.Text, out var v6) ? v6 / 100.0 : 1.0;
+        double spacingX  = double.TryParse(txtSpacingX?.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var v7) ? v7 : 0.0;
+        double spacingY  = double.TryParse(txtSpacingY?.Text, out var v8)  ? v8 / 100.0 : 1.0;
 
         var runsDict = new Dictionary<string, object>();
         foreach (RunOverrideRow row in _runOverrides)
@@ -2810,6 +2934,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 pageZoomY    = zoomY,
                 pageSizeX    = pageSizeX,
                 pageSizeY    = pageSizeY,
+                textSpacingX = spacingX,
+                textSpacingY = spacingY,
                 forceBold    = ChkBold.IsChecked == true,
                 fontOverride = TxtFont.Text.Trim()
             },
@@ -2869,6 +2995,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         if (PdfEditorImage is null || PdfEditorOverlay is null || PdfEditorCanvas is null)
             return;
+
+        if (_pdfEditorIsWebMode)
+        {
+            _ = PushSettingsToWebView();
+            return;
+        }
 
         if (_pdfEditorBasePreview is null)
         {
@@ -3188,12 +3320,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         var editButton = FindName("PdfEditorEditModeBtn") as Button;
         var viewButton = FindName("PdfEditorViewModeBtn") as Button;
+        var webButton  = FindName("PdfEditorWebModeBtn")  as Button;
 
         if (editButton is null || viewButton is null)
             return;
 
         ApplyPdfEditorModeButtonState(editButton, _pdfEditorIsEditMode);
         ApplyPdfEditorModeButtonState(viewButton, !_pdfEditorIsEditMode);
+        if (webButton is not null)
+            ApplyPdfEditorModeButtonState(webButton, _pdfEditorIsWebMode);
     }
 
     private static void ApplyPdfEditorModeButtonState(Button button, bool isActive)

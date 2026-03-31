@@ -1,0 +1,13 @@
+﻿{
+  "global": {
+    "textSizeY": 1,
+    "textSizeX": 1,
+    "pageZoomX": 1,
+    "pageZoomY": 1,
+    "pageSizeX": 1,
+    "pageSizeY": 1,
+    "forceBold": false,
+    "fontOverride": "Verdana"
+  },
+  "runs": {}
+}

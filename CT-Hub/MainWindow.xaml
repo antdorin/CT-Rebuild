@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:CTHub"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="CT Hub"
         Height="780" Width="1100"
         MinHeight="500" MinWidth="700"
@@ -656,6 +657,12 @@
                                         Content="Save"
                                         Margin="8,0,0,0"
                                         Click="PdfEditorSave_Click"/>
+                            <Button x:Name="PdfEditorWebModeBtn"
+                                DockPanel.Dock="Right"
+                                Style="{StaticResource PdfModeButton}"
+                                Content="🌐 Web"
+                                Margin="8,0,0,0"
+                                Click="PdfEditorWebMode_Click"/>
                             <Button x:Name="PdfEditorViewModeBtn"
                                 DockPanel.Dock="Right"
                                 Style="{StaticResource PdfModeButton}"
@@ -693,6 +700,37 @@
                                     <TextBlock Text="GLOBAL SETTINGS"
                                                FontFamily="Consolas" FontSize="11" FontWeight="SemiBold"
                                                Foreground="#569CD6" Margin="0,0,0,10"/>
+
+                                    <TextBlock Text="Font" Foreground="#9CDCFE"
+                                               FontFamily="Consolas" FontSize="11" Margin="0,0,0,3"/>
+                                    <ComboBox x:Name="TxtFont"
+                                              IsEditable="True"
+                                              Background="#3C3C3C" Foreground="#999999"
+                                              BorderBrush="#555555"
+                                              FontFamily="Consolas" FontSize="12"
+                                              Margin="0,0,0,10"
+                                              SelectionChanged="FontCombo_SelectionChanged">
+                                        <ComboBoxItem Content="Verdana"/>
+                                        <ComboBoxItem Content="Segoe UI"/>
+                                        <ComboBoxItem Content="Arial"/>
+                                        <ComboBoxItem Content="Calibri"/>
+                                        <ComboBoxItem Content="Consolas"/>
+                                        <ComboBoxItem Content="Courier New"/>
+                                        <ComboBoxItem Content="Georgia"/>
+                                        <ComboBoxItem Content="Helvetica"/>
+                                        <ComboBoxItem Content="Impact"/>
+                                        <ComboBoxItem Content="Lucida Console"/>
+                                        <ComboBoxItem Content="Tahoma"/>
+                                        <ComboBoxItem Content="Times New Roman"/>
+                                        <ComboBoxItem Content="Trebuchet MS"/>
+                                        <ComboBoxItem Content="Century Gothic"/>
+                                        <ComboBoxItem Content="Franklin Gothic Medium"/>
+                                        <ComboBoxItem Content="Palatino Linotype"/>
+                                        <ComboBoxItem Content="Garamond"/>
+                                        <ComboBoxItem Content="Book Antiqua"/>
+                                        <ComboBoxItem Content="Candara"/>
+                                        <ComboBoxItem Content="Segoe UI Semibold"/>
+                                    </ComboBox>
 
                                     <TextBlock Text="Text Size Y (%)" Foreground="#9CDCFE"
                                                FontFamily="Consolas" FontSize="11" Margin="0,0,0,3"/>
@@ -766,36 +804,29 @@
                                                 ValueChanged="SldPageSizeY_ValueChanged"/>
                                     </DockPanel>
 
-                                    <TextBlock Text="Font" Foreground="#9CDCFE"
+                                    <TextBlock Text="Text Spacing X (px)" Foreground="#9CDCFE"
                                                FontFamily="Consolas" FontSize="11" Margin="0,8,0,3"/>
-                                    <ComboBox x:Name="TxtFont"
-                                              IsEditable="True"
-                                              Background="#3C3C3C" Foreground="#999999"
-                                              BorderBrush="#555555"
-                                              FontFamily="Consolas" FontSize="12"
-                                              Margin="0,0,0,2"
-                                              SelectionChanged="FontCombo_SelectionChanged">
-                                        <ComboBoxItem Content="Verdana"/>
-                                        <ComboBoxItem Content="Segoe UI"/>
-                                        <ComboBoxItem Content="Arial"/>
-                                        <ComboBoxItem Content="Calibri"/>
-                                        <ComboBoxItem Content="Consolas"/>
-                                        <ComboBoxItem Content="Courier New"/>
-                                        <ComboBoxItem Content="Georgia"/>
-                                        <ComboBoxItem Content="Helvetica"/>
-                                        <ComboBoxItem Content="Impact"/>
-                                        <ComboBoxItem Content="Lucida Console"/>
-                                        <ComboBoxItem Content="Tahoma"/>
-                                        <ComboBoxItem Content="Times New Roman"/>
-                                        <ComboBoxItem Content="Trebuchet MS"/>
-                                        <ComboBoxItem Content="Century Gothic"/>
-                                        <ComboBoxItem Content="Franklin Gothic Medium"/>
-                                        <ComboBoxItem Content="Palatino Linotype"/>
-                                        <ComboBoxItem Content="Garamond"/>
-                                        <ComboBoxItem Content="Book Antiqua"/>
-                                        <ComboBoxItem Content="Candara"/>
-                                        <ComboBoxItem Content="Segoe UI Semibold"/>
-                                    </ComboBox>
+                                    <DockPanel Margin="0,0,0,2">
+                                        <TextBox x:Name="TxtSpacingX" DockPanel.Dock="Right"
+                                                 Width="60" Margin="8,0,0,0"
+                                                 Style="{StaticResource SearchBox}"
+                                                 Text="0" TextChanged="GlobalSetting_Changed"/>
+                                        <Slider x:Name="SldSpacingX" Minimum="-2" Maximum="12"
+                                                Value="0" TickFrequency="1"
+                                                ValueChanged="SldSpacingX_ValueChanged"/>
+                                    </DockPanel>
+
+                                    <TextBlock Text="Text Spacing Y (line %)" Foreground="#9CDCFE"
+                                               FontFamily="Consolas" FontSize="11" Margin="0,8,0,3"/>
+                                    <DockPanel Margin="0,0,0,2">
+                                        <TextBox x:Name="TxtSpacingY" DockPanel.Dock="Right"
+                                                 Width="60" Margin="8,0,0,0"
+                                                 Style="{StaticResource SearchBox}"
+                                                 Text="100" TextChanged="GlobalSetting_Changed"/>
+                                        <Slider x:Name="SldSpacingY" Minimum="50" Maximum="300"
+                                                Value="100" TickFrequency="5"
+                                                ValueChanged="SldSpacingY_ValueChanged"/>
+                                    </DockPanel>
 
                                     <CheckBox x:Name="ChkBold"
                                               Content="Bold Text"
@@ -838,7 +869,7 @@
                             <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"
                                           Background="#3C3C3C"/>
 
-                            <Border Grid.Column="2" Background="#111" ClipToBounds="True">
+                            <Grid Grid.Column="2" Background="#111" ClipToBounds="True">
                                 <ScrollViewer x:Name="PdfEditorScroll"
                                               VerticalScrollBarVisibility="Auto"
                                               HorizontalScrollBarVisibility="Auto">
@@ -852,7 +883,8 @@
                                                 IsHitTestVisible="False"/>
                                     </Grid>
                                 </ScrollViewer>
-                            </Border>
+                                <wv2:WebView2 x:Name="PdfEditorWebView" Visibility="Collapsed"/>
+                            </Grid>
 
                         </Grid>
                     </DockPanel>
