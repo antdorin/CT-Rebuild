@@ -1,13 +1,13 @@
 ﻿{
   "global": {
-    "textSizeY": 1,
-    "textSizeX": 1,
+    "textSizeY": 1.5,
+    "textSizeX": 0.63,
     "pageZoomX": 1,
-    "pageZoomY": 1,
-    "pageSizeX": 1,
-    "pageSizeY": 1,
-    "textSpacingX": 0,
-    "textSpacingY": 1,
+    "pageZoomY": 1.72,
+    "pageSizeX": 0.25,
+    "pageSizeY": 0.25,
+    "textSpacingX": -2,
+    "textSpacingY": 3,
     "forceBold": false,
     "fontOverride": "Verdana"
   },

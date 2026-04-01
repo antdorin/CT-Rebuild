@@ -77,7 +77,7 @@ public sealed class HubServer
     public const int DiscoveryPort      = 5052; // UDP port desktop listens on for CT-DISCOVER probes
     public const int DiscoveryReplyPort = 5051; // UDP port phone listens on (desktop broadcasts here)
 
-    public async Task StartAsync()
+    public Task StartAsync()
     {
         _cts = new CancellationTokenSource();
         _listener = new HttpListener();
@@ -96,6 +96,8 @@ public sealed class HubServer
                     $"[HubServer] PDF sidecar failed to start: {ex.Message}");
             }
         });
+
+        return Task.CompletedTask;
     }
 
     public void Stop()

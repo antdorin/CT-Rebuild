@@ -1,6 +1,5 @@
 import Foundation
 import Combine
-import UIKit
 
 // MARK: - Models
 
@@ -255,35 +254,6 @@ final class HubClient: ObservableObject {
         guard let http = response as? HTTPURLResponse, http.statusCode == 200
         else { throw HubError.serverError }
         return data
-    }
-
-    /// Returns the page count for a PDF file via the Hub sidecar.
-    func fetchPdfPageCount(filename: String) async throws -> Int {
-        guard let encoded = filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
-        else { throw HubError.invalidFilename }
-        let url = try endpoint("/api/pdf-pages/\(encoded)")
-        let (data, response) = try await URLSession.shared.data(from: url)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200
-        else { throw HubError.serverError }
-        struct PageCountResponse: Decodable { let count: Int }
-        return try JSONDecoder().decode(PageCountResponse.self, from: data).count
-    }
-
-    /// Downloads a rendered JPEG for a single page of a PDF via the Hub sidecar.
-    func fetchPdfPageImage(filename: String, page: Int) async throws -> UIImage {
-        guard let encoded = filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
-        else { throw HubError.invalidFilename }
-        var comps = URLComponents(url: try endpoint("/api/pdf-render/\(encoded)"), resolvingAgainstBaseURL: false)!
-        comps.queryItems = [
-            URLQueryItem(name: "page",  value: String(page + 1)),
-            URLQueryItem(name: "scale", value: "2")
-        ]
-        guard let url = comps.url else { throw HubError.serverError }
-        let (data, response) = try await URLSession.shared.data(from: url)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
-              let image = UIImage(data: data)
-        else { throw HubError.serverError }
-        return image
     }
 
     func fetchPdfContext() async throws -> PdfContext {

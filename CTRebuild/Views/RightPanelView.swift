@@ -17,6 +17,27 @@ struct RightPanelView: View {
     @AppStorage("panel_tintRightB")      private var panelTintB: Double = 0
     @AppStorage("panel_tintRightA")      private var panelTintA: Double = 0
 
+    // ── Enabled pages ──────────────────────────────────────────────────────
+    @AppStorage("panel_rightPage0_enabled") private var rightPage0Enabled = true
+    @AppStorage("panel_rightPage1_enabled") private var rightPage1Enabled = true
+    @AppStorage("panel_rightPage2_enabled") private var rightPage2Enabled = true
+    @AppStorage("panel_rightPage3_enabled") private var rightPage3Enabled = true
+    @AppStorage("panel_rightPage4_enabled") private var rightPage4Enabled = true
+    @AppStorage("panel_rightPage5_enabled") private var rightPage5Enabled = true
+    @AppStorage("panel_rightPage6_enabled") private var rightPage6Enabled = true
+    @AppStorage("panel_rightPage7_enabled") private var rightPage7Enabled = false
+    @AppStorage("panel_rightPage8_enabled") private var rightPage8Enabled = false
+    @AppStorage("panel_rightPage9_enabled") private var rightPage9Enabled = false
+
+    private var enabledIndices: [Int] {
+        let flags = [rightPage0Enabled, rightPage1Enabled, rightPage2Enabled,
+                     rightPage3Enabled, rightPage4Enabled, rightPage5Enabled,
+                     rightPage6Enabled, rightPage7Enabled, rightPage8Enabled,
+                     rightPage9Enabled]
+        let result = flags.enumerated().compactMap { $1 ? $0 : nil }
+        return result.isEmpty ? [0] : result
+    }
+
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -34,7 +55,8 @@ struct RightPanelView: View {
                         selectedIndex: $selectedIndex,
                         isPPOpen: $isPPOpen,
                         panelSize: geo.size,
-                        safeArea: safeArea
+                        safeArea: safeArea,
+                        enabledIndices: enabledIndices
                     )
                     .transition(.opacity.animation(.easeInOut(duration: 0.2)))
                 } else {
@@ -46,7 +68,10 @@ struct RightPanelView: View {
         .ignoresSafeArea()
         .onAppear {
             if autoPickerRight { isPPOpen = true }
-            else { selectedIndex = rightStartPage }
+            else {
+                let enabled = enabledIndices
+                selectedIndex = enabled.contains(rightStartPage) ? rightStartPage : (enabled.first ?? 0)
+            }
         }
         .onDisappear {
             isPPOpen = false
@@ -57,15 +82,18 @@ struct RightPanelView: View {
             case GestureAction.openPagePicker.rawValue:
                 withAnimation(.slideBck) { isPPOpen.toggle() }
             case GestureAction.nextRightPage.rawValue:
-                let total = 7
+                let enabled = enabledIndices
+                let curPos  = enabled.firstIndex(of: selectedIndex) ?? 0
                 withAnimation(.slideFwd) {
-                    selectedIndex = (selectedIndex + 1) % total
+                    selectedIndex = enabled[(curPos + 1) % enabled.count]
                     isPPOpen = false
                 }
             case GestureAction.prevRightPage.rawValue:
-                let total = 7
+                let enabled = enabledIndices
+                let count   = enabled.count
+                let curPos  = enabled.firstIndex(of: selectedIndex) ?? 0
                 withAnimation(.slideBck) {
-                    selectedIndex = (selectedIndex - 1 + total) % total
+                    selectedIndex = enabled[(curPos - 1 + count) % count]
                     isPPOpen = false
                 }
             default: break
@@ -123,6 +151,9 @@ private let rightPageTitles: [String] = [
     "Page 5",
     "Page 6",
     "App Settings",
+    "Page 8",
+    "Page 9",
+    "Page 10",
 ]
 
 // MARK: - Right Panel Page Picker
@@ -132,8 +163,9 @@ private struct RightWheelSelector: View {
     @Binding var isPPOpen: Bool
     let panelSize: CGSize
     let safeArea: EdgeInsets
+    let enabledIndices: [Int]
 
-    private let itemCount = 7
+    private var itemCount: Int { enabledIndices.isEmpty ? 1 : enabledIndices.count }
     private let cardW: CGFloat = 320
     private let spacing: CGFloat = 580
 
@@ -149,17 +181,25 @@ private struct RightWheelSelector: View {
         return cardW / panelSize.width
     }
 
-    // Maps any virtual page to a real 0–(itemCount-1) index, wrapping circularly
+    // Maps any virtual carousel position to an actual page index via enabledIndices
     private func realIndex(_ page: Int) -> Int {
-        let m = page % itemCount
-        return m < 0 ? m + itemCount : m
+        guard !enabledIndices.isEmpty else { return 0 }
+        let count = enabledIndices.count
+        let m = page % count
+        let pos = m < 0 ? m + count : m
+        return enabledIndices[pos]
     }
 
     var body: some View {
         carousel
             .frame(width: panelSize.width, height: panelSize.height)
             .onAppear {
-                virtualPage = selectedIndex
+                // Start carousel centered on the enabled position of selectedIndex
+                if let pos = enabledIndices.firstIndex(of: selectedIndex) {
+                    virtualPage = pos
+                } else {
+                    virtualPage = 0
+                }
             }
     }
 

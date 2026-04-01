@@ -423,7 +423,7 @@ struct PdfBrowserView: View {
                     let doc = try await downloadAndMerge(group)
                     if !binStore.isActive(groupId: group.id) {
                         let label = group.soLabel.isEmpty ? group.dateLabel : group.soLabel
-                        binStore.activate(groupId: group.id, label: label, document: doc)
+                        binStore.activate(groupId: group.id, label: label, document: doc, filenames: group.filenames, pageCounts: counts)
                     }
                     mergedDoc = doc
                 } catch {
@@ -445,7 +445,7 @@ struct PdfBrowserView: View {
             do {
                 let doc = try await downloadAndMerge(group)
                 let label = group.soLabel.isEmpty ? group.dateLabel : group.soLabel
-                binStore.activate(groupId: group.id, label: label, document: doc)
+                binStore.activate(groupId: group.id, label: label, document: doc, filenames: group.filenames)
             } catch {
                 // Silently skip on network error (user can retry)
             }

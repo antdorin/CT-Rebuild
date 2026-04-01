@@ -307,21 +307,14 @@
 
                     <ToolBar Grid.Row="0" Background="#252526">
                         <Button Style="{StaticResource ToolbarButton}"
-                                Content="＋  Add Row"
-                                Click="QrMappings_Add"/>
-                        <Button Style="{StaticResource DeleteButton}"
-                                Content="✕  Delete"
-                                Click="QrMappings_Delete"/>
-                        <Separator/>
-                        <Button Style="{StaticResource ToolbarButton}"
-                            Content="🖨  Print"
-                            Click="QrGenerator_Print"/>
-                        <Button Style="{StaticResource ToolbarButton}"
-                                Content="Use Selected QR Value"
-                                Click="QrGenerator_UseSelected"/>
+                                Content="🖨  Print"
+                                Click="QrGenerator_Print"/>
                         <Button Style="{StaticResource ToolbarButton}"
                                 Content="Copy ZPL"
                                 Click="QrGenerator_CopyZpl"/>
+                        <Button Style="{StaticResource ToolbarButton}"
+                                Content="Use Selected QR"
+                                Click="QrGenerator_UseSelected"/>
                     </ToolBar>
 
                     <Border Grid.Row="1" Background="#252526" BorderBrush="#3C3C3C" BorderThickness="0,0,0,1" Padding="8,6">
@@ -358,7 +351,30 @@
 
                     <GridSplitter Grid.Row="3" Height="6" HorizontalAlignment="Stretch" Background="#3C3C3C"/>
 
-                    <Grid Grid.Row="4">
+                    <DockPanel Grid.Row="4">
+                        <Border DockPanel.Dock="Top" Background="#252526" BorderBrush="#3C3C3C"
+                                BorderThickness="0,0,0,1" Padding="6,5">
+                            <UniformGrid Rows="1" Columns="4">
+                                <Button Style="{StaticResource ToolbarButton}"
+                                        Content="＋  New"
+                                        Margin="2,0"
+                                        Click="QrMappings_Add"/>
+                                <Button Style="{StaticResource ToolbarButton}"
+                                        Content="Save"
+                                        Margin="2,0"
+                                        Click="QrMappings_Save"/>
+                                <Button Style="{StaticResource ToolbarButton}"
+                                        Content="Reset to Default"
+                                        Margin="2,0"
+                                        Click="QrGen_ResetToDefault"/>
+                                <Button Style="{StaticResource DeleteButton}"
+                                        Content="✕  Delete"
+                                        Margin="2,0"
+                                        Click="QrMappings_Delete"/>
+                            </UniformGrid>
+                        </Border>
+
+                    <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="370" MinWidth="320"/>
                             <ColumnDefinition Width="6"/>
@@ -387,6 +403,9 @@
                                                          Foreground="#D4D4D4" Margin="0,0,12,0"
                                                          Checked="QrGenerator_ToggleChanged"/>
                                             <RadioButton x:Name="QrGenTypeBarcode" Content="Barcode 128"
+                                                         Foreground="#D4D4D4" Margin="0,0,12,0"
+                                                         Checked="QrGenerator_ToggleChanged"/>
+                                            <RadioButton x:Name="QrGenTypeUpcA" Content="UPC-A"
                                                          Foreground="#D4D4D4"
                                                          Checked="QrGenerator_ToggleChanged"/>
                                         </StackPanel>
@@ -400,6 +419,19 @@
                                               Margin="0,2,0,10"
                                               Checked="QrGenerator_ToggleChanged"
                                               Unchecked="QrGenerator_ToggleChanged"/>
+
+                                    <DockPanel Margin="0,8,0,2">
+                                        <TextBlock Text="Units" Foreground="#9CDCFE"
+                                                   FontFamily="Consolas" FontSize="11" VerticalAlignment="Center"/>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <RadioButton Content="in" IsChecked="True"
+                                                         Foreground="#D4D4D4" Margin="0,0,12,0"
+                                                         Checked="QrGenerator_ToggleChanged"/>
+                                            <RadioButton x:Name="QrGenUnitMm" Content="mm"
+                                                         Foreground="#D4D4D4"
+                                                         Checked="QrGenerator_ToggleChanged"/>
+                                        </StackPanel>
+                                    </DockPanel>
 
                                     <TextBlock Text="Printer DPI" Foreground="#9CDCFE"
                                                FontFamily="Consolas" FontSize="11" Margin="0,4,0,3"/>
@@ -456,7 +488,7 @@
                                                 ValueChanged="QrGenerator_NumberSliderChanged"/>
                                     </DockPanel>
 
-                                    <TextBlock Text="Margin X (dots)" Foreground="#9CDCFE"
+                                    <TextBlock x:Name="QrGenMarginXLabel" Text="Margin X (in)" Foreground="#9CDCFE"
                                                FontFamily="Consolas" FontSize="11" Margin="0,8,0,3"/>
                                     <DockPanel>
                                         <TextBox x:Name="QrGenMarginX"
@@ -472,7 +504,7 @@
                                                 ValueChanged="QrGenerator_NumberSliderChanged"/>
                                     </DockPanel>
 
-                                    <TextBlock Text="Margin Y (dots)" Foreground="#9CDCFE"
+                                    <TextBlock x:Name="QrGenMarginYLabel" Text="Margin Y (in)" Foreground="#9CDCFE"
                                                FontFamily="Consolas" FontSize="11" Margin="0,8,0,3"/>
                                     <DockPanel>
                                         <TextBox x:Name="QrGenMarginY"
@@ -504,7 +536,7 @@
                                                 ValueChanged="QrGenerator_NumberSliderChanged"/>
                                     </DockPanel>
 
-                                    <TextBlock Text="Quiet Zone (modules)" Foreground="#9CDCFE"
+                                    <TextBlock x:Name="QrGenQuietZoneLabel" Text="Quiet Zone (in)" Foreground="#9CDCFE"
                                                FontFamily="Consolas" FontSize="11" Margin="0,8,0,3"/>
                                     <DockPanel>
                                         <TextBox x:Name="QrGenQuietZone"
@@ -520,7 +552,7 @@
                                                 ValueChanged="QrGenerator_NumberSliderChanged"/>
                                     </DockPanel>
 
-                                    <TextBlock Text="Barcode Height (dots)" Foreground="#9CDCFE"
+                                    <TextBlock x:Name="QrGenBarcodeHeightLabel" Text="Barcode Height (in)" Foreground="#9CDCFE"
                                                FontFamily="Consolas" FontSize="11" Margin="0,8,0,3"/>
                                     <DockPanel>
                                         <TextBox x:Name="QrGenBarcodeHeight"
@@ -544,6 +576,41 @@
                                               Margin="0,10,0,8"
                                               Checked="QrGenerator_ToggleChanged"
                                               Unchecked="QrGenerator_ToggleChanged"/>
+
+                                    <DockPanel Margin="0,4,0,2">
+                                        <TextBlock Text="Alignment" Foreground="#9CDCFE"
+                                                   FontFamily="Consolas" FontSize="11" VerticalAlignment="Center"/>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <RadioButton x:Name="QrGenAlignLeft" Content="Left"
+                                                         Foreground="#D4D4D4" Margin="0,0,10,0"
+                                                         Checked="QrGenerator_ToggleChanged"/>
+                                            <RadioButton Content="Center" IsChecked="True"
+                                                         Foreground="#D4D4D4" Margin="0,0,10,0"
+                                                         Checked="QrGenerator_ToggleChanged"/>
+                                            <RadioButton x:Name="QrGenAlignRight" Content="Right"
+                                                         Foreground="#D4D4D4"
+                                                         Checked="QrGenerator_ToggleChanged"/>
+                                        </StackPanel>
+                                    </DockPanel>
+
+                                    <TextBlock Text="Top Line 1" Foreground="#9CDCFE"
+                                               FontFamily="Consolas" FontSize="11" Margin="0,8,0,3"/>
+                                    <TextBox x:Name="QrGenTopLine1"
+                                             Style="{StaticResource SearchBox}"
+                                             TextChanged="QrGenerator_TextChanged"/>
+
+                                    <TextBlock Text="Top Line 2" Foreground="#9CDCFE"
+                                               FontFamily="Consolas" FontSize="11" Margin="0,6,0,3"/>
+                                    <TextBox x:Name="QrGenTopLine2"
+                                             Style="{StaticResource SearchBox}"
+                                             TextChanged="QrGenerator_TextChanged"/>
+
+                                    <TextBlock Text="Bottom Line" Foreground="#9CDCFE"
+                                               FontFamily="Consolas" FontSize="11" Margin="0,6,0,3"/>
+                                    <TextBox x:Name="QrGenBottomLine"
+                                             Style="{StaticResource SearchBox}"
+                                             Margin="0,0,0,8"
+                                             TextChanged="QrGenerator_TextChanged"/>
 
                                     <TextBlock Text="ZPL Preview" Foreground="#9CDCFE"
                                                FontFamily="Consolas" FontSize="11" Margin="0,8,0,3"/>
@@ -581,15 +648,33 @@
                                         BorderThickness="1"
                                         CornerRadius="4"
                                         Padding="12">
-                                    <Viewbox Stretch="Uniform" StretchDirection="DownOnly">
-                                        <Border Background="White" Padding="0" BorderBrush="#333" BorderThickness="1">
-                                            <Image x:Name="QrGenPreview"
-                                                   Stretch="None"
-                                                   HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"
-                                                   RenderOptions.BitmapScalingMode="NearestNeighbor"/>
-                                        </Border>
-                                    </Viewbox>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="20"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="20"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+                                        <Canvas x:Name="QrGenRulerTop"
+                                                Grid.Row="0" Grid.Column="1"
+                                                Background="#1A1A1A" ClipToBounds="True"/>
+                                        <Canvas x:Name="QrGenRulerLeft"
+                                                Grid.Row="1" Grid.Column="0"
+                                                Background="#1A1A1A" ClipToBounds="True"/>
+                                        <Viewbox x:Name="QrGenPreviewViewbox"
+                                                 Grid.Row="1" Grid.Column="1"
+                                                 Stretch="Uniform" StretchDirection="DownOnly">
+                                            <Border Background="White" Padding="0" BorderBrush="#333" BorderThickness="1">
+                                                <Image x:Name="QrGenPreview"
+                                                       Stretch="None"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                                            </Border>
+                                        </Viewbox>
+                                    </Grid>
                                 </Border>
 
                                 <TextBlock x:Name="QrGenHint"
@@ -602,6 +687,7 @@
                             </Grid>
                         </Border>
                     </Grid>
+                    </DockPanel>
                 </Grid>
             </TabItem>
 
@@ -1100,6 +1186,19 @@
                                            Foreground="#555" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ── Settings ──────────────────────────────────────────────── -->
+            <TabItem Header="Settings">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="#1E1E1E">
+                    <StackPanel Margin="24,20,24,24" MaxWidth="680">
+
+                        <TextBlock Text="SETTINGS"
+                                   FontFamily="Consolas" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="#569CD6" Margin="0,0,0,8"/>
 
                     </StackPanel>
                 </ScrollViewer>

@@ -1433,6 +1433,30 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         StatusText = "Copied ZPL to clipboard.";
     }
 
+    private void QrMappings_Save(object sender, RoutedEventArgs e)
+    {
+        // Commit any in-progress cell edit then force a save of all current rows
+        QrMappingsGrid.CommitEdit(DataGridEditingUnit.Row, exitEditingMode: true);
+        foreach (var item in _hub.QrMappings.GetAll())
+            _ = _hub.QrMappings.UpsertAsync(item);
+        Touch();
+        StatusText = "QR Mappings saved.";
+    }
+
+    private void QrGen_ResetToDefault(object sender, RoutedEventArgs e)
+    {
+        _qrGenSyncing = true;
+        try
+        {
+            InitializeQrGenerator();
+        }
+        finally
+        {
+            _qrGenSyncing = false;
+        }
+        StatusText = "QR Generator reset to defaults.";
+    }
+
     private void QrGenerator_Print(object sender, RoutedEventArgs e)
     {
         if (QrGenPreview is null)
