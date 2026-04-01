@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import UIKit
 
 // MARK: - Models
 
@@ -254,6 +255,30 @@ final class HubClient: ObservableObject {
         guard let http = response as? HTTPURLResponse, http.statusCode == 200
         else { throw HubError.serverError }
         return data
+    }
+
+    /// Returns the page count for a PDF via the server's sidecar service.
+    func fetchPdfPageCount(filename: String) async throws -> Int {
+        guard let encoded = filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
+        else { throw HubError.invalidFilename }
+        let url = try endpoint("/api/pdf-pages/\(encoded)")
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200
+        else { throw HubError.serverError }
+        let json = try JSONDecoder().decode([String: Int].self, from: data)
+        return json["pageCount"] ?? json["count"] ?? 0
+    }
+
+    /// Returns a server-rendered JPEG image for a single page of a PDF (0-based page index).
+    func fetchPdfPageImage(filename: String, page: Int) async throws -> UIImage {
+        guard let encoded = filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
+        else { throw HubError.invalidFilename }
+        let url = try endpoint("/api/pdf-render/\(encoded)?page=\(page + 1)&scale=2")
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let image = UIImage(data: data)
+        else { throw HubError.serverError }
+        return image
     }
 
     func fetchPdfContext() async throws -> PdfContext {
