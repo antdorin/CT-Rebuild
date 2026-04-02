@@ -1108,13 +1108,12 @@
 
         const wrapW = Math.max(1, viewerWrap?.clientWidth || window.innerWidth);
         const wrapH = Math.max(1, viewerWrap?.clientHeight || window.innerHeight);
-        // contain-fit: use the smaller of width-fit and height-fit so the whole page fits
+        // fill-fit: scale each axis independently so the page fills the entire viewport
         const fitScaleW = wrapW / Math.max(1, layout.pageWidth);
         const fitScaleH = wrapH / Math.max(1, layout.pageHeight);
-        const fitScale = Math.min(fitScaleW, fitScaleH);
         // Independent X and Y layout scales — 1.00/1.00 is now a neutral full-page fit
-        const scaleX = fitScale * textViewSettings.pageZoomX;
-        const scaleY = fitScale * textViewSettings.pageZoomY;
+        const scaleX = fitScaleW * textViewSettings.pageZoomX;
+        const scaleY = fitScaleH * textViewSettings.pageZoomY;
         // fontScaleY: controls font-size (glyph height); fontScaleX: applied via scaleX transform (glyph width)
         const fontScaleY = Math.sqrt(scaleX * scaleY) * textViewSettings.textSizeY;
         const fontScaleX = textViewSettings.textSizeX;
