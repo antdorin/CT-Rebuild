@@ -20,18 +20,6 @@ struct PanelSettingsView: View {
     // ── Right panel ────────────────────────────────────────────────────────
     @AppStorage("panel_rightStartPage")  private var rightStartPage: Int = 0
 
-    // ── Right panel page visibility ────────────────────────────────
-    @AppStorage("panel_rightPage0_enabled") private var rightPage0Enabled = true
-    @AppStorage("panel_rightPage1_enabled") private var rightPage1Enabled = true
-    @AppStorage("panel_rightPage2_enabled") private var rightPage2Enabled = true
-    @AppStorage("panel_rightPage3_enabled") private var rightPage3Enabled = true
-    @AppStorage("panel_rightPage4_enabled") private var rightPage4Enabled = true
-    @AppStorage("panel_rightPage5_enabled") private var rightPage5Enabled = true
-    @AppStorage("panel_rightPage6_enabled") private var rightPage6Enabled = true
-    @AppStorage("panel_rightPage7_enabled") private var rightPage7Enabled = false
-    @AppStorage("panel_rightPage8_enabled") private var rightPage8Enabled = false
-    @AppStorage("panel_rightPage9_enabled") private var rightPage9Enabled = false
-
     @AppStorage("panel_showMaterial")    private var showMaterial = true
 
     // ── Panel size (percent of screen) ───────────────────────────────────
@@ -118,35 +106,8 @@ struct PanelSettingsView: View {
                                 label: "Default Page",
                                 detail: "Which page opens first (0 = page 1)",
                                 value: $rightStartPage,
-                                range: 0...9
+                                range: 0...6
                             )
-                        }
-                        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
-                        .padding(.bottom, 14)
-
-                        // ── Right Panel Pages ─────────────────────────────────
-                        sectionHeader("RIGHT PANEL PAGES")
-
-                        VStack(spacing: 0) {
-                            toggleRow(icon: "doc.richtext",    label: "Page 1 – PDF Browser",   detail: "Right panel slot 1", binding: $rightPage0Enabled)
-                            Divider().opacity(0.1).padding(.leading, 46)
-                            toggleRow(icon: "shippingbox",     label: "Page 2 – Bin Locations", detail: "Right panel slot 2", binding: $rightPage1Enabled)
-                            Divider().opacity(0.1).padding(.leading, 46)
-                            toggleRow(icon: "doc.plaintext",   label: "Page 3",                 detail: "Right panel slot 3", binding: $rightPage2Enabled)
-                            Divider().opacity(0.1).padding(.leading, 46)
-                            toggleRow(icon: "doc.plaintext",   label: "Page 4",                 detail: "Right panel slot 4", binding: $rightPage3Enabled)
-                            Divider().opacity(0.1).padding(.leading, 46)
-                            toggleRow(icon: "doc.plaintext",   label: "Page 5",                 detail: "Right panel slot 5", binding: $rightPage4Enabled)
-                            Divider().opacity(0.1).padding(.leading, 46)
-                            toggleRow(icon: "doc.plaintext",   label: "Page 6",                 detail: "Right panel slot 6", binding: $rightPage5Enabled)
-                            Divider().opacity(0.1).padding(.leading, 46)
-                            toggleRow(icon: "gearshape",       label: "Page 7 – App Settings",  detail: "Right panel slot 7", binding: $rightPage6Enabled)
-                            Divider().opacity(0.1).padding(.leading, 46)
-                            toggleRow(icon: "square.dashed",   label: "Page 8",                 detail: "Right panel slot 8 – unused", binding: $rightPage7Enabled)
-                            Divider().opacity(0.1).padding(.leading, 46)
-                            toggleRow(icon: "square.dashed",   label: "Page 9",                 detail: "Right panel slot 9 – unused", binding: $rightPage8Enabled)
-                            Divider().opacity(0.1).padding(.leading, 46)
-                            toggleRow(icon: "square.dashed",   label: "Page 10",                detail: "Right panel slot 10 – unused", binding: $rightPage9Enabled)
                         }
                         .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
                         .padding(.bottom, 14)

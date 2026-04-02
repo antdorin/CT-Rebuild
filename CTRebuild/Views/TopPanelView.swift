@@ -5,8 +5,7 @@ import SwiftUI
 struct TopPanelView: View {
     let safeArea: EdgeInsets
 
-    @AppStorage("panel_selectedTab") private var selectedTabRaw: Int = 1
-    @State private var selectedTab: Int? = nil
+    @State private var selectedTab: Int? = 1
     @AppStorage("panel_showMaterial")  private var showMaterial    = true
     @AppStorage("panel_materialStyle") private var materialStyleRaw = "ultraThin"
     @AppStorage("panel_tintTopR")      private var panelTintR: Double = 0
@@ -46,9 +45,8 @@ struct TopPanelView: View {
                         if tab == 0 {
                             CalculatorContentView(safeArea: safeArea)
                         } else if tab == 1 {
-                            TasksContentView(safeArea: safeArea)
-                        } else if tab == 2 {
-                            NotesContentView(safeArea: safeArea)                        } else {
+                            NotesContentView(safeArea: safeArea)
+                        } else {
                             Spacer()
                         }
                     }
@@ -60,14 +58,6 @@ struct TopPanelView: View {
             }
         }
         .animation(.easeInOut(duration: 0.18), value: selectedTab)
-        .onAppear {
-            if selectedTab == nil {
-                selectedTab = selectedTabRaw
-            }
-        }
-        .onChange(of: selectedTab) { newVal in
-            if let v = newVal { selectedTabRaw = v }
-        }
     }
 }
 
@@ -76,7 +66,7 @@ struct TopPanelView: View {
 private struct TopTabBar: View {
     @Binding var selected: Int?
 
-    private let labels = ["CALC", "TASKS", "NOTES"]
+    private let labels = ["CALC", "NOTES", "—"]
 
     var body: some View {
         HStack(spacing: 10) {
@@ -85,8 +75,6 @@ private struct TopTabBar: View {
                     Text(labels[i])
                         .font(.system(size: 14, weight: .semibold, design: .monospaced))
                         .tracking(2)
-                        .minimumScaleFactor(0.55)
-                        .lineLimit(1)
                         .foregroundColor(selected == i ? .black : .secondary)
                         .frame(maxWidth: .infinity)
                         .frame(height: 44)
@@ -230,40 +218,6 @@ private struct CalculatorContentView: View {
         if v.isNaN || v.isInfinite { return "Error" }
         let r = v == v.rounded() ? String(format: "%.0f", v) : String(v)
         return r.count > 10 ? String(format: "%.6g", v) : r
-    }
-}
-
-// MARK: - Tasks Content
-
-private struct TasksContentView: View {
-    let safeArea: EdgeInsets
-    @AppStorage("tasks_selectedSubTab") private var selectedSubTab: Int = 0
-
-    private let subLabels = ["PDF BROWSER", "PDF READER"]
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // Sub-tab picker
-            Picker("", selection: $selectedSubTab) {
-                ForEach(subLabels.indices, id: \.self) { i in
-                    Text(subLabels[i]).tag(i)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-
-            Divider()
-
-            Group {
-                if selectedSubTab == 0 {
-                    PdfBrowserView(safeArea: safeArea)
-                } else {
-                    WebReaderView(safeArea: safeArea)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
     }
 }
 
