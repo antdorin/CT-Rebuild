@@ -17,8 +17,9 @@
             <Setter Property="Foreground" Value="#D4D4D4"/>
             <Setter Property="BorderBrush" Value="#3C3C3C"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="GridLinesVisibility" Value="All"/>
             <Setter Property="HorizontalGridLinesBrush" Value="#3C3C3C"/>
+            <Setter Property="VerticalGridLinesBrush" Value="#3C3C3C"/>
             <Setter Property="RowBackground" Value="#252526"/>
             <Setter Property="AlternatingRowBackground" Value="#2D2D2D"/>
             <Setter Property="AutoGenerateColumns" Value="False"/>
@@ -36,6 +37,7 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="BorderBrush" Value="#3C3C3C"/>
             <Setter Property="BorderThickness" Value="0,0,1,1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <EventSetter Event="ContextMenuOpening" Handler="ColumnHeader_ContextMenuOpening"/>
         </Style>
         <Style TargetType="DataGridRow">
@@ -59,6 +61,34 @@
                     <Setter Property="Foreground" Value="White"/>
                 </Trigger>
             </Style.Triggers>
+        </Style>
+        <!-- Shared GroupItem style — renders group headers like DataGridColumnHeaders -->
+        <Style x:Key="SectionGroupContainerStyle" TargetType="GroupItem">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="GroupItem">
+                        <StackPanel>
+                            <Border Padding="8,4" BorderThickness="0,0,0,1">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="#1E1E1E"/>
+                                        <Setter Property="BorderBrush" Value="#3C3C3C"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Name}" Value="">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="{Binding Name}"
+                                           Foreground="#9CDCFE" FontFamily="Consolas"
+                                           FontSize="13" FontWeight="SemiBold"/>
+                            </Border>
+                            <ItemsPresenter/>
+                        </StackPanel>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
         <Style x:Key="ToolbarButton" TargetType="Button">
             <Setter Property="Padding" Value="14,6"/>
@@ -132,6 +162,30 @@
             </StatusBarItem>
         </StatusBar>
 
+        <!-- ── Backup / Restore ────────────────────────────────────────────── -->
+        <Border DockPanel.Dock="Bottom"
+                Background="#252526" BorderBrush="#3C3C3C" BorderThickness="0,1,0,0"
+                Padding="12,6">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="Backup"  Click="BackupData_Click"
+                            Background="#0E639C" Foreground="White"
+                            FontFamily="Consolas" FontSize="12"
+                            Padding="14,4" Margin="6,0,0,0"
+                            BorderBrush="#1177BB" Cursor="Hand"/>
+                    <Button Content="Restore" Click="RestoreData_Click"
+                            Background="#0E639C" Foreground="White"
+                            FontFamily="Consolas" FontSize="12"
+                            Padding="14,4" Margin="6,0,0,0"
+                            BorderBrush="#1177BB" Cursor="Hand"/>
+                </StackPanel>
+                <TextBlock VerticalAlignment="Center"
+                           Foreground="#808080" FontFamily="Consolas" FontSize="11"
+                           TextWrapping="Wrap"
+                           Text="App data (columns, settings, picking tickets) is stored in %APPDATA%\CT-Hub. Use Backup to copy it into this project folder, and Restore to load it on another computer."/>
+            </DockPanel>
+        </Border>
+
         <!-- ── Tab Control ─────────────────────────────────────────────────── -->
         <TabControl Background="#1E1E1E" BorderBrush="#3C3C3C"
                     Foreground="#D4D4D4">
@@ -170,44 +224,38 @@
                                  Text="{Binding ChaseSearchText, UpdateSourceTrigger=PropertyChanged}"
                                  ToolTip="Search bin, label, qty, stock threshold, notes, id"/>
                     </Border>
-                    <DataGrid x:Name="ChaseTacticalGrid"
-                              ItemsSource="{Binding ChaseTacticalItems}"
-                              CellEditEnding="ChaseTactical_CellEditEnding">
-                        <DataGrid.ContextMenu>
-                            <ContextMenu>
-                                <MenuItem Header="Add Row" Click="ChaseTactical_Add"/>
-                                <MenuItem Header="Import Bulk" Click="ChaseTactical_ImportBulk"/>
-                                <MenuItem Header="Delete Selected" Click="ChaseTactical_Delete"/>
-                            </ContextMenu>
-                        </DataGrid.ContextMenu>
-                        <DataGrid.Columns>
-                            <DataGridComboBoxColumn Header="Bin"
-                                                    SelectedItemBinding="{Binding Bin, UpdateSourceTrigger=PropertyChanged}"
-                                                    ItemsSource="{x:Static local:MainWindow.BinLocations}"
-                                                    Width="130"/>
-                            <DataGridComboBoxColumn Header="Class"
-                                                    SelectedItemBinding="{Binding ClassName, UpdateSourceTrigger=PropertyChanged}"
-                                                    ItemsSource="{x:Static local:MainWindow.ClassNames}"
-                                                    Width="220"/>
-                            <DataGridComboBoxColumn Header="Letter"
-                                                    SelectedItemBinding="{Binding ClassLetter, UpdateSourceTrigger=PropertyChanged}"
-                                                    ItemsSource="{x:Static local:MainWindow.ClassLetters}"
-                                                    Width="80"/>
-                            <DataGridTextColumn Header="Class ID"    Binding="{Binding ClassId}"     Width="180" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Label"       Binding="{Binding Label}"       Width="200"/>
-                            <DataGridTextColumn Header="Qty"         Binding="{Binding Qty}"         Width="80"/>
-                            <DataGridTextColumn Header="Stock Threshhold" Binding="{Binding StockThreshold}" Width="130"/>
-                            <DataGridTextColumn Header="Notes"       Binding="{Binding Notes}"       Width="*"/>
-                            <DataGridTextColumn Header="ID"          Binding="{Binding Id}"          Width="220" IsReadOnly="True">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Foreground" Value="#555"/>
-                                        <Setter Property="FontSize" Value="10"/>
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-                        </DataGrid.Columns>
-                    </DataGrid>
+                    <Grid>
+                        <DataGrid x:Name="ChaseTacticalGrid"
+                                  ItemsSource="{Binding ChaseTacticalItems}"
+                                  CanUserSortColumns="False"
+                                  CellEditEnding="ChaseTactical_CellEditEnding">
+                            <DataGrid.GroupStyle>
+                                <GroupStyle ContainerStyle="{StaticResource SectionGroupContainerStyle}"/>
+                            </DataGrid.GroupStyle>
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Add Row" Click="ChaseTactical_Add"/>
+                                    <MenuItem Header="Import Bulk" Click="ChaseTactical_ImportBulk"/>
+                                    <MenuItem Header="Delete Selected" Click="ChaseTactical_Delete"/>
+                                    <Separator/>
+                                    <MenuItem Header="⊞  Set Section…" Click="ChaseTactical_SetSection"/>
+                                    <MenuItem Header="✕  Clear Section" Click="ChaseTactical_ClearSection"/>
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
+
+                        </DataGrid>
+                        <Button x:Name="ChaseIdColToggleBtn"
+                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Width="17" Height="26"
+                                Tag="ChaseTacticalGrid"
+                                Click="IdColToggle_Click"
+                                Cursor="Hand"
+                                ToolTip="Show / hide ID column"
+                                Background="#1E1E1E" BorderBrush="#3C3C3C" BorderThickness="0,0,0,1"
+                                Foreground="#606060" FontSize="10" Padding="0"
+                                Margin="0,0,17,0"
+                                Content="&#x25C1;"/>
+                    </Grid>
                 </DockPanel>
             </TabItem>
 
@@ -230,32 +278,38 @@
                                  Text="{Binding ToughHooksSearchText, UpdateSourceTrigger=PropertyChanged}"
                                  ToolTip="Search bin, sku, description, qty, stock threshold, id"/>
                     </Border>
-                    <DataGrid x:Name="ToughHooksGrid"
-                              ItemsSource="{Binding ToughHookItems}"
-                              CellEditEnding="ToughHooks_CellEditEnding">
-                        <DataGrid.ContextMenu>
-                            <ContextMenu>
-                                <MenuItem Header="Add Row" Click="ToughHooks_Add"/>
-                                <MenuItem Header="Import Bulk" Click="ToughHooks_ImportBulk"/>
-                                <MenuItem Header="Delete Selected" Click="ToughHooks_Delete"/>
-                            </ContextMenu>
-                        </DataGrid.ContextMenu>
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Bin"         Binding="{Binding Bin}"         Width="120"/>
-                            <DataGridTextColumn Header="SKU"         Binding="{Binding Sku}"         Width="140"/>
-                            <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*"/>
-                            <DataGridTextColumn Header="Qty"         Binding="{Binding Qty}"         Width="80"/>
-                            <DataGridTextColumn Header="Stock Threshhold" Binding="{Binding StockThreshold}" Width="130"/>
-                            <DataGridTextColumn Header="ID"          Binding="{Binding Id}"          Width="220" IsReadOnly="True">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Foreground" Value="#555"/>
-                                        <Setter Property="FontSize" Value="10"/>
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-                        </DataGrid.Columns>
-                    </DataGrid>
+                    <Grid>
+                        <DataGrid x:Name="ToughHooksGrid"
+                                  ItemsSource="{Binding ToughHookItems}"
+                                  CanUserSortColumns="False"
+                                  CellEditEnding="ToughHooks_CellEditEnding">
+                            <DataGrid.GroupStyle>
+                                <GroupStyle ContainerStyle="{StaticResource SectionGroupContainerStyle}"/>
+                            </DataGrid.GroupStyle>
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Add Row" Click="ToughHooks_Add"/>
+                                    <MenuItem Header="Import Bulk" Click="ToughHooks_ImportBulk"/>
+                                    <MenuItem Header="Delete Selected" Click="ToughHooks_Delete"/>
+                                    <Separator/>
+                                    <MenuItem Header="⊞  Set Section…" Click="ToughHooks_SetSection"/>
+                                    <MenuItem Header="✕  Clear Section" Click="ToughHooks_ClearSection"/>
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
+
+                        </DataGrid>
+                        <Button x:Name="ToughHooksIdColToggleBtn"
+                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Width="17" Height="26"
+                                Tag="ToughHooksGrid"
+                                Click="IdColToggle_Click"
+                                Cursor="Hand"
+                                ToolTip="Show / hide ID column"
+                                Background="#1E1E1E" BorderBrush="#3C3C3C" BorderThickness="0,0,0,1"
+                                Foreground="#606060" FontSize="10" Padding="0"
+                                Margin="0,0,17,0"
+                                Content="&#x25C1;"/>
+                    </Grid>
                 </DockPanel>
             </TabItem>
 
@@ -275,22 +329,36 @@
                                  Text="{Binding ShippingSupplysSearchText, UpdateSourceTrigger=PropertyChanged}"
                                  ToolTip="Search dimensions, bundle, single, stock threshold, id"/>
                     </Border>
-                    <DataGrid x:Name="ShippingSupplysGrid"
-                              ItemsSource="{Binding ShippingSupplysItems}"
-                              CellEditEnding="ShippingSupplys_CellEditEnding">
-                        <DataGrid.ContextMenu>
-                            <ContextMenu>
-                                <MenuItem Header="Add Row" Click="ShippingSupplys_Add"/>
-                                <MenuItem Header="Delete Selected" Click="ShippingSupplys_Delete"/>
-                            </ContextMenu>
-                        </DataGrid.ContextMenu>
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Dimensions" Binding="{Binding Dimensions}" Width="*"/>
-                            <DataGridTextColumn Header="Bundle"     Binding="{Binding Bundle}"     Width="120"/>
-                            <DataGridTextColumn Header="Single"     Binding="{Binding Single}"     Width="120"/>
-                            <DataGridTextColumn Header="Stock Threshhold" Binding="{Binding StockThreshold}" Width="130"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
+                    <Grid>
+                        <DataGrid x:Name="ShippingSupplysGrid"
+                                  ItemsSource="{Binding ShippingSupplysItems}"
+                                  CanUserSortColumns="False"
+                                  CellEditEnding="ShippingSupplys_CellEditEnding">
+                            <DataGrid.GroupStyle>
+                                <GroupStyle ContainerStyle="{StaticResource SectionGroupContainerStyle}"/>
+                            </DataGrid.GroupStyle>
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Add Row" Click="ShippingSupplys_Add"/>
+                                    <MenuItem Header="Delete Selected" Click="ShippingSupplys_Delete"/>
+                                    <Separator/>
+                                    <MenuItem Header="⊞  Set Section…" Click="ShippingSupplys_SetSection"/>
+                                    <MenuItem Header="✕  Clear Section" Click="ShippingSupplys_ClearSection"/>
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
+                        </DataGrid>
+                        <Button x:Name="ShippingSupplysIdColToggleBtn"
+                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Width="17" Height="26"
+                                Tag="ShippingSupplysGrid"
+                                Click="IdColToggle_Click"
+                                Cursor="Hand"
+                                ToolTip="Show / hide ID column"
+                                Background="#1E1E1E" BorderBrush="#3C3C3C" BorderThickness="0,0,0,1"
+                                Foreground="#606060" FontSize="10" Padding="0"
+                                Margin="0,0,17,0"
+                                Content="&#x25C1;"/>
+                    </Grid>
                 </DockPanel>
             </TabItem>
 
@@ -326,6 +394,7 @@
                     <DataGrid Grid.Row="2"
                               x:Name="QrMappingsGrid"
                               ItemsSource="{Binding QrMappingItems}"
+                              CanUserSortColumns="False"
                               SelectionChanged="QrMappings_SelectionChanged"
                               CellEditEnding="QrMappings_CellEditEnding">
                         <DataGrid.ContextMenu>
@@ -334,19 +403,6 @@
                                 <MenuItem Header="Delete Selected" Click="QrMappings_Delete"/>
                             </ContextMenu>
                         </DataGrid.ContextMenu>
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="QR Value"      Binding="{Binding QrValue}"      Width="220"/>
-                            <DataGridTextColumn Header="Classification" Binding="{Binding Classification}" Width="180"/>
-                            <DataGridTextColumn Header="Description"   Binding="{Binding Description}"  Width="*"/>
-                            <DataGridTextColumn Header="ID"            Binding="{Binding Id}"            Width="220" IsReadOnly="True">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Foreground" Value="#555"/>
-                                        <Setter Property="FontSize" Value="10"/>
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-                        </DataGrid.Columns>
                     </DataGrid>
 
                     <GridSplitter Grid.Row="3" Height="6" HorizontalAlignment="Stretch" Background="#3C3C3C"/>
@@ -394,6 +450,18 @@
                                              Style="{StaticResource SearchBox}"
                                              Text="SCAN_ME"
                                              TextChanged="QrGenerator_TextChanged"/>
+                                    <DockPanel Margin="0,4,0,0">
+                                        <ComboBox x:Name="QrGenUpcALeadDigit"
+                                                  DockPanel.Dock="Left"
+                                                  Width="46" Padding="6,4"
+                                                  FontFamily="Consolas" FontSize="11"
+                                                  ToolTip="Number system digit to prepend (0 = standard retail)"/>
+                                        <Button Content="⬆ Pad to UPC-A"
+                                                Click="QrGenPadUpcA_Click"
+                                                Padding="10,4" Margin="4,0,0,0"
+                                                FontFamily="Consolas" FontSize="11"
+                                                ToolTip="Prepend selected digit to 11 digits, recalculate check → valid 12-digit UPC-A"/>
+                                    </DockPanel>
 
                                     <DockPanel Margin="0,8,0,2">
                                         <TextBlock Text="Code Type" Foreground="#9CDCFE"
@@ -795,6 +863,12 @@
                                 Content="Edit"
                                 Margin="8,0,0,0"
                                 Click="PdfEditorEditMode_Click"/>
+                            <Button x:Name="PdfEditorRunEditBtn"
+                                DockPanel.Dock="Right"
+                                Style="{StaticResource PdfModeButton}"
+                                Content="✏ Edit Runs: Off"
+                                Margin="8,0,0,0"
+                                Click="PdfEditorRunEdit_Click"/>
                                 <TextBlock x:Name="PdfEditorSelectedFileText"
                                            Text="Select a PDF from the list above"
                                            Foreground="#D4D4D4"
@@ -1041,6 +1115,11 @@
                 </Grid>
             </TabItem>
 
+            <!-- ── Maintenance ────────────────────────────────────────────── -->
+            <TabItem Header="Maintenance">
+                <Grid Background="#1E1E1E"/>
+            </TabItem>
+
             <!-- ── Server ────────────────────────────────────────────────── -->
             <TabItem Header="Server">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Background="#1E1E1E">
@@ -1199,6 +1278,163 @@
                         <TextBlock Text="SETTINGS"
                                    FontFamily="Consolas" FontSize="11" FontWeight="SemiBold"
                                    Foreground="#569CD6" Margin="0,0,0,8"/>
+
+                        <!-- ── Mobile Card Display ──────────────────────────── -->
+                        <TextBlock Text="MOBILE CARD DISPLAY"
+                                   FontFamily="Consolas" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="#569CD6" Margin="0,16,0,6"/>
+                        <TextBlock Text="Controls what fields appear on each entry card in the Android scan picker."
+                                   Foreground="#858585" FontSize="12" Margin="0,0,0,12" TextWrapping="Wrap"/>
+
+                        <!-- Chase Tactical -->
+                        <Border Background="#252526" BorderBrush="#3C3C3C" BorderThickness="1"
+                                CornerRadius="4" Padding="14,10" Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="140"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
+                                           Text="Chase Tactical" Foreground="#D4D4D4"
+                                           FontWeight="SemiBold" FontSize="13" Margin="0,0,0,8"/>
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Title (Row 1)"
+                                           Foreground="#858585" FontSize="12" VerticalAlignment="Center"/>
+                                <ComboBox Grid.Row="1" Grid.Column="1"
+                                          x:Name="CT_Row1Combo"
+                                          ItemsSource="{Binding MobileCardFieldOptions_CT}"
+                                          SelectedValue="{Binding MobileCard_CT_Row1, UpdateSourceTrigger=PropertyChanged}"
+                                          Background="#1E1E1E" Foreground="{StaticResource DropDownTextBrush}"
+                                          BorderBrush="#3C3C3C" Margin="0,2,0,2"/>
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Subtitle (Row 2)"
+                                           Foreground="#858585" FontSize="12" VerticalAlignment="Center" Margin="0,4,0,0"/>
+                                <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="0,4,0,2">
+                                    <ComboBox x:Name="CT_Row2aCombo" Width="180"
+                                              ItemsSource="{Binding MobileCardFieldOptions_CT}"
+                                              SelectedValue="{Binding MobileCard_CT_Row2a, UpdateSourceTrigger=PropertyChanged}"
+                                              Background="#1E1E1E" Foreground="{StaticResource DropDownTextBrush}"
+                                              BorderBrush="#3C3C3C" Margin="0,0,6,0"/>
+                                    <ComboBox x:Name="CT_Row2bCombo" Width="180"
+                                              ItemsSource="{Binding MobileCardFieldOptions_CT}"
+                                              SelectedValue="{Binding MobileCard_CT_Row2b, UpdateSourceTrigger=PropertyChanged}"
+                                              Background="#1E1E1E" Foreground="{StaticResource DropDownTextBrush}"
+                                              BorderBrush="#3C3C3C"/>
+                                </StackPanel>
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Badge"
+                                           Foreground="#858585" FontSize="12" VerticalAlignment="Center" Margin="0,4,0,0"/>
+                                <ComboBox Grid.Row="3" Grid.Column="1" Margin="0,4,0,0"
+                                          x:Name="CT_BadgeCombo"
+                                          ItemsSource="{Binding MobileCardFieldOptions_CT}"
+                                          SelectedValue="{Binding MobileCard_CT_Badge, UpdateSourceTrigger=PropertyChanged}"
+                                          Background="#1E1E1E" Foreground="{StaticResource DropDownTextBrush}"
+                                          BorderBrush="#3C3C3C"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Tough Hooks -->
+                        <Border Background="#252526" BorderBrush="#3C3C3C" BorderThickness="1"
+                                CornerRadius="4" Padding="14,10" Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="140"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
+                                           Text="Tough Hooks" Foreground="#D4D4D4"
+                                           FontWeight="SemiBold" FontSize="13" Margin="0,0,0,8"/>
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Title (Row 1)"
+                                           Foreground="#858585" FontSize="12" VerticalAlignment="Center"/>
+                                <ComboBox Grid.Row="1" Grid.Column="1"
+                                          x:Name="TH_Row1Combo"
+                                          ItemsSource="{Binding MobileCardFieldOptions_TH}"
+                                          SelectedValue="{Binding MobileCard_TH_Row1, UpdateSourceTrigger=PropertyChanged}"
+                                          Background="#1E1E1E" Foreground="{StaticResource DropDownTextBrush}"
+                                          BorderBrush="#3C3C3C" Margin="0,2,0,2"/>
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Subtitle (Row 2)"
+                                           Foreground="#858585" FontSize="12" VerticalAlignment="Center" Margin="0,4,0,0"/>
+                                <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="0,4,0,2">
+                                    <ComboBox x:Name="TH_Row2aCombo" Width="180"
+                                              ItemsSource="{Binding MobileCardFieldOptions_TH}"
+                                              SelectedValue="{Binding MobileCard_TH_Row2a, UpdateSourceTrigger=PropertyChanged}"
+                                              Background="#1E1E1E" Foreground="{StaticResource DropDownTextBrush}"
+                                              BorderBrush="#3C3C3C" Margin="0,0,6,0"/>
+                                    <ComboBox x:Name="TH_Row2bCombo" Width="180"
+                                              ItemsSource="{Binding MobileCardFieldOptions_TH}"
+                                              SelectedValue="{Binding MobileCard_TH_Row2b, UpdateSourceTrigger=PropertyChanged}"
+                                              Background="#1E1E1E" Foreground="{StaticResource DropDownTextBrush}"
+                                              BorderBrush="#3C3C3C"/>
+                                </StackPanel>
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Badge"
+                                           Foreground="#858585" FontSize="12" VerticalAlignment="Center" Margin="0,4,0,0"/>
+                                <ComboBox Grid.Row="3" Grid.Column="1" Margin="0,4,0,0"
+                                          x:Name="TH_BadgeCombo"
+                                          ItemsSource="{Binding MobileCardFieldOptions_TH}"
+                                          SelectedValue="{Binding MobileCard_TH_Badge, UpdateSourceTrigger=PropertyChanged}"
+                                          Background="#1E1E1E" Foreground="{StaticResource DropDownTextBrush}"
+                                          BorderBrush="#3C3C3C"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Shipping Supplys -->
+                        <Border Background="#252526" BorderBrush="#3C3C3C" BorderThickness="1"
+                                CornerRadius="4" Padding="14,10" Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="140"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
+                                           Text="Shipping Supplys" Foreground="#D4D4D4"
+                                           FontWeight="SemiBold" FontSize="13" Margin="0,0,0,8"/>
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Title (Row 1)"
+                                           Foreground="#858585" FontSize="12" VerticalAlignment="Center"/>
+                                <ComboBox Grid.Row="1" Grid.Column="1"
+                                          x:Name="SS_Row1Combo"
+                                          ItemsSource="{Binding MobileCardFieldOptions_SS}"
+                                          SelectedValue="{Binding MobileCard_SS_Row1, UpdateSourceTrigger=PropertyChanged}"
+                                          Background="#1E1E1E" Foreground="{StaticResource DropDownTextBrush}"
+                                          BorderBrush="#3C3C3C" Margin="0,2,0,2"/>
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Subtitle (Row 2)"
+                                           Foreground="#858585" FontSize="12" VerticalAlignment="Center" Margin="0,4,0,0"/>
+                                <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="0,4,0,2">
+                                    <ComboBox x:Name="SS_Row2aCombo" Width="180"
+                                              ItemsSource="{Binding MobileCardFieldOptions_SS}"
+                                              SelectedValue="{Binding MobileCard_SS_Row2a, UpdateSourceTrigger=PropertyChanged}"
+                                              Background="#1E1E1E" Foreground="{StaticResource DropDownTextBrush}"
+                                              BorderBrush="#3C3C3C" Margin="0,0,6,0"/>
+                                    <ComboBox x:Name="SS_Row2bCombo" Width="180"
+                                              ItemsSource="{Binding MobileCardFieldOptions_SS}"
+                                              SelectedValue="{Binding MobileCard_SS_Row2b, UpdateSourceTrigger=PropertyChanged}"
+                                              Background="#1E1E1E" Foreground="{StaticResource DropDownTextBrush}"
+                                              BorderBrush="#3C3C3C"/>
+                                </StackPanel>
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Badge"
+                                           Foreground="#858585" FontSize="12" VerticalAlignment="Center" Margin="0,4,0,0"/>
+                                <ComboBox Grid.Row="3" Grid.Column="1" Margin="0,4,0,0"
+                                          x:Name="SS_BadgeCombo"
+                                          ItemsSource="{Binding MobileCardFieldOptions_SS}"
+                                          SelectedValue="{Binding MobileCard_SS_Badge, UpdateSourceTrigger=PropertyChanged}"
+                                          Background="#1E1E1E" Foreground="{StaticResource DropDownTextBrush}"
+                                          BorderBrush="#3C3C3C"/>
+                            </Grid>
+                        </Border>
 
                     </StackPanel>
                 </ScrollViewer>

@@ -79,6 +79,31 @@ public class ChaseTacticalEntry : INotifyPropertyChanged
         set => SetField(ref _notes, value);
     }
 
+    private string _sectionLabel = string.Empty;
+
+    [JsonPropertyName("sectionLabel")]
+    public string SectionLabel
+    {
+        get => _sectionLabel;
+        set => SetField(ref _sectionLabel, value);
+    }
+
+    [JsonPropertyName("extraFields")]
+    public Dictionary<string, string> ExtraFields { get; set; } = new();
+
+    /// <summary>Indexer for WPF dynamic column binding: {Binding [columnId]}</summary>
+    public string this[string key]
+    {
+        get => ExtraFields.TryGetValue(key, out var v) ? v : string.Empty;
+        set
+        {
+            if (ExtraFields.TryGetValue(key, out var cur) && cur == value) return;
+            ExtraFields[key] = value;
+            OnPropertyChanged($"Item[{key}]");
+            OnPropertyChanged(string.Empty); // refresh MultiBinding (computed columns)
+        }
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

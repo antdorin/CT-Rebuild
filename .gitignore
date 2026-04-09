@@ -38,3 +38,15 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots
 fastlane/test_output
+
+# Android / Gradle
+CTRebuildAndroid/.gradle/
+CTRebuildAndroid/build/
+CTRebuildAndroid/app/build/
+CTRebuildAndroid/local.properties
+CTRebuildAndroid/**/*.apk
+CTRebuildAndroid/**/*.aab
+CTRebuildAndroid/**/*.ap_
+CTRebuildAndroid/**/captures/
+CTRebuildAndroid/**/.cxx/
+CTRebuildAndroid/**/release/

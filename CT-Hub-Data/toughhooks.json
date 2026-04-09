@@ -1,0 +1,168 @@
+[
+  {
+    "id": "527d9312-8847-4422-a9eb-e902bd459c98",
+    "bin": "\u2014",
+    "sku": "TH-BLK",
+    "description": "Tough Hook (Black)",
+    "qty": 0,
+    "stockThreshold": 0,
+    "extraFields": {
+      "80f401f6-f979-41ce-94e3-5d8b55d3cd84": "0"
+    }
+  },
+  {
+    "id": "2ac71927-7efa-4af6-8efe-1b16b597eb4a",
+    "bin": "\u2014",
+    "sku": "TH-BLUE",
+    "description": "Tough Hook (Blue)",
+    "qty": 0,
+    "stockThreshold": 0,
+    "extraFields": {
+      "24fb9829-44dc-427c-8462-863229514587": ""
+    }
+  },
+  {
+    "id": "ba6f05eb-4334-4239-8f04-faa54d22823a",
+    "bin": "\u2014",
+    "sku": "TH-FG",
+    "description": "Tough Hook (Foliage Green)",
+    "qty": 0,
+    "stockThreshold": 0,
+    "extraFields": {}
+  },
+  {
+    "id": "c5f31d43-77a9-400f-bd9b-3b9b5b3b0210",
+    "bin": "\u2014",
+    "sku": "TH-GRY",
+    "description": "Tough Hook (Gray)",
+    "qty": 0,
+    "stockThreshold": 0,
+    "extraFields": {}
+  },
+  {
+    "id": "bff317bb-0429-4fea-8692-31e9ce479b61",
+    "bin": "\u2014",
+    "sku": "TH-MAPLE",
+    "description": "Tough Hook (Maple Wood)",
+    "qty": 0,
+    "stockThreshold": 0,
+    "extraFields": {}
+  },
+  {
+    "id": "5ce72198-6b31-45d1-a7e7-34353f83bc59",
+    "bin": "\u2014",
+    "sku": "TH-RED",
+    "description": "Tough Hook (Red)",
+    "qty": 0,
+    "stockThreshold": 0,
+    "extraFields": {}
+  },
+  {
+    "id": "e99b7a7f-fa83-4692-9380-1d32257f4776",
+    "bin": "\u2014",
+    "sku": "TH-RH-BLK",
+    "description": "RHINO Hanger (Black)",
+    "qty": 0,
+    "stockThreshold": 0,
+    "extraFields": {}
+  },
+  {
+    "id": "5c4790bf-d217-4069-8f26-e371dc74ee04",
+    "bin": "\u2014",
+    "sku": "TH-RH-BLUE",
+    "description": "RHINO Hanger (Blue)",
+    "qty": 0,
+    "stockThreshold": 0,
+    "extraFields": {}
+  },
+  {
+    "id": "455244cd-fcc1-4c39-927d-66bb01a4cf5e",
+    "bin": "\u2014",
+    "sku": "TH-RH-FG",
+    "description": "RHINO Hanger (Foliage)",
+    "qty": 0,
+    "stockThreshold": 0,
+    "extraFields": {}
+  },
+  {
+    "id": "b620e477-72a3-4558-8d8e-6027f7ea7faf",
+    "bin": "\u2014",
+    "sku": "TH-RH-GRY",
+    "description": "RHINO Hanger (Gray)",
+    "qty": 0,
+    "stockThreshold": 0,
+    "extraFields": {}
+  },
+  {
+    "id": "5361da3d-3a31-41e4-bd3f-560abcbc38b0",
+    "bin": "\u2014",
+    "sku": "TH-RH-ORG",
+    "description": "RHINO Hanger (Orange)",
+    "qty": 0,
+    "stockThreshold": 0,
+    "extraFields": {}
+  },
+  {
+    "id": "ff3325fe-9b45-411b-b435-d32a7c056cd0",
+    "bin": "\u2014",
+    "sku": "TH-RH-RED",
+    "description": "RHINO Hanger (Red)",
+    "qty": 0,
+    "stockThreshold": 0,
+    "extraFields": {}
+  },
+  {
+    "id": "3b3f2419-090d-41ea-b2d8-0be264984dd2",
+    "bin": "\u2014",
+    "sku": "TH-RH-TAN",
+    "description": "RHINO Hanger (Tan)",
+    "qty": 0,
+    "stockThreshold": 0,
+    "extraFields": {}
+  },
+  {
+    "id": "b5864551-20ad-4e9a-8d2a-16ab98944ded",
+    "bin": "\u2014",
+    "sku": "TH-RH-YEL",
+    "description": "RHINO Hanger (Yellow)",
+    "qty": 0,
+    "stockThreshold": 0,
+    "extraFields": {}
+  },
+  {
+    "id": "8ee4e83f-5a23-44e0-bddf-8b1aaa587981",
+    "bin": "\u2014",
+    "sku": "TH-TAN",
+    "description": "Tough Hook (Tan)",
+    "qty": 0,
+    "stockThreshold": 0,
+    "extraFields": {}
+  },
+  {
+    "id": "34aab2a4-17e0-47fa-9631-e10e6698303d",
+    "bin": "\u2014",
+    "sku": "TOUGH-HANGER-BLK",
+    "description": "Tough Hanger XL (Black)",
+    "qty": 0,
+    "stockThreshold": 0,
+    "extraFields": {}
+  },
+  {
+    "id": "53468900-44f3-49f8-9ce3-d24d1fc4e366",
+    "bin": "\u2014",
+    "sku": "TOUGH-HANGER-GRY",
+    "description": "Tough Hanger XL (GRAY)",
+    "qty": 0,
+    "stockThreshold": 0,
+    "extraFields": {}
+  },
+  {
+    "id": "30634b93-e20e-4c97-a772-d85f5985ed79",
+    "bin": "\u2014",
+    "sku": "TOUGH-HANGER-TAN",
+    "description": "Tough Hanger XL (Coyote Tan)",
+    "qty": 0,
+    "stockThreshold": 0,
+    "extraFields": {}
+  }
+]

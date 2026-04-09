@@ -69,13 +69,9 @@ final class BinDataStore: ObservableObject {
         pattern: #"\b\d+\s+[A-Z]{1,8}\s+(\d+)\b"#
     )
 
-    /// Converts PDF format "1-A-4D" → grid format "1A-4D"
+    /// Keeps PDF format "1-A-4D" as-is (grid now matches PDF format)
     private func toGridCode(_ raw: String) -> String {
-        raw.uppercased().replacingOccurrences(
-            of: #"^(\d+)-([A-F])-"#,
-            with: "$1$2-",
-            options: .regularExpression
-        )
+        raw.uppercased()
     }
 
     /// Extracts (gridCode, committedQty) pairs from a single PDF page's text.

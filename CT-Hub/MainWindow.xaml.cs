@@ -27,9 +27,9 @@ namespace CTHub;
 
 public partial class MainWindow : Window, INotifyPropertyChanged
 {
-    private const double PdfEditorWebZoomMin = 0.20;
+    private const double PdfEditorWebZoomMin = 0.30;
     private const double PdfEditorWebZoomMax = 4.0;
-    private const double PdfEditorWebZoomDefault = 0.50;
+    private const double PdfEditorWebZoomDefault = 1.0;
 
     private readonly HubServer _hub = App.Hub;
     private readonly CdpDevToolsService _cdp = new();
@@ -185,6 +185,93 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             OnPropertyChanged();
             _pdfFilesView?.Refresh();
         }
+    }
+
+    // ── Mobile Card Config ────────────────────────────────────────────────────
+
+    // Field option lists (BindingPath + friendly label) for each table's ComboBoxes.
+    // "(none)" maps to null — no field shown.
+    private static readonly List<string?> _ctFields  = new() { null, "Bin", "ClassName", "ClassLetter", "ClassId", "Label", "Qty", "StockThreshold", "Notes" };
+    private static readonly List<string?> _thFields  = new() { null, "Bin", "Sku", "Description", "Qty", "StockThreshold" };
+    private static readonly List<string?> _ssFields  = new() { null, "Dimensions", "Bundle", "Single", "StockThreshold" };
+
+    public IReadOnlyList<string?> MobileCardFieldOptions_CT => _ctFields;
+    public IReadOnlyList<string?> MobileCardFieldOptions_TH => _thFields;
+    public IReadOnlyList<string?> MobileCardFieldOptions_SS => _ssFields;
+
+    private CTHub.Services.MobileCardEntry CardCfg(string table) =>
+        _settings.MobileCardConfig.TryGetValue(table, out var e) ? e : new();
+
+    private void SaveCardCfg(string table, CTHub.Services.MobileCardEntry entry)
+    {
+        _settings.MobileCardConfig[table] = entry;
+        _settings.Save();
+    }
+
+    // Chase Tactical
+    public string? MobileCard_CT_Row1
+    {
+        get => CardCfg("chasetactical").Row1;
+        set { var e = CardCfg("chasetactical"); e.Row1 = value; SaveCardCfg("chasetactical", e); OnPropertyChanged(); }
+    }
+    public string? MobileCard_CT_Row2a
+    {
+        get => CardCfg("chasetactical").Row2.ElementAtOrDefault(0);
+        set { var e = CardCfg("chasetactical"); var r2 = e.Row2.ToList(); if (r2.Count == 0) r2.Add(value!); else r2[0] = value!; e.Row2 = r2.Where(x => x != null).ToList()!; SaveCardCfg("chasetactical", e); OnPropertyChanged(); }
+    }
+    public string? MobileCard_CT_Row2b
+    {
+        get => CardCfg("chasetactical").Row2.ElementAtOrDefault(1);
+        set { var e = CardCfg("chasetactical"); var r2 = e.Row2.ToList(); while (r2.Count < 2) r2.Add(null!); r2[1] = value!; e.Row2 = r2.Where(x => x != null).ToList()!; SaveCardCfg("chasetactical", e); OnPropertyChanged(); }
+    }
+    public string? MobileCard_CT_Badge
+    {
+        get => CardCfg("chasetactical").Badge;
+        set { var e = CardCfg("chasetactical"); e.Badge = value; SaveCardCfg("chasetactical", e); OnPropertyChanged(); }
+    }
+
+    // Tough Hooks
+    public string? MobileCard_TH_Row1
+    {
+        get => CardCfg("toughhooks").Row1;
+        set { var e = CardCfg("toughhooks"); e.Row1 = value; SaveCardCfg("toughhooks", e); OnPropertyChanged(); }
+    }
+    public string? MobileCard_TH_Row2a
+    {
+        get => CardCfg("toughhooks").Row2.ElementAtOrDefault(0);
+        set { var e = CardCfg("toughhooks"); var r2 = e.Row2.ToList(); if (r2.Count == 0) r2.Add(value!); else r2[0] = value!; e.Row2 = r2.Where(x => x != null).ToList()!; SaveCardCfg("toughhooks", e); OnPropertyChanged(); }
+    }
+    public string? MobileCard_TH_Row2b
+    {
+        get => CardCfg("toughhooks").Row2.ElementAtOrDefault(1);
+        set { var e = CardCfg("toughhooks"); var r2 = e.Row2.ToList(); while (r2.Count < 2) r2.Add(null!); r2[1] = value!; e.Row2 = r2.Where(x => x != null).ToList()!; SaveCardCfg("toughhooks", e); OnPropertyChanged(); }
+    }
+    public string? MobileCard_TH_Badge
+    {
+        get => CardCfg("toughhooks").Badge;
+        set { var e = CardCfg("toughhooks"); e.Badge = value; SaveCardCfg("toughhooks", e); OnPropertyChanged(); }
+    }
+
+    // Shipping Supplys
+    public string? MobileCard_SS_Row1
+    {
+        get => CardCfg("shippingsupplys").Row1;
+        set { var e = CardCfg("shippingsupplys"); e.Row1 = value; SaveCardCfg("shippingsupplys", e); OnPropertyChanged(); }
+    }
+    public string? MobileCard_SS_Row2a
+    {
+        get => CardCfg("shippingsupplys").Row2.ElementAtOrDefault(0);
+        set { var e = CardCfg("shippingsupplys"); var r2 = e.Row2.ToList(); if (r2.Count == 0) r2.Add(value!); else r2[0] = value!; e.Row2 = r2.Where(x => x != null).ToList()!; SaveCardCfg("shippingsupplys", e); OnPropertyChanged(); }
+    }
+    public string? MobileCard_SS_Row2b
+    {
+        get => CardCfg("shippingsupplys").Row2.ElementAtOrDefault(1);
+        set { var e = CardCfg("shippingsupplys"); var r2 = e.Row2.ToList(); while (r2.Count < 2) r2.Add(null!); r2[1] = value!; e.Row2 = r2.Where(x => x != null).ToList()!; SaveCardCfg("shippingsupplys", e); OnPropertyChanged(); }
+    }
+    public string? MobileCard_SS_Badge
+    {
+        get => CardCfg("shippingsupplys").Badge;
+        set { var e = CardCfg("shippingsupplys"); e.Badge = value; SaveCardCfg("shippingsupplys", e); OnPropertyChanged(); }
     }
 
     private string _statusText = $"http://localhost:{HubServer.Port}";
@@ -458,6 +545,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         InitializeComponent();
 
+        QrGenUpcALeadDigit.ItemsSource = Enumerable.Range(0, 10);
+        QrGenUpcALeadDigit.SelectedIndex = 0;
+
         _chadHoldTimer = new System.Windows.Threading.DispatcherTimer
         {
             Interval = TimeSpan.FromSeconds(3)
@@ -549,6 +639,32 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         UpdatePdfEditorModeUi();
         InitializeQrGenerator();
         Loaded += (_, _) => Dispatcher.BeginInvoke(new Action(ApplySavedPdfEditorLayout), System.Windows.Threading.DispatcherPriority.Loaded);
+        Loaded += (_, _) =>
+        {
+            SeedColumnsIfNeeded();
+            RebuildAllDynamicColumns();
+            QrMappingItems.CollectionChanged += (_, e) =>
+            {
+                if (e.Action != System.Collections.Specialized.NotifyCollectionChangedAction.Add) return;
+                if (e.NewItems?[0] is not QrClassMapping added) return;
+                Dispatcher.InvokeAsync(() =>
+                {
+                    // Set code type first so preview renders correctly when Text is set
+                    if (added.QrValue.Length == 12 && added.QrValue.All(char.IsDigit))
+                        QrGenTypeUpcA.IsChecked = true;
+                    else if (added.QrValue.All(c => char.IsAsciiLetterOrDigit(c) || c == '-'))
+                        QrGenTypeBarcode.IsChecked = true;
+                    else
+                        QrGenTypeQr.IsChecked = true;
+                    // Fill payload — TextChanged fires UpdateQrGeneratorPreview() with correct type
+                    QrGenPayload.Text = added.QrValue;
+                    // Select + scroll the new row into view
+                    QrMappingsGrid.SelectedItem = added;
+                    QrMappingsGrid.ScrollIntoView(added);
+                });
+            };
+            Dispatcher.BeginInvoke(new Action(ApplyAllGridLayouts), System.Windows.Threading.DispatcherPriority.Background);
+        };
 
         // Populate server info panel
         RefreshServerInfo();
@@ -556,6 +672,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     protected override async void OnClosed(EventArgs e)
     {
+        SaveAllGridLayouts();
         await _cdp.DisposeAsync();
         base.OnClosed(e);
     }
@@ -647,12 +764,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         _chaseView = CollectionViewSource.GetDefaultView(ChaseTacticalItems);
         _chaseView.Filter = item => FilterChase(item as ChaseTacticalEntry);
+        _chaseView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ChaseTacticalEntry.SectionLabel)));
 
         _toughHooksView = CollectionViewSource.GetDefaultView(ToughHookItems);
         _toughHooksView.Filter = item => FilterToughHook(item as ToughHookEntry);
+        _toughHooksView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ToughHookEntry.SectionLabel)));
 
         _shippingSupplysView = CollectionViewSource.GetDefaultView(ShippingSupplysItems);
         _shippingSupplysView.Filter = item => FilterShippingSupplys(item as ShippingSupplyEntry);
+        _shippingSupplysView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ShippingSupplyEntry.SectionLabel)));
 
         _qrMappingsView = CollectionViewSource.GetDefaultView(QrMappingItems);
         _qrMappingsView.Filter = item => FilterQrMapping(item as QrClassMapping);
@@ -763,6 +883,75 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             || row.ImportDateTime.ToString("yyyy-MM-dd HH:mm:ss").Contains(term, StringComparison.OrdinalIgnoreCase);
     }
 
+    // ── Backup / Restore ───────────────────────────────────────────────────
+
+    private static readonly string _appDataDir = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CT-Hub");
+
+    private string BackupDir => Path.Combine(
+        AppContext.BaseDirectory, "..", "..", "..", "..", "CT-Hub-Data");
+
+    private void BackupData_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var dest = Path.GetFullPath(BackupDir);
+            CopyDirectory(_appDataDir, dest);
+            StatusText = $"Backup complete → {dest}";
+            MessageBox.Show($"App data backed up to:\n{dest}", "CT Hub – Backup",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Backup failed:\n{ex.Message}", "CT Hub – Backup",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void RestoreData_Click(object sender, RoutedEventArgs e)
+    {
+        var src = Path.GetFullPath(BackupDir);
+        if (!Directory.Exists(src))
+        {
+            MessageBox.Show($"No backup folder found at:\n{src}\n\nRun Backup on the other computer first.",
+                "CT Hub – Restore", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var result = MessageBox.Show(
+            "This will overwrite your current app data with the backup. Continue?",
+            "CT Hub – Restore", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (result != MessageBoxResult.Yes) return;
+
+        try
+        {
+            CopyDirectory(src, _appDataDir);
+            StatusText = "Restore complete – restart CT Hub to load the restored data.";
+            MessageBox.Show("Restore complete.\nPlease restart CT Hub to load the restored data.",
+                "CT Hub – Restore", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Restore failed:\n{ex.Message}", "CT Hub – Restore",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private static void CopyDirectory(string sourceDir, string destDir)
+    {
+        Directory.CreateDirectory(destDir);
+        foreach (var file in Directory.GetFiles(sourceDir))
+        {
+            var destFile = Path.Combine(destDir, Path.GetFileName(file));
+            File.Copy(file, destFile, overwrite: true);
+        }
+        foreach (var dir in Directory.GetDirectories(sourceDir))
+        {
+            var destSub = Path.Combine(destDir, Path.GetFileName(dir));
+            CopyDirectory(dir, destSub);
+        }
+    }
+
     // ── Column header context menu handlers ──────────────────────────────────
 
     private void ColumnHeader_ContextMenuOpening(object sender, ContextMenuEventArgs e)
@@ -773,72 +962,1252 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _activeHeader = header;
         _activeGrid = FindParentDataGrid(header);
 
-        if (header.ContextMenu is null)
-        {
-            var menu = new ContextMenu();
+        // Rebuild menu every time so Edit/Delete are only shown for dynamic columns
+        bool isDynamic = header.Column is IDynamicColumn;
 
+        var menu = new ContextMenu();
+
+        if (isDynamic)
+        {
+            var editItem = new MenuItem { Header = "Edit Column…" };
+            editItem.Click += ColumnHeader_Edit_Click;
+            menu.Items.Add(editItem);
+        }
+        else
+        {
             var editItem = new MenuItem { Header = "Edit Header" };
             editItem.Click += ColumnHeader_Edit_Click;
-
-            var addItem = new MenuItem { Header = "Add Header (after)" };
-            addItem.Click += ColumnHeader_Add_Click;
-
-            var deleteItem = new MenuItem { Header = "Delete Header" };
-            deleteItem.Click += ColumnHeader_Delete_Click;
-
             menu.Items.Add(editItem);
-            menu.Items.Add(addItem);
-            menu.Items.Add(deleteItem);
-
-            header.ContextMenu = menu;
         }
+
+        var addItem = new MenuItem { Header = "Add Column (after)…" };
+        addItem.Click += ColumnHeader_Add_Click;
+        menu.Items.Add(addItem);
+
+        if (isDynamic)
+        {
+            var deleteItem = new MenuItem { Header = "Delete Column" };
+            deleteItem.Click += ColumnHeader_Delete_Click;
+            menu.Items.Add(deleteItem);
+        }
+
+        if (isDynamic && header.Column is IDynamicColumn dynHdrCol && dynHdrCol.DefinitionKind == DataKind.Number)
+        {
+            var def = _hub.Columns.GetAll().FirstOrDefault(c => c.Id == dynHdrCol.DefinitionId);
+            menu.Items.Add(new Separator());
+            var setThreshLabel = def?.WarningThreshold is double t ? $"📊  Column Threshold: {t:G}…" : "📊  Set Column Threshold…";
+            var setThreshItem  = new MenuItem { Header = setThreshLabel };
+            setThreshItem.Tag   = dynHdrCol.DefinitionId;
+            setThreshItem.Click += ColumnHeader_SetThreshold_Click;
+            menu.Items.Add(setThreshItem);
+            if (def?.WarningThreshold is not null)
+            {
+                var clearThreshItem = new MenuItem { Header = "✕  Clear Column Threshold", Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x55, 0x55)) };
+                clearThreshItem.Tag    = dynHdrCol.DefinitionId;
+                clearThreshItem.Click += ColumnHeader_ClearThreshold_Click;
+                menu.Items.Add(clearThreshItem);
+            }
+        }
+
+        // Cancel whatever menu WPF already resolved (on first click it would be the
+        // DataGrid row menu because the header had no ContextMenu yet).  Open the
+        // freshly-built header menu directly instead.
+        e.Handled = true;
+        menu.PlacementTarget = header;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
+        menu.IsOpen = true;
     }
 
     private void ColumnHeader_Edit_Click(object sender, RoutedEventArgs e)
     {
-        if (_activeHeader?.Column is null)
+        if (_activeHeader?.Column is null) return;
+
+        // Dynamic column — persist edit
+        if (_activeHeader.Column is IDynamicColumn dynCol)
+        {
+            var def = _hub.Columns.GetAll().FirstOrDefault(c => c.Id == dynCol.DefinitionId);
+            if (def is null) return;
+
+            var tableCols = _hub.Columns.GetAll()
+                .Where(c => c.TableName.Equals(def.TableName, StringComparison.OrdinalIgnoreCase) && c.Id != def.Id)
+                .ToList();
+            var dlg = new DataKindSelectorDialog(this, def.HeaderText, def.DataKind, def.Options, def.Formula, tableCols);
+            if (dlg.ShowDialog() != true) return;
+
+            def.HeaderText = dlg.ResultHeaderText;
+            def.DataKind   = dlg.ResultDataKind;
+            def.Options    = dlg.ResultOptions;
+            def.Formula    = dlg.ResultFormula;
+            _ = _hub.Columns.UpsertAsync(def);
+
+            SaveGridLayout(_activeGrid!);
+            RebuildDynamicColumns(_activeGrid!, def.TableName);
+            ApplyGridLayout(_activeGrid!);
             return;
+        }
 
-        var currentHeader = _activeHeader.Column.Header?.ToString() ?? string.Empty;
-        var updatedHeader = PromptForText("Edit Header", "Header text:", currentHeader);
-
-        if (string.IsNullOrWhiteSpace(updatedHeader))
-            return;
-
-        _activeHeader.Column.Header = updatedHeader.Trim();
+        // Static column — persist rename
+        var current = ExtractHeaderLabel(_activeHeader.Column);
+        var updated = PromptForText("Edit Header", "Header text:", current);
+        if (!string.IsNullOrWhiteSpace(updated) && _activeGrid is not null)
+        {
+            var newLabel = updated.Trim();
+            // Recover the original XAML label stored in the dict (set by AttachSortHeaders)
+            var origLabel   = _staticColOrigLabel.TryGetValue(_activeHeader.Column, out var orig) ? orig : current;
+            var settingsKey = $"{_activeGrid.Name}|{origLabel}";
+            _settings.StaticColumnLabels[settingsKey] = newLabel;
+            _settings.Save();
+            var view = GetGridView(_activeGrid);
+            _activeHeader.Column.Header = BuildSortHeader(newLabel, _activeHeader.Column, _activeGrid, view);
+        }
     }
 
     private void ColumnHeader_Add_Click(object sender, RoutedEventArgs e)
     {
-        if (_activeGrid is null || _activeHeader?.Column is null)
-            return;
+        if (_activeGrid is null || _activeHeader?.Column is null) return;
 
-        var header = PromptForText("Add Header", "New header text:", "New Column");
-        if (string.IsNullOrWhiteSpace(header))
-            return;
+        var tableName = GetTableName(_activeGrid);
+        if (tableName is null) return;
 
-        var insertIndex = _activeGrid.Columns.IndexOf(_activeHeader.Column) + 1;
-        var placeholderColumn = new DataGridTextColumn
+        // SortOrder = max existing + 1 for this table
+        var existing = _hub.Columns.GetAll()
+            .Where(c => c.TableName == tableName)
+            .ToList();
+        var dlg = new DataKindSelectorDialog(this, availableColumns: existing);
+        if (dlg.ShowDialog() != true) return;
+
+        var sortOrder = existing.Count == 0 ? 0 : existing.Max(c => c.SortOrder) + 1;
+
+        var def = new CTHub.Models.ColumnDefinition
         {
-            Header = header.Trim(),
-            Binding = new Binding { Source = string.Empty },
-            Width = new DataGridLength(140),
-            IsReadOnly = true
+            Id           = Guid.NewGuid().ToString(),
+            TableName    = tableName,
+            HeaderText   = dlg.ResultHeaderText,
+            DataKind     = dlg.ResultDataKind,
+            Options      = dlg.ResultOptions,
+            Formula      = dlg.ResultFormula,
+            SortOrder    = sortOrder,
+            CreatedAtUtc = DateTime.UtcNow.ToString("o")
         };
 
-        _activeGrid.Columns.Insert(insertIndex, placeholderColumn);
+        _ = _hub.Columns.UpsertAsync(def);
+        SaveGridLayout(_activeGrid);
+        RebuildDynamicColumns(_activeGrid, tableName);
+        ApplyGridLayout(_activeGrid);
     }
 
     private void ColumnHeader_Delete_Click(object sender, RoutedEventArgs e)
     {
-        if (_activeGrid is null || _activeHeader?.Column is null)
-            return;
+        if (_activeGrid is null || _activeHeader?.Column is null) return;
+        if (_activeHeader.Column is not IDynamicColumn dynCol) return;
 
-        if (_activeGrid.Columns.Count <= 1)
-            return;
+        // If this is a BarcodeScan column, unmap all QrMappings for every value it held
+        var def = _hub.Columns.GetAll().FirstOrDefault(c => c.Id == dynCol.DefinitionId);
+        if (def?.DataKind == DataKind.BarcodeScan)
+        {
+            // Gather every unique scanned value across all entry tables for this column
+            var allValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var ct in _hub.ChaseTactical.GetAll())
+                if (!string.IsNullOrWhiteSpace(ct[def.Id])) allValues.Add(ct[def.Id]);
+            foreach (var th in _hub.ToughHooks.GetAll())
+                if (!string.IsNullOrWhiteSpace(th[def.Id])) allValues.Add(th[def.Id]);
+            foreach (var ss in _hub.ShippingSupplys.GetAll())
+                if (!string.IsNullOrWhiteSpace(ss[def.Id])) allValues.Add(ss[def.Id]);
 
+            foreach (var v in allValues)
+                UnmapQrValueFromAllEntries(v);
+        }
+
+        _ = _hub.Columns.DeleteAsync(dynCol.DefinitionId);
         _activeGrid.Columns.Remove(_activeHeader.Column);
     }
+
+    private void ColumnHeader_SetThreshold_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem mi) return;
+        var defId = mi.Tag as string;
+        if (string.IsNullOrEmpty(defId)) return;
+        var def = _hub.Columns.GetAll().FirstOrDefault(c => c.Id == defId);
+        if (def is null) return;
+        var current = def.WarningThreshold?.ToString("G", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+        var input   = PromptForText("Column Threshold", $"Highlight cells at or below this value for \"{def.HeaderText}\":", current);
+        if (input is null) return;
+        input = input.Trim();
+        if (!double.TryParse(input, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var val)) return;
+        def.WarningThreshold = val;
+        _ = _hub.Columns.UpsertAsync(def);
+        if (_activeGrid is not null)
+        {
+            SaveGridLayout(_activeGrid);
+            RebuildDynamicColumns(_activeGrid, def.TableName);
+            ApplyGridLayout(_activeGrid);
+        }
+    }
+
+    private void ColumnHeader_ClearThreshold_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem mi) return;
+        var defId = mi.Tag as string;
+        if (string.IsNullOrEmpty(defId)) return;
+        var def = _hub.Columns.GetAll().FirstOrDefault(c => c.Id == defId);
+        if (def is null) return;
+        def.WarningThreshold = null;
+        _ = _hub.Columns.UpsertAsync(def);
+        if (_activeGrid is not null)
+        {
+            SaveGridLayout(_activeGrid);
+            RebuildDynamicColumns(_activeGrid, def.TableName);
+            ApplyGridLayout(_activeGrid);
+        }
+    }
+
+    // ── Dynamic column helpers ────────────────────────────────────────────────
+
+    /// <summary>Shared interface for dynamic columns carrying ColumnDefinition metadata.</summary>
+    private interface IDynamicColumn
+    {
+        string   DefinitionId   { get; }
+        DataKind DefinitionKind { get; }
+        string   HeaderText     { get; }
+    }
+
+    private sealed class DynamicDataGridTextColumn : DataGridTextColumn, IDynamicColumn
+    {
+        public string   DefinitionId   { get; init; } = string.Empty;
+        public DataKind DefinitionKind { get; init; } = DataKind.Text;
+        public string   HeaderText     { get; init; } = string.Empty;
+    }
+
+    private sealed class DynamicDataGridComboBoxColumn : DataGridComboBoxColumn, IDynamicColumn
+    {
+        public string   DefinitionId   { get; init; } = string.Empty;
+        public DataKind DefinitionKind { get; init; } = DataKind.Text;
+        public string   HeaderText     { get; init; } = string.Empty;
+    }
+
+    private sealed class FormulaMultiConverter : System.Windows.Data.IMultiValueConverter
+    {
+        private readonly record struct Factor(int Sign, double Multiplier);
+        private readonly List<Factor> _factors;
+
+        /// <summary>Number of source-column bindings (first N). The next N are per-row multiplier overrides.</summary>
+        public int SourceCount => _factors.Count;
+
+        public FormulaMultiConverter(string formula)
+        {
+            _factors = formula
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Select(t =>
+                {
+                    var sign = t[0] == '-' ? -1 : 1;
+                    var rest = t[1..];
+                    var star = rest.IndexOf('*');
+                    double mult;
+                    if (star >= 0)
+                    {
+                        double.TryParse(rest[(star + 1)..],
+                            System.Globalization.NumberStyles.Any,
+                            System.Globalization.CultureInfo.InvariantCulture, out mult);
+                        if (mult == 0) mult = 1.0;
+                    }
+                    else mult = 1.0;
+                    return new Factor(sign, mult);
+                }).ToList();
+        }
+
+        public object Convert(object[] values, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            int n = _factors.Count;
+            double total = 0;
+            for (int i = 0; i < Math.Min(values.Length, n); i++)
+            {
+                var raw = values[i] == System.Windows.DependencyProperty.UnsetValue ? string.Empty
+                        : values[i]?.ToString() ?? string.Empty;
+                if (!double.TryParse(raw, System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out var srcVal))
+                    continue;
+
+                // Use per-row multiplier override if present, otherwise column-level default
+                double mult = _factors[i].Multiplier;
+                if (i + n < values.Length)
+                {
+                    var overrideRaw = values[i + n] == System.Windows.DependencyProperty.UnsetValue ? string.Empty
+                                    : values[i + n]?.ToString() ?? string.Empty;
+                    if (!string.IsNullOrWhiteSpace(overrideRaw) &&
+                        double.TryParse(overrideRaw, System.Globalization.NumberStyles.Any,
+                            System.Globalization.CultureInfo.InvariantCulture, out var overrideVal) &&
+                        overrideVal != 0)
+                    {
+                        mult = overrideVal;
+                    }
+                }
+
+                total += _factors[i].Sign * mult * srcVal;
+            }
+            return total == Math.Floor(total) && total is >= long.MinValue and <= long.MaxValue
+                ? ((long)total).ToString()
+                : total.ToString("G", culture);
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, System.Globalization.CultureInfo culture)
+            => throw new NotSupportedException();
+    }
+
+    /// <summary>
+    /// Shows a default multiplier value when the stored string is empty;
+    /// writes the user's input back as-is on edit.
+    /// </summary>
+    private sealed class DefaultIfEmptyConverter : System.Windows.Data.IValueConverter
+    {
+        private readonly string _defaultText;
+        public DefaultIfEmptyConverter(double defaultValue)
+            => _defaultText = defaultValue.ToString("G", System.Globalization.CultureInfo.InvariantCulture);
+
+        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            var s = value?.ToString() ?? string.Empty;
+            return string.IsNullOrWhiteSpace(s) ? _defaultText : s;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            => value?.ToString() ?? string.Empty;
+    }
+
+    private sealed class ThresholdBrushConverter : System.Windows.Data.IMultiValueConverter
+    {
+        private static readonly SolidColorBrush _critical = (SolidColorBrush)Freeze(new SolidColorBrush(Color.FromRgb(0x5C, 0x1A, 0x1A)));
+        private static readonly SolidColorBrush _warning  = (SolidColorBrush)Freeze(new SolidColorBrush(Color.FromRgb(0x4A, 0x34, 0x00)));
+        private static readonly SolidColorBrush _ok       = (SolidColorBrush)Freeze(new SolidColorBrush(Colors.Transparent));
+
+        public object Convert(object[] values, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            double? threshold = parameter is double d ? d : (double?)null;
+            if (values.Length >= 2)
+            {
+                var rowStr = values[1] == DependencyProperty.UnsetValue ? string.Empty : values[1]?.ToString() ?? string.Empty;
+                if (rowStr.Length > 0 && double.TryParse(rowStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var rowT))
+                    threshold = rowT;
+            }
+            if (threshold is null) return _ok;
+            var raw = values[0] == DependencyProperty.UnsetValue ? string.Empty : values[0]?.ToString() ?? string.Empty;
+            if (!double.TryParse(raw, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var cellVal)) return _ok;
+            if (cellVal <= threshold.Value)        return _critical;
+            if (cellVal <= threshold.Value * 1.25) return _warning;
+            return _ok;
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, System.Globalization.CultureInfo culture)
+            => throw new NotSupportedException();
+    }
+
+    private static DataGridLength DynColWidth(CTHub.Models.ColumnDefinition def) =>
+        def.DefaultWidth < 0 ? new DataGridLength(1, DataGridLengthUnitType.Star) :
+        def.DefaultWidth > 0 ? new DataGridLength(def.DefaultWidth) :
+                                new DataGridLength(140);
+
+    private Style BuildThresholdCellStyle(CTHub.Models.ColumnDefinition def)
+    {
+        var bindPath = !string.IsNullOrEmpty(def.BindingPath) ? def.BindingPath : $"[{def.Id}]";
+        var rowKey   = $"[_rowThreshold_{def.Id}]";
+
+        var bgBinding = new System.Windows.Data.MultiBinding
+        {
+            Converter          = new ThresholdBrushConverter(),
+            ConverterParameter = def.WarningThreshold
+        };
+        bgBinding.Bindings.Add(new System.Windows.Data.Binding(bindPath));
+        bgBinding.Bindings.Add(new System.Windows.Data.Binding(rowKey));
+
+        var setRowItem   = new MenuItem { Header = "📊  Set Row Threshold…" };
+        var clearRowItem = new MenuItem { Header = "✕  Clear Row Threshold", Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x55, 0x55)) };
+        setRowItem.Click   += NumberCell_SetRowThreshold;
+        clearRowItem.Click += NumberCell_ClearRowThreshold;
+
+        var ctxMenu = new ContextMenu();
+        ctxMenu.Items.Add(setRowItem);
+        ctxMenu.Items.Add(new Separator());
+        ctxMenu.Items.Add(clearRowItem);
+
+        var cellStyle = new Style(typeof(DataGridCell));
+        cellStyle.Setters.Add(new Setter(DataGridCell.BackgroundProperty, bgBinding));
+        cellStyle.Setters.Add(new Setter(FrameworkElement.ContextMenuProperty, ctxMenu));
+        return cellStyle;
+    }
+
+    private void SeedColumnsIfNeeded()
+    {
+        var appliedIds = _settings.AppliedSeedIds;
+        void Seed(CTHub.Models.ColumnDefinition d)
+        {
+            if (appliedIds.Contains(d.Id)) return;
+            _ = _hub.Columns.UpsertAsync(d);
+            appliedIds.Add(d.Id);
+        }
+
+        int s = 0;
+
+        // ── Chase Tactical ────────────────────────────────────────────────
+        Seed(new() { Id = "seed-ct-bin", TableName = "chasetactical",   HeaderText = "Bin",             DataKind = DataKind.Dropdown, BindingPath = "Bin",            DefaultWidth = 130,  SortOrder = s++, Options = BinLocations });
+        Seed(new() { Id = "seed-ct-cls", TableName = "chasetactical",   HeaderText = "Class",           DataKind = DataKind.Dropdown, BindingPath = "ClassName",      DefaultWidth = 220,  SortOrder = s++, Options = ClassNames });
+        Seed(new() { Id = "seed-ct-ltr", TableName = "chasetactical",   HeaderText = "Letter",          DataKind = DataKind.Dropdown, BindingPath = "ClassLetter",    DefaultWidth = 80,   SortOrder = s++, Options = ClassLetters });
+        Seed(new() { Id = "seed-ct-cid", TableName = "chasetactical",   HeaderText = "Class ID",        DataKind = DataKind.Text,     BindingPath = "ClassId",        DefaultWidth = 180,  SortOrder = s++, IsReadOnly = true });
+        Seed(new() { Id = "seed-ct-lbl", TableName = "chasetactical",   HeaderText = "Label",           DataKind = DataKind.Text,     BindingPath = "Label",          DefaultWidth = 200,  SortOrder = s++ });
+        Seed(new() { Id = "seed-ct-qty", TableName = "chasetactical",   HeaderText = "Qty",             DataKind = DataKind.Number,   BindingPath = "Qty",            DefaultWidth = 80,   SortOrder = s++ });
+        Seed(new() { Id = "seed-ct-stk", TableName = "chasetactical",   HeaderText = "Stock Threshold", DataKind = DataKind.Number,   BindingPath = "StockThreshold", DefaultWidth = 130,  SortOrder = s++ });
+        Seed(new() { Id = "seed-ct-nts", TableName = "chasetactical",   HeaderText = "Notes",           DataKind = DataKind.Text,     BindingPath = "Notes",          DefaultWidth = -1,   SortOrder = s++ });
+        Seed(new() { Id = "seed-ct-id",  TableName = "chasetactical",   HeaderText = "ID",              DataKind = DataKind.Text,     BindingPath = "Id",             DefaultWidth = 220,  SortOrder = s++, IsReadOnly = true, IsCollapsibleId = true });
+
+        // ── Tough Hooks ───────────────────────────────────────────────────
+        s = 0;
+        Seed(new() { Id = "seed-th-bin", TableName = "toughhooks",      HeaderText = "Bin",             DataKind = DataKind.Text,     BindingPath = "Bin",            DefaultWidth = 120,  SortOrder = s++ });
+        Seed(new() { Id = "seed-th-sku", TableName = "toughhooks",      HeaderText = "SKU",             DataKind = DataKind.Text,     BindingPath = "Sku",            DefaultWidth = 140,  SortOrder = s++ });
+        Seed(new() { Id = "seed-th-dsc", TableName = "toughhooks",      HeaderText = "Description",     DataKind = DataKind.Text,     BindingPath = "Description",    DefaultWidth = -1,   SortOrder = s++ });
+        Seed(new() { Id = "seed-th-qty", TableName = "toughhooks",      HeaderText = "Qty",             DataKind = DataKind.Number,   BindingPath = "Qty",            DefaultWidth = 80,   SortOrder = s++ });
+        Seed(new() { Id = "seed-th-stk", TableName = "toughhooks",      HeaderText = "Stock Threshold", DataKind = DataKind.Number,   BindingPath = "StockThreshold", DefaultWidth = 130,  SortOrder = s++ });
+        Seed(new() { Id = "seed-th-id",  TableName = "toughhooks",      HeaderText = "ID",              DataKind = DataKind.Text,     BindingPath = "Id",             DefaultWidth = 220,  SortOrder = s++, IsReadOnly = true, IsCollapsibleId = true });
+
+        // ── Shipping Supplies ─────────────────────────────────────────────
+        s = 0;
+        Seed(new() { Id = "seed-ss-dim", TableName = "shippingsupplys", HeaderText = "Dimensions",      DataKind = DataKind.Text,     BindingPath = "Dimensions",     DefaultWidth = -1,   SortOrder = s++ });
+        Seed(new() { Id = "seed-ss-bdl", TableName = "shippingsupplys", HeaderText = "Bundle",          DataKind = DataKind.Number,   BindingPath = "Bundle",         DefaultWidth = 120,  SortOrder = s++ });
+        Seed(new() { Id = "seed-ss-sng", TableName = "shippingsupplys", HeaderText = "Single",          DataKind = DataKind.Number,   BindingPath = "Single",         DefaultWidth = 120,  SortOrder = s++ });
+        Seed(new() { Id = "seed-ss-stk", TableName = "shippingsupplys", HeaderText = "Stock Threshold", DataKind = DataKind.Number,   BindingPath = "StockThreshold", DefaultWidth = 130,  SortOrder = s++ });
+        Seed(new() { Id = "seed-ss-id",  TableName = "shippingsupplys", HeaderText = "ID",              DataKind = DataKind.Text,     BindingPath = "Id",             DefaultWidth = 220,  SortOrder = s++, IsReadOnly = true, IsCollapsibleId = true });
+
+        // ── QR / Code Mappings ────────────────────────────────────────────
+        s = 0;
+        Seed(new() { Id = "seed-qr-val", TableName = "qrmappings", HeaderText = "QR Value",      DataKind = DataKind.Text, BindingPath = "QrValue",        DefaultWidth = 220,  SortOrder = s++ });
+        Seed(new() { Id = "seed-qr-cls", TableName = "qrmappings", HeaderText = "Classification", DataKind = DataKind.Text, BindingPath = "Classification", DefaultWidth = 180,  SortOrder = s++ });
+        Seed(new() { Id = "seed-qr-dsc", TableName = "qrmappings", HeaderText = "Description",   DataKind = DataKind.Text, BindingPath = "Description",    DefaultWidth = -1,   SortOrder = s++ });
+        Seed(new() { Id = "seed-qr-id",  TableName = "qrmappings", HeaderText = "ID",            DataKind = DataKind.Text, BindingPath = "Id",             DefaultWidth = 220,  SortOrder = s++, IsReadOnly = true, IsCollapsibleId = true });
+
+        // ── Seed default mobile card config ───────────────────────────────
+        var cfg = _settings.MobileCardConfig;
+        if (!cfg.ContainsKey("chasetactical"))
+            cfg["chasetactical"] = new CTHub.Services.MobileCardEntry
+                { Row1 = "Label", Row2 = new() { "Bin", "ClassName" }, Badge = "Qty" };
+        if (!cfg.ContainsKey("toughhooks"))
+            cfg["toughhooks"] = new CTHub.Services.MobileCardEntry
+                { Row1 = "Sku", Row2 = new() { "Bin" }, Badge = "Qty" };
+        if (!cfg.ContainsKey("shippingsupplys"))
+            cfg["shippingsupplys"] = new CTHub.Services.MobileCardEntry
+                { Row1 = "Dimensions", Row2 = new() { "Bundle", "Single" }, Badge = null };
+
+        _settings.Save();
+    }
+
+    private void RebuildAllDynamicColumns()
+    {
+        RebuildDynamicColumns(ChaseTacticalGrid,   "chasetactical");
+        RebuildDynamicColumns(ToughHooksGrid,      "toughhooks");
+        RebuildDynamicColumns(ShippingSupplysGrid, "shippingsupplys");
+        RebuildDynamicColumns(QrMappingsGrid,      "qrmappings");
+    }
+
+    private void RebuildDynamicColumns(DataGrid grid, string tableName)
+    {
+        // Remove existing dynamic columns
+        var toRemove = grid.Columns.Where(c => c is IDynamicColumn).ToList();
+        foreach (var col in toRemove)
+            grid.Columns.Remove(col);
+
+        // Re-insert in SortOrder
+        var defs = _hub.Columns.GetAll()
+            .Where(c => c.TableName.Equals(tableName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(c => c.SortOrder);
+
+        var allDefsCache = _hub.Columns.GetAll().ToList();
+        foreach (var def in defs)
+        {
+            // Computed column — MultiBinding on each source property for live updates
+            if (def.DataKind == DataKind.Computed && !string.IsNullOrEmpty(def.Formula))
+            {
+                var defMap = allDefsCache.ToDictionary(d => d.Id);
+                var formulaConverter = new FormulaMultiConverter(def.Formula);
+                var mb = new System.Windows.Data.MultiBinding
+                {
+                    Converter = formulaConverter,
+                    Mode      = System.Windows.Data.BindingMode.OneWay
+                };
+
+                // Parse formula terms for source bindings and per-row override info
+                var formulaTerms = def.Formula.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+                // First N bindings: source column values
+                foreach (var token in formulaTerms)
+                {
+                    var rest  = token[1..];
+                    var star  = rest.IndexOf('*');
+                    var colId = star >= 0 ? rest[..star] : rest;
+                    var bp    = defMap.TryGetValue(colId, out var d) && !string.IsNullOrEmpty(d.BindingPath)
+                                ? d.BindingPath
+                                : $"[{colId}]";
+                    mb.Bindings.Add(new System.Windows.Data.Binding(bp));
+                }
+
+                // Next N bindings: per-row multiplier overrides (stored in ExtraFields)
+                for (int ti = 0; ti < formulaTerms.Length; ti++)
+                {
+                    var overrideKey = $"_rowMult_{def.Id}_{ti}";
+                    mb.Bindings.Add(new System.Windows.Data.Binding($"[{overrideKey}]"));
+                }
+
+                var tc = new DynamicDataGridTextColumn
+                {
+                    DefinitionId   = def.Id,
+                    DefinitionKind = def.DataKind,
+                    HeaderText     = def.HeaderText,
+                    Header         = BuildColumnHeader(def),
+                    Binding        = mb,
+                    Width          = DynColWidth(def),
+                    IsReadOnly     = true
+                };
+                var computedCellStyle = new Style(typeof(TextBlock));
+                computedCellStyle.Setters.Add(new Setter(TextBlock.ForegroundProperty,
+                    new SolidColorBrush(Color.FromRgb(0xD4, 0xD4, 0xD4))));
+                tc.ElementStyle = computedCellStyle;
+                grid.Columns.Add(tc);
+
+                // Add editable companion columns for per-row multiplier overrides
+                // (only for terms whose column-level multiplier is not 1.0)
+                for (int ti = 0; ti < formulaTerms.Length; ti++)
+                {
+                    var termToken = formulaTerms[ti];
+                    var termRest  = termToken[1..];
+                    var termStar  = termRest.IndexOf('*');
+                    double termMult = 1.0;
+                    if (termStar >= 0)
+                    {
+                        double.TryParse(termRest[(termStar + 1)..],
+                            System.Globalization.NumberStyles.Any,
+                            System.Globalization.CultureInfo.InvariantCulture, out termMult);
+                        if (termMult == 0) termMult = 1.0;
+                    }
+                    if (termMult == 1.0) continue;
+
+                    var overrideKey = $"_rowMult_{def.Id}_{ti}";
+                    var companion = new DynamicDataGridTextColumn
+                    {
+                        DefinitionId   = $"{def.Id}__rowmult_{ti}",
+                        DefinitionKind = DataKind.Number,
+                        HeaderText     = $"{def.HeaderText} ×",
+                        Header         = $"{def.HeaderText} ×",
+                        Binding        = new System.Windows.Data.Binding($"[{overrideKey}]")
+                        {
+                            Converter           = new DefaultIfEmptyConverter(termMult),
+                            UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.PropertyChanged
+                        },
+                        Width    = new DataGridLength(90),
+                        IsReadOnly = false
+                    };
+                    grid.Columns.Add(companion);
+                }
+
+                continue;
+            }
+
+            var bindPath = !string.IsNullOrEmpty(def.BindingPath) ? def.BindingPath : $"[{def.Id}]";
+
+            DataGridColumn col;
+            if (def.DataKind == DataKind.Dropdown)
+            {
+                col = new DynamicDataGridComboBoxColumn
+                {
+                    DefinitionId        = def.Id,
+                    DefinitionKind      = def.DataKind,
+                    HeaderText          = def.HeaderText,
+                    Header              = BuildColumnHeader(def),
+                    SelectedItemBinding = new System.Windows.Data.Binding(bindPath)
+                    {
+                        UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.PropertyChanged
+                    },
+                    ItemsSource         = def.Options ?? [],
+                    Width               = DynColWidth(def)
+                };
+            }
+            else
+            {
+                var tc = new DynamicDataGridTextColumn
+                {
+                    DefinitionId   = def.Id,
+                    DefinitionKind = def.DataKind,
+                    HeaderText     = def.HeaderText,
+                    Header         = BuildColumnHeader(def),
+                    Binding        = new System.Windows.Data.Binding(bindPath),
+                    Width          = DynColWidth(def)
+                };
+                if (def.IsReadOnly) tc.IsReadOnly = true;
+                if (def.IsCollapsibleId)
+                {
+                    var idStyle = new Style(typeof(TextBlock));
+                    idStyle.Setters.Add(new Setter(TextBlock.ForegroundProperty, new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55))));
+                    idStyle.Setters.Add(new Setter(TextBlock.FontSizeProperty, 10.0));
+                    tc.ElementStyle = idStyle;
+                }
+                col = tc;
+            }
+
+            if (!string.IsNullOrEmpty(def.BindingPath))
+                col.SortMemberPath = def.BindingPath;
+
+            if (def.DataKind == DataKind.BarcodeScan)
+            {
+                col.IsReadOnly = true;
+
+                var editItem   = new MenuItem { Header = "✏  Edit value" };
+                var clearItem  = new MenuItem { Header = "✕  Clear", Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x55, 0x55)) };
+                var linksItem  = new MenuItem { Header = "🔗  Manage links…" };
+                editItem.Click  += BarcodeCell_Edit;
+                clearItem.Click += BarcodeCell_Clear;
+                linksItem.Click += BarcodeCell_ManageLinks;
+
+                var menu = new ContextMenu();
+                menu.Items.Add(editItem);
+                menu.Items.Add(linksItem);
+                menu.Items.Add(new Separator());
+                menu.Items.Add(clearItem);
+
+                var cellStyle = new Style(typeof(DataGridCell));
+                cellStyle.Setters.Add(new Setter(FrameworkElement.ContextMenuProperty, menu));
+                col.CellStyle = cellStyle;
+            }
+
+            if (def.DataKind == DataKind.Number)
+                col.CellStyle = BuildThresholdCellStyle(def);
+
+            grid.Columns.Add(col);
+        }
+
+        AttachSortHeaders(grid);
+    }
+
+    private static FrameworkElement BuildColumnHeader(CTHub.Models.ColumnDefinition def)
+    {
+        var badge = new TextBlock
+        {
+            Text              = DataKindBadge(def.DataKind),
+            FontSize          = 10,
+            Foreground        = new SolidColorBrush(Color.FromRgb(0x85, 0x85, 0x85)),
+            Margin            = new Thickness(4, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        var title = new TextBlock
+        {
+            Text              = def.HeaderText,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        return new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Children    = { title, badge }
+        };
+    }
+
+    // ── Sort headers ──────────────────────────────────────────────────────────
+
+    private readonly Dictionary<DataGridColumn, ListSortDirection?> _colSortStates = new();
+
+    // Per-grid: the currently-active column's up/down arrows so we can reset them
+    private readonly Dictionary<DataGrid, (DataGridColumn col, System.Windows.Shapes.Path up, System.Windows.Shapes.Path down)> _activeSortCol = new();
+    // Original XAML label for static columns — key for StaticColumnLabels lookups
+    private readonly Dictionary<DataGridColumn, string> _staticColOrigLabel = new();
+
+    private static ControlTemplate? _sortBtnTemplate;
+    private static ControlTemplate SortBtnTemplate => _sortBtnTemplate ??= CreateSortBtnTemplate();
+
+    private static ControlTemplate CreateSortBtnTemplate()
+    {
+        var t  = new ControlTemplate(typeof(Button));
+        var cp = new FrameworkElementFactory(typeof(ContentPresenter));
+        cp.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        cp.SetValue(ContentPresenter.VerticalAlignmentProperty,   VerticalAlignment.Center);
+        t.VisualTree = cp;
+        t.Seal();
+        return t;
+    }
+
+    private static readonly SolidColorBrush _sortOrange = (SolidColorBrush)Freeze(new SolidColorBrush(Color.FromRgb(0xFF, 0x95, 0x00)));
+    private static readonly SolidColorBrush _sortGrey   = (SolidColorBrush)Freeze(new SolidColorBrush(Color.FromRgb(0x60, 0x60, 0x60)));
+
+    private static System.Windows.Shapes.Path MakeSortArrow(bool up)
+    {
+        // Solid triangle pointing up or down
+        var geo = Geometry.Parse(up ? "M 4,0 L 8,7 L 0,7 Z" : "M 4,7 L 8,0 L 0,0 Z");
+        geo.Freeze();
+        return new System.Windows.Shapes.Path
+        {
+            Data                = geo,
+            Fill                = _sortGrey,
+            Width               = 9,
+            Height              = 7,
+            Stretch             = Stretch.Uniform,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment   = VerticalAlignment.Center,
+        };
+    }
+
+    private void AttachSortHeaders(DataGrid grid)
+    {
+        var view = GetGridView(grid);
+        foreach (var col in grid.Columns)
+        {
+            if (col.Header is FrameworkElement fh && "sort-header".Equals(fh.Tag))
+                continue;
+            // For static columns, check if the user previously renamed it
+            string label;
+            if (col is not IDynamicColumn)
+            {
+                var origLabel   = ExtractHeaderLabel(col);
+                var settingsKey = $"{grid.Name}|{origLabel}";
+                label = _settings.StaticColumnLabels.TryGetValue(settingsKey, out var saved)
+                    ? saved
+                    : origLabel;
+                // Stash the original XAML label so rename can key off it
+                _staticColOrigLabel[col] = origLabel;
+            }
+            else
+            {
+                label = ExtractHeaderLabel(col);
+            }
+            col.Header = BuildSortHeader(label, col, grid, view);
+        }
+        PinIdColumnLast(grid);
+    }
+
+    private static string ExtractHeaderLabel(DataGridColumn col) => col.Header switch
+    {
+        string s            => s,
+        FrameworkElement fe => ExtractLabelFromElement(fe),
+        _                   => col.Header?.ToString() ?? string.Empty
+    };
+
+    private static string ExtractLabelFromElement(FrameworkElement fe)
+    {
+        // DockPanel = sort header wrapper: label content is the LastChildFill (last) child
+        if (fe is DockPanel dp && dp.Children.Count >= 2)
+        {
+            var last = dp.Children[dp.Children.Count - 1];
+            if (last is TextBlock tb0) return tb0.Text;
+            if (last is StackPanel sp0 && sp0.Children.Count > 0 && sp0.Children[0] is TextBlock tb1) return tb1.Text;
+        }
+        if (fe is StackPanel sp && sp.Children.Count > 0 && sp.Children[0] is TextBlock tb)
+            return tb.Text;
+        return string.Empty;
+    }
+
+    private FrameworkElement BuildSortHeader(string label, DataGridColumn col, DataGrid grid, ICollectionView? view)
+    {
+        var sortPath = GetSortPath(col);
+
+        var upArrow   = MakeSortArrow(up: true);
+        var downArrow = MakeSortArrow(up: false);
+
+        var sortBtn = new Button
+        {
+            Content = new StackPanel
+            {
+                Orientation       = Orientation.Vertical,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Width             = 12,
+                Children          = { upArrow, new Border { Height = 3 }, downArrow }
+            },
+            Template          = SortBtnTemplate,
+            Padding           = new Thickness(0),
+            Margin            = new Thickness(4, 0, 4, 0),
+            Cursor            = System.Windows.Input.Cursors.Hand,
+            VerticalAlignment = VerticalAlignment.Stretch,
+            ToolTip           = "Sort",
+        };
+
+        sortBtn.Click += (_, args) =>
+        {
+            args.Handled = true;
+            if (string.IsNullOrEmpty(sortPath)) return;
+
+            // Reset the previously-active column in this grid
+            if (_activeSortCol.TryGetValue(grid, out var prev) && !ReferenceEquals(prev.col, col))
+            {
+                _colSortStates[prev.col] = null;
+                prev.up.Fill   = _sortGrey;
+                prev.down.Fill = _sortGrey;
+            }
+
+            var current = _colSortStates.TryGetValue(col, out var s) ? s : null;
+            var next = current switch
+            {
+                null                        => (ListSortDirection?)ListSortDirection.Ascending,
+                ListSortDirection.Ascending => ListSortDirection.Descending,
+                _                           => null
+            };
+            _colSortStates[col] = next;
+
+            if (next.HasValue)
+                _activeSortCol[grid] = (col, upArrow, downArrow);
+            else
+                _activeSortCol.Remove(grid);
+
+            if (view is not null)
+            {
+                view.SortDescriptions.Clear();
+                if (next.HasValue)
+                    view.SortDescriptions.Add(new SortDescription(sortPath, next.Value));
+            }
+
+            upArrow.Fill   = next == ListSortDirection.Ascending  ? _sortOrange : _sortGrey;
+            downArrow.Fill = next == ListSortDirection.Descending ? _sortOrange : _sortGrey;
+        };
+
+        var labelBlock = new TextBlock
+        {
+            Text              = label,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+
+        FrameworkElement labelContent;
+        if (col is IDynamicColumn dyn)
+        {
+            var badgeBlock = new TextBlock
+            {
+                Text              = DataKindBadge(dyn.DefinitionKind),
+                FontSize          = 10,
+                Foreground        = new SolidColorBrush(Color.FromRgb(0x85, 0x85, 0x85)),
+                Margin            = new Thickness(4, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            labelContent = new StackPanel
+            {
+                Orientation       = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Children          = { labelBlock, badgeBlock }
+            };
+        }
+        else
+        {
+            labelContent = labelBlock;
+        }
+
+        var panel = new DockPanel
+        {
+            Tag               = "sort-header",
+            LastChildFill     = true,
+            VerticalAlignment = VerticalAlignment.Stretch,
+        };
+        DockPanel.SetDock(sortBtn, Dock.Right);
+        panel.Children.Add(sortBtn);
+        panel.Children.Add(labelContent);
+        return panel;
+    }
+
+    private FrameworkElement BuildIdColHeader(DataGridColumn col, DataGrid grid) => throw new NotImplementedException(); // removed — handled by overlay button
+
+    private void IdColToggle_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not string gridName) return;
+        var grid = AllDataGrids.FirstOrDefault(g => g.Name == gridName);
+        if (grid is null) return;
+        var idCol = grid.Columns.FirstOrDefault(c => GetSortPath(c) == "Id");
+        if (idCol is null) return;
+
+        var nowHidden = idCol.Visibility == Visibility.Collapsed;
+        idCol.Visibility = nowHidden ? Visibility.Visible : Visibility.Collapsed;
+        btn.Content = nowHidden ? "\u25C1" : "\u25B7";  // ◁ / ▷
+    }
+
+    private void PinIdColumnLast(DataGrid grid)
+    {
+        var idCol = grid.Columns.FirstOrDefault(c => GetSortPath(c) == "Id");
+        if (idCol is null) return;
+        var maxIdx = grid.Columns.Max(c => c.DisplayIndex);
+        if (idCol.DisplayIndex != maxIdx)
+        {
+            try { idCol.DisplayIndex = maxIdx; }
+            catch { }
+        }
+    }
+
+    private static string GetSortPath(DataGridColumn col)
+    {
+        if (!string.IsNullOrEmpty(col.SortMemberPath))
+            return col.SortMemberPath;
+        if (col is DataGridBoundColumn bc && bc.Binding is System.Windows.Data.Binding b)
+            return b.Path.Path;
+        if (col is DataGridComboBoxColumn cbc && cbc.SelectedItemBinding is System.Windows.Data.Binding sb)
+            return sb.Path.Path;
+        return string.Empty;
+    }
+
+    private ICollectionView? GetGridView(DataGrid grid) => grid.Name switch
+    {
+        "ChaseTacticalGrid"   => _chaseView,
+        "ToughHooksGrid"      => _toughHooksView,
+        "ShippingSupplysGrid" => _shippingSupplysView,
+        "QrMappingsGrid"      => _qrMappingsView,
+        _                     => null
+    };
+
+    // ── Grid column layout persistence ─────────────────────────────────────────────────
+
+    private DataGrid[] AllDataGrids => [ChaseTacticalGrid, ToughHooksGrid, ShippingSupplysGrid, QrMappingsGrid];
+
+    private void SaveGridLayout(DataGrid grid)
+    {
+        _settings.ColumnLayouts[grid.Name] = grid.Columns
+            .Select(col => new ColumnLayoutEntry
+            {
+                Key          = ColumnKey(col),
+                Width        = col.Width.UnitType == DataGridLengthUnitType.Pixel ? col.Width.Value : double.NaN,
+                DisplayIndex = col.DisplayIndex
+            })
+            .ToList();
+        _settings.Save();
+    }
+
+    private void SaveAllGridLayouts()
+    {
+        foreach (var grid in AllDataGrids)
+            SaveGridLayout(grid);
+    }
+
+    private void ApplyAllGridLayouts()
+    {
+        // One-time cleanup: if any layout was saved with the old broken DockPanel key, wipe it
+        // so it doesn't silently block legitimate saves from being applied.
+        bool purged = false;
+        foreach (var grid in AllDataGrids)
+        {
+            if (_settings.ColumnLayouts.TryGetValue(grid.Name, out var entries)
+                && entries.Any(e => e.Key.Contains("DockPanel") || string.IsNullOrEmpty(e.Key)))
+            {
+                _settings.ColumnLayouts.Remove(grid.Name);
+                purged = true;
+            }
+        }
+        if (purged) _settings.Save();
+
+        foreach (var grid in AllDataGrids)
+            ApplyGridLayout(grid);
+        foreach (var grid in AllDataGrids)
+            PinIdColumnLast(grid);
+    }
+
+    private void ApplyGridLayout(DataGrid grid)
+    {
+        if (!_settings.ColumnLayouts.TryGetValue(grid.Name, out var entries) || entries.Count == 0)
+            return;
+
+        var byKey = entries.ToDictionary(e => e.Key);
+
+        // Apply widths first (order-independent)
+        foreach (var col in grid.Columns)
+        {
+            if (byKey.TryGetValue(ColumnKey(col), out var entry) && !double.IsNaN(entry.Width) && entry.Width > 0)
+                col.Width = new DataGridLength(entry.Width);
+        }
+
+        // Apply display indexes in ascending order to avoid WPF range violations
+        var ordered = entries
+            .OrderBy(e => e.DisplayIndex)
+            .ToList();
+
+        foreach (var entry in ordered)
+        {
+            var col = grid.Columns.FirstOrDefault(c => ColumnKey(c) == entry.Key);
+            if (col is null) continue;
+            var clamped = Math.Clamp(entry.DisplayIndex, 0, grid.Columns.Count - 1);
+            if (col.DisplayIndex != clamped)
+            {
+                try { col.DisplayIndex = clamped; }
+                catch { /* ignore if reorder not supported */ }
+            }
+        }
+    }
+
+    private static string ColumnKey(DataGridColumn col) => col switch
+    {
+        IDynamicColumn dyn => dyn.DefinitionId,
+        _                  => ExtractHeaderLabel(col)
+    };
+
+    // ── Barcode cell context menu handlers ─────────────────────────────────
+
+    private void BarcodeCell_Edit(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetBarcodeCellTarget(sender, out var grid, out var col, out var rowItem)) return;
+        var current = GetExtraFieldValue(rowItem!, col!.DefinitionId);
+        var newVal  = PromptForText($"Edit — {col.HeaderText}", "Barcode / QR value:", current);
+        if (newVal is null) return;
+        SetAndUpsertExtraField(grid!, rowItem!, col.DefinitionId, newVal);
+    }
+
+    private void BarcodeCell_Clear(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetBarcodeCellTarget(sender, out var grid, out var col, out var rowItem)) return;
+
+        var barcodeValue = GetExtraFieldValue(rowItem!, col!.DefinitionId);
+        var orphanedLinks = string.IsNullOrWhiteSpace(barcodeValue)
+            ? []
+            : _hub.BarcodeLinks.GetAll()
+                .Where(l => l.SourceBarcodeValue.Equals(barcodeValue, StringComparison.OrdinalIgnoreCase)
+                         && l.SourceColumnId == col.DefinitionId)
+                .ToList();
+
+        var linkWarning = orphanedLinks.Count > 0
+            ? $"\n\nThis will also remove {orphanedLinks.Count} associated link{(orphanedLinks.Count == 1 ? "" : "s")}."
+            : string.Empty;
+
+        var confirm = MessageBox.Show(
+            $"Clear the barcode value for column \"{col.HeaderText}\"?{linkWarning}",
+            "CT Hub", MessageBoxButton.OKCancel, MessageBoxImage.Question);
+        if (confirm != MessageBoxResult.OK) return;
+
+        foreach (var link in orphanedLinks)
+            _ = _hub.BarcodeLinks.DeleteAsync(link.Id);
+
+        // Remove any QrClassMapping whose QrValue matches the cleared barcode
+        foreach (var mapping in _hub.QrMappings.GetAll()
+            .Where(m => m.QrValue.Equals(barcodeValue, StringComparison.OrdinalIgnoreCase)).ToList())
+            _ = _hub.QrMappings.DeleteAsync(mapping.Id);
+
+        SetAndUpsertExtraField(grid!, rowItem!, col.DefinitionId, string.Empty);
+    }
+
+    private void BarcodeCell_ManageLinks(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetBarcodeCellTarget(sender, out _, out var col, out var rowItem)) return;
+        var barcodeValue = GetExtraFieldValue(rowItem!, col!.DefinitionId);
+        if (string.IsNullOrWhiteSpace(barcodeValue))
+        {
+            MessageBox.Show(
+                "This cell has no barcode value yet. Edit it first before adding links.",
+                "CT Hub", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var tableName = rowItem switch
+        {
+            ChaseTacticalEntry  => "chasetactical",
+            ToughHookEntry      => "toughhooks",
+            ShippingSupplyEntry => "shippingsupplys",
+            _                   => string.Empty
+        };
+        new BarcodeLinkDialog(this, _hub, barcodeValue, col.DefinitionId, tableName).ShowDialog();
+    }
+
+    private static bool TryGetBarcodeCellTarget(
+        object sender,
+        out DataGrid? grid,
+        out DynamicDataGridTextColumn? col,
+        out object? rowItem)
+    {
+        grid = null; col = null; rowItem = null;
+        if (sender is not MenuItem mi) return false;
+        if (mi.Parent is not ContextMenu cm) return false;
+        if (cm.PlacementTarget is not DataGridCell cell) return false;
+        col     = cell.Column as DynamicDataGridTextColumn;
+        grid    = FindParentDataGrid(cell);
+        rowItem = cell.DataContext;
+        return col is not null && grid is not null && rowItem is not null;
+    }
+
+    private static bool TryGetNumberCellTarget(
+        object sender,
+        out DataGrid? grid,
+        out DynamicDataGridTextColumn? col,
+        out object? rowItem)
+    {
+        grid = null; col = null; rowItem = null;
+        if (sender is not MenuItem mi) return false;
+        if (mi.Parent is not ContextMenu cm) return false;
+        if (cm.PlacementTarget is not DataGridCell cell) return false;
+        col     = cell.Column as DynamicDataGridTextColumn;
+        grid    = FindParentDataGrid(cell);
+        rowItem = cell.DataContext;
+        return col?.DefinitionKind == DataKind.Number && grid is not null && rowItem is not null;
+    }
+
+    private void NumberCell_SetRowThreshold(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetNumberCellTarget(sender, out var grid, out var col, out var rowItem)) return;
+        var rowKey  = $"_rowThreshold_{col!.DefinitionId}";
+        var current = GetExtraFieldValue(rowItem!, rowKey);
+        var input   = PromptForText("Row Threshold", $"Override threshold for this row in \"{col.HeaderText}\":", current);
+        if (input is null) return;
+        input = input.Trim();
+        if (!double.TryParse(input, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out _)) return;
+        SetAndUpsertExtraField(grid!, rowItem!, rowKey, input);
+    }
+
+    private void NumberCell_ClearRowThreshold(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetNumberCellTarget(sender, out var grid, out var col, out var rowItem)) return;
+        var rowKey = $"_rowThreshold_{col!.DefinitionId}";
+        SetAndUpsertExtraField(grid!, rowItem!, rowKey, string.Empty);
+    }
+
+    private static string GetExtraFieldValue(object rowItem, string defId) => rowItem switch
+    {
+        ChaseTacticalEntry  ct => ct[defId],
+        ToughHookEntry      th => th[defId],
+        ShippingSupplyEntry ss => ss[defId],
+        _                      => string.Empty
+    };
+
+    private void SetAndUpsertExtraField(DataGrid grid, object rowItem, string defId, string value)
+    {
+        switch (rowItem)
+        {
+            case ChaseTacticalEntry ct:
+                ct[defId] = value;
+                _ = _hub.ChaseTactical.UpsertAsync(ct);
+                break;
+            case ToughHookEntry th:
+                th[defId] = value;
+                _ = _hub.ToughHooks.UpsertAsync(th);
+                break;
+            case ShippingSupplyEntry ss:
+                ss[defId] = value;
+                _ = _hub.ShippingSupplys.UpsertAsync(ss);
+                break;
+        }
+
+        // Force the DataGrid to re-evaluate cells for this row — needed because
+        // IsReadOnly columns don't go through the normal edit commit path.
+        grid.Items.Refresh();
+
+        Touch();
+    }
+
+    private static string DataKindBadge(CTHub.Models.DataKind kind) => kind switch
+    {
+        CTHub.Models.DataKind.Text        => "Tt",
+        CTHub.Models.DataKind.Number      => "#",
+        CTHub.Models.DataKind.Dropdown    => "▾",
+        CTHub.Models.DataKind.Date        => "📅",
+        CTHub.Models.DataKind.BarcodeScan => "▣",
+        CTHub.Models.DataKind.Photo       => "🖼",
+        CTHub.Models.DataKind.Gps         => "📍",
+        CTHub.Models.DataKind.ManualEntry => "✏",
+        CTHub.Models.DataKind.Toggle      => "⊙",
+        CTHub.Models.DataKind.Computed    => "∑",
+        _                                 => "?"
+    };
+
+    /// <summary>
+    /// Removes all BarcodeLinkEntries that point to (or originate from) the given
+    /// entry when it is being deleted, preventing ghost links on the phone.
+    /// </summary>
+    private void DeleteBarcodeLinksByEntry(string tableName, string entryId)
+    {
+        var orphans = _hub.BarcodeLinks.GetAll()
+            .Where(l => (l.TargetTableName.Equals(tableName, StringComparison.OrdinalIgnoreCase)
+                         && l.TargetEntryId == entryId)
+                     || (l.SourceTableName.Equals(tableName, StringComparison.OrdinalIgnoreCase)
+                         && l.SourceBarcodeValue != string.Empty
+                         && l.TargetEntryId == entryId))
+            .ToList();
+
+        foreach (var link in orphans)
+            _ = _hub.BarcodeLinks.DeleteAsync(link.Id);
+    }
+
+    /// <summary>
+    /// Clears <paramref name="qrValue"/> from every BarcodeScan extra-field that holds it
+    /// and deletes all BarcodeLink rows that reference it.
+    /// Call whenever a QrClassMapping is removed or its QrValue changes.
+    /// </summary>
+    private void UnmapQrValueFromAllEntries(string qrValue)
+    {
+        if (string.IsNullOrWhiteSpace(qrValue)) return;
+
+        // Only BarcodeScan columns can legitimately hold a scanned barcode value
+        var barcodeColIds = _hub.Columns.GetAll()
+            .Where(c => c.DataKind == DataKind.BarcodeScan)
+            .Select(c => c.Id)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // Delete every BarcodeLink that references this value
+        foreach (var link in _hub.BarcodeLinks.GetAll()
+            .Where(l => l.SourceBarcodeValue.Equals(qrValue, StringComparison.OrdinalIgnoreCase)).ToList())
+            _ = _hub.BarcodeLinks.DeleteAsync(link.Id);
+
+        // Clear the value from every ChaseTactical entry that holds it in a scan column
+        foreach (var entry in _hub.ChaseTactical.GetAll())
+        {
+            var dirty = false;
+            foreach (var key in entry.ExtraFields.Keys.ToList())
+            {
+                if (!barcodeColIds.Contains(key)) continue;
+                if (!entry.ExtraFields[key].Equals(qrValue, StringComparison.OrdinalIgnoreCase)) continue;
+                entry.ExtraFields[key] = string.Empty;
+                dirty = true;
+            }
+            if (dirty) _ = _hub.ChaseTactical.UpsertAsync(entry);
+        }
+
+        // Clear from ToughHook entries
+        foreach (var entry in _hub.ToughHooks.GetAll())
+        {
+            var dirty = false;
+            foreach (var key in entry.ExtraFields.Keys.ToList())
+            {
+                if (!barcodeColIds.Contains(key)) continue;
+                if (!entry.ExtraFields[key].Equals(qrValue, StringComparison.OrdinalIgnoreCase)) continue;
+                entry.ExtraFields[key] = string.Empty;
+                dirty = true;
+            }
+            if (dirty) _ = _hub.ToughHooks.UpsertAsync(entry);
+        }
+
+        // Clear from ShippingSupply entries
+        foreach (var entry in _hub.ShippingSupplys.GetAll())
+        {
+            var dirty = false;
+            foreach (var key in entry.ExtraFields.Keys.ToList())
+            {
+                if (!barcodeColIds.Contains(key)) continue;
+                if (!entry.ExtraFields[key].Equals(qrValue, StringComparison.OrdinalIgnoreCase)) continue;
+                entry.ExtraFields[key] = string.Empty;
+                dirty = true;
+            }
+            if (dirty) _ = _hub.ShippingSupplys.UpsertAsync(entry);
+        }
+
+        // Force grids to re-render the now-empty cells
+        foreach (var g in AllDataGrids)
+            g.Items.Refresh();
+    }
+
+    /// <summary>
+    /// Collects all barcode values stored in BarcodeScan extra-fields of <paramref name="extraFields"/>
+    /// and removes any QrClassMapping whose QrValue matches.
+    /// Call whenever an inventory entry row is deleted.
+    /// </summary>
+    private void DeleteQrMappingsForEntryBarcodeValues(Dictionary<string, string> extraFields)
+    {
+        var barcodeColIds = _hub.Columns.GetAll()
+            .Where(c => c.DataKind == DataKind.BarcodeScan)
+            .Select(c => c.Id)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var values = extraFields
+            .Where(kv => barcodeColIds.Contains(kv.Key) && !string.IsNullOrWhiteSpace(kv.Value))
+            .Select(kv => kv.Value)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var mapping in _hub.QrMappings.GetAll()
+            .Where(m => values.Contains(m.QrValue)).ToList())
+            _ = _hub.QrMappings.DeleteAsync(mapping.Id);
+    }
+
+    private string? GetTableName(DataGrid grid) => grid.Name switch
+    {
+        "ChaseTacticalGrid"   => "chasetactical",
+        "ToughHooksGrid"      => "toughhooks",
+        "ShippingSupplysGrid" => "shippingsupplys",
+        _                     => null
+    };
 
     private static DataGrid? FindParentDataGrid(DependencyObject start)
     {
@@ -1091,10 +2460,31 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         foreach (var item in selected)
         {
+            DeleteBarcodeLinksByEntry("chasetactical", item.Id);
+            DeleteQrMappingsForEntryBarcodeValues(item.ExtraFields);
             _ = _hub.ChaseTactical.DeleteAsync(item.Id);
         }
 
         if (selected.Count > 0) Touch();
+    }
+
+    private void ChaseTactical_SetSection(object sender, RoutedEventArgs e)
+    {
+        var selected = ChaseTacticalGrid.SelectedItems.Cast<ChaseTacticalEntry>().ToList();
+        if (selected.Count == 0) return;
+        var current = selected[0].SectionLabel;
+        var label = PromptForText("Set Section", "Section label for selected rows:", current);
+        if (label is null) return;
+        foreach (var item in selected) { item.SectionLabel = label; _ = _hub.ChaseTactical.UpsertAsync(item); }
+        Touch();
+        _chaseView?.Refresh();
+    }
+
+    private void ChaseTactical_ClearSection(object sender, RoutedEventArgs e)
+    {
+        var selected = ChaseTacticalGrid.SelectedItems.Cast<ChaseTacticalEntry>().ToList();
+        foreach (var item in selected) { item.SectionLabel = string.Empty; _ = _hub.ChaseTactical.UpsertAsync(item); }
+        if (selected.Count > 0) { Touch(); _chaseView?.Refresh(); }
     }
 
     private async void ChaseTactical_ImportBulk(object sender, RoutedEventArgs e)
@@ -1239,10 +2629,31 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         foreach (var item in selected)
         {
+            DeleteBarcodeLinksByEntry("toughhooks", item.Id);
+            DeleteQrMappingsForEntryBarcodeValues(item.ExtraFields);
             _ = _hub.ToughHooks.DeleteAsync(item.Id);
         }
 
         if (selected.Count > 0) Touch();
+    }
+
+    private void ToughHooks_SetSection(object sender, RoutedEventArgs e)
+    {
+        var selected = ToughHooksGrid.SelectedItems.Cast<ToughHookEntry>().ToList();
+        if (selected.Count == 0) return;
+        var current = selected[0].SectionLabel;
+        var label = PromptForText("Set Section", "Section label for selected rows:", current);
+        if (label is null) return;
+        foreach (var item in selected) { item.SectionLabel = label; _ = _hub.ToughHooks.UpsertAsync(item); }
+        Touch();
+        _toughHooksView?.Refresh();
+    }
+
+    private void ToughHooks_ClearSection(object sender, RoutedEventArgs e)
+    {
+        var selected = ToughHooksGrid.SelectedItems.Cast<ToughHookEntry>().ToList();
+        foreach (var item in selected) { item.SectionLabel = string.Empty; _ = _hub.ToughHooks.UpsertAsync(item); }
+        if (selected.Count > 0) { Touch(); _toughHooksView?.Refresh(); }
     }
 
     private async void ToughHooks_ImportBulk(object sender, RoutedEventArgs e)
@@ -1370,6 +2781,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         foreach (var item in selected)
         {
+            // Unmap this barcode value from every scan column and BarcodeLink
+            UnmapQrValueFromAllEntries(item.QrValue);
             _ = _hub.QrMappings.DeleteAsync(item.Id);
         }
 
@@ -1404,6 +2817,31 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         QrGenPayload.Text = selected.QrValue.Trim();
         _qrGenSyncing = false;
         UpdateQrGeneratorPreview();
+    }
+
+    private void QrGenPadUpcA_Click(object sender, RoutedEventArgs e)
+    {
+        string raw = System.Text.RegularExpressions.Regex.Replace(QrGenPayload.Text, @"\D", "");
+        if (raw.Length < 11)
+        {
+            MessageBox.Show("Payload must contain at least 11 digits.", "Pad to UPC-A",
+                            MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        int lead = QrGenUpcALeadDigit.SelectedIndex; // 0–9
+        // If already 12+ digits treat digits 2–11 (indices 1–10) as the 10-digit core;
+        // if exactly 11 digits treat all 11 as digits 2–12 (drop last, recalculate check).
+        string core = raw.Length >= 12 ? raw.Substring(1, 10) : raw.Substring(0, 10);
+        var digits = new int[12];
+        digits[0] = lead;
+        for (int i = 0; i < 10; i++)
+            digits[i + 1] = core[i] - '0';
+        int sum = 0;
+        for (int i = 0; i < 11; i++)
+            sum += digits[i] * (i % 2 == 0 ? 3 : 1);
+        digits[11] = (10 - (sum % 10)) % 10;
+        QrGenPayload.Text = string.Concat(digits);
+        QrGenTypeUpcA.IsChecked = true;
     }
 
     private void QrGenerator_UseSelected(object sender, RoutedEventArgs e)
@@ -1762,7 +3200,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var quietZone = ParseIntOrDefault(QrGenQuietZone.Text, 4, 0, 20);
         var barcodeHeight = ParseIntOrDefault(QrGenBarcodeHeight.Text, 120, 20, 1200);
 
-        var isQr = QrGenTypeQr.IsChecked == true;
+        var isQr   = QrGenTypeQr.IsChecked   == true;
+        var isUpcA = QrGenTypeUpcA.IsChecked  == true;
         var includeText = QrGenIncludeText.IsChecked == true;
 
         var canvas = new bool[Math.Max(1, labelWidthDots) * Math.Max(1, labelHeightDots)];
@@ -1809,12 +3248,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     }
                 }
 
-                _qrGenCurrentZpl = BuildQrZpl(labelWidthDots, labelHeightDots, marginX, marginY, moduleDots, payload);
+                var tl1 = QrGenTopLine1.Text ?? string.Empty;
+                var tl2 = QrGenTopLine2.Text ?? string.Empty;
+                var bl  = QrGenBottomLine.Text ?? string.Empty;
+                _qrGenCurrentZpl = BuildQrZpl(labelWidthDots, labelHeightDots, marginX, marginY, moduleDots, payload, tl1, tl2, bl);
                 QrGenInfo.Text = $"QR | {dpi} DPI | {labelWidthDots}x{labelHeightDots} dots | module {moduleDots} dots";
             }
             else
             {
-                var barMatrix = writer.encode(payload, BarcodeFormat.CODE_128, maxCodeWidth, barcodeHeight, hints);
+                BarcodeFormat fmt = isUpcA ? BarcodeFormat.UPC_A : BarcodeFormat.CODE_128;
+                var barMatrix = writer.encode(payload, fmt, maxCodeWidth, barcodeHeight, hints);
                 var drawWidth = Math.Min(maxCodeWidth, barMatrix.Width);
                 var drawHeight = Math.Min(maxCodeHeight, barMatrix.Height);
                 var offsetX = marginX + Math.Max(0, (maxCodeWidth - drawWidth) / 2);
@@ -1833,8 +3276,19 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     }
                 }
 
-                _qrGenCurrentZpl = BuildCode128Zpl(labelWidthDots, labelHeightDots, marginX, marginY, moduleDots, barcodeHeight, includeText, payload);
-                QrGenInfo.Text = $"Code128 | {dpi} DPI | {labelWidthDots}x{labelHeightDots} dots | height {barcodeHeight} dots";
+                var line1 = QrGenTopLine1.Text ?? string.Empty;
+                var line2 = QrGenTopLine2.Text ?? string.Empty;
+                var lineB = QrGenBottomLine.Text ?? string.Empty;
+                if (isUpcA)
+                {
+                    _qrGenCurrentZpl = BuildUpcAZpl(labelWidthDots, labelHeightDots, marginX, marginY, moduleDots, barcodeHeight, includeText, payload, line1, line2, lineB);
+                    QrGenInfo.Text = $"UPC-A | {dpi} DPI | {labelWidthDots}x{labelHeightDots} dots | height {barcodeHeight} dots";
+                }
+                else
+                {
+                    _qrGenCurrentZpl = BuildCode128Zpl(labelWidthDots, labelHeightDots, marginX, marginY, moduleDots, barcodeHeight, includeText, payload, line1, line2, lineB);
+                    QrGenInfo.Text = $"Code128 | {dpi} DPI | {labelWidthDots}x{labelHeightDots} dots | height {barcodeHeight} dots";
+                }
             }
 
             var bmp = BuildMonochromeBitmap(canvas, labelWidthDots, labelHeightDots);
@@ -1904,36 +3358,99 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         return bmp;
     }
 
-    private static string BuildQrZpl(int labelWidthDots, int labelHeightDots, int marginX, int marginY, int moduleDots, string payload)
+    private static string BuildQrZpl(int labelWidthDots, int labelHeightDots, int marginX, int marginY, int moduleDots, string payload,
+        string topLine1 = "", string topLine2 = "", string bottomLine = "")
     {
         var safe = payload.Replace("^", " ").Replace("~", " ");
-        return string.Join("\n", new[]
+        var lines = new List<string>
         {
             "^XA",
+            "^MMT",
             $"^PW{labelWidthDots}",
             $"^LL{labelHeightDots}",
+            "^LS0",
             $"^FO{marginX},{marginY}",
             $"^BQN,2,{Math.Max(1, moduleDots)}",
             $"^FDLA,{safe}^FS",
-            "^XZ"
-        });
+        };
+        AppendTextLines(lines, marginX, marginY, 0, labelHeightDots, topLine1, topLine2, bottomLine);
+        lines.Add("^PQ1,0,1,Y");
+        lines.Add("^XZ");
+        return string.Join("\n", lines);
     }
 
-    private static string BuildCode128Zpl(int labelWidthDots, int labelHeightDots, int marginX, int marginY, int moduleDots, int heightDots, bool includeText, string payload)
+    private static string BuildUpcAZpl(int labelWidthDots, int labelHeightDots, int marginX, int marginY, int moduleDots, int heightDots, bool includeText, string payload,
+        string topLine1 = "", string topLine2 = "", string bottomLine = "")
     {
         var safe = payload.Replace("^", " ").Replace("~", " ");
         var textFlag = includeText ? "Y" : "N";
-        return string.Join("\n", new[]
+        int h = Math.Max(20, heightDots);
+        int barcodeBottomY = marginY + h;
+        var lines = new List<string>
         {
             "^XA",
+            "^MMT",
             $"^PW{labelWidthDots}",
             $"^LL{labelHeightDots}",
-            $"^FO{marginX},{marginY}",
-            $"^BY{Math.Max(1, moduleDots)},2,{Math.Max(20, heightDots)}",
-            $"^BCN,{Math.Max(20, heightDots)},{textFlag},N,N",
+            "^LS0",
+            $"^BY{Math.Max(1, moduleDots)},2,{h}",
+            $"^FT{marginX},{barcodeBottomY}",
+            $"^BUN,,{textFlag},N,N",
             $"^FD{safe}^FS",
-            "^XZ"
-        });
+        };
+        AppendTextLines(lines, marginX, marginY, barcodeBottomY, labelHeightDots, topLine1, topLine2, bottomLine);
+        lines.Add("^PQ1,0,1,Y");
+        lines.Add("^XZ");
+        return string.Join("\n", lines);
+    }
+
+    private static string BuildCode128Zpl(int labelWidthDots, int labelHeightDots, int marginX, int marginY, int moduleDots, int heightDots, bool includeText, string payload,
+        string topLine1 = "", string topLine2 = "", string bottomLine = "")
+    {
+        var safe = payload.Replace("^", " ").Replace("~", " ");
+        var textFlag = includeText ? "Y" : "N";
+        int h = Math.Max(20, heightDots);
+        int barcodeBottomY = marginY + h;
+        var lines = new List<string>
+        {
+            "^XA",
+            "^MMT",
+            $"^PW{labelWidthDots}",
+            $"^LL{labelHeightDots}",
+            "^LS0",
+            $"^BY{Math.Max(1, moduleDots)},2,{h}",
+            $"^FT{marginX},{barcodeBottomY}",
+            $"^BCN,{h},{textFlag},N,N",
+            $"^FD{safe}^FS",
+        };
+        AppendTextLines(lines, marginX, marginY, barcodeBottomY, labelHeightDots, topLine1, topLine2, bottomLine);
+        lines.Add("^PQ1,0,1,Y");
+        lines.Add("^XZ");
+        return string.Join("\n", lines);
+    }
+
+    private static void AppendTextLines(List<string> lines, int marginX, int marginY, int barcodeBottomY, int labelHeightDots,
+        string topLine1, string topLine2, string bottomLine)
+    {
+        const int fontSize = 20;
+        const int lineGap  = 24;
+        int y = barcodeBottomY + lineGap;
+        if (!string.IsNullOrWhiteSpace(topLine1))
+        {
+            var t = topLine1.Replace("^", " ").Replace("~", " ");
+            lines.Add($"^FT{marginX},{y}^A0N,{fontSize},{fontSize}^FD{t}^FS");
+            y += lineGap;
+        }
+        if (!string.IsNullOrWhiteSpace(topLine2))
+        {
+            var t = topLine2.Replace("^", " ").Replace("~", " ");
+            lines.Add($"^FT{marginX},{y}^A0N,{fontSize},{fontSize}^FD{t}^FS");
+        }
+        if (!string.IsNullOrWhiteSpace(bottomLine))
+        {
+            var t = bottomLine.Replace("^", " ").Replace("~", " ");
+            lines.Add($"^FT{marginX},{labelHeightDots - marginY}^A0N,{fontSize},{fontSize}^FD{t}^FS");
+        }
     }
 
     // ── Shipping Supplys handlers ─────────────────────────────────────────────
@@ -1954,10 +3471,31 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         foreach (var item in selected)
         {
+            DeleteBarcodeLinksByEntry("shippingsupplys", item.Id);
+            DeleteQrMappingsForEntryBarcodeValues(item.ExtraFields);
             _ = _hub.ShippingSupplys.DeleteAsync(item.Id);
         }
 
         if (selected.Count > 0) Touch();
+    }
+
+    private void ShippingSupplys_SetSection(object sender, RoutedEventArgs e)
+    {
+        var selected = ShippingSupplysGrid.SelectedItems.Cast<ShippingSupplyEntry>().ToList();
+        if (selected.Count == 0) return;
+        var current = selected[0].SectionLabel;
+        var label = PromptForText("Set Section", "Section label for selected rows:", current);
+        if (label is null) return;
+        foreach (var item in selected) { item.SectionLabel = label; _ = _hub.ShippingSupplys.UpsertAsync(item); }
+        Touch();
+        _shippingSupplysView?.Refresh();
+    }
+
+    private void ShippingSupplys_ClearSection(object sender, RoutedEventArgs e)
+    {
+        var selected = ShippingSupplysGrid.SelectedItems.Cast<ShippingSupplyEntry>().ToList();
+        foreach (var item in selected) { item.SectionLabel = string.Empty; _ = _hub.ShippingSupplys.UpsertAsync(item); }
+        if (selected.Count > 0) { Touch(); _shippingSupplysView?.Refresh(); }
     }
 
     private void ShippingSupplys_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
@@ -2694,6 +4232,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string? _pdfEditorCurrentFile;
     private bool _pdfEditorIsEditMode = true;
     private bool _pdfEditorIsWebMode;
+    private bool _pdfEditorIsRunEditMode;
     private System.Windows.Media.Imaging.BitmapSource? _pdfEditorBasePreview;
     private readonly System.Collections.ObjectModel.ObservableCollection<RunOverrideRow> _runOverrides = new();
     private List<string> _pdfEditorPageLines = [];
@@ -3025,6 +4564,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _pdfEditorIsEditMode = false;
         UpdatePdfEditorModeUi();
         RefreshPdfEditorSurface();
+    }
+
+    private async void PdfEditorRunEdit_Click(object sender, RoutedEventArgs e)
+    {
+        _pdfEditorIsRunEditMode = !_pdfEditorIsRunEditMode;
+        UpdatePdfEditorModeUi();
+        if (PdfEditorWebView.CoreWebView2 is not null)
+            await PdfEditorWebView.CoreWebView2.ExecuteScriptAsync(
+                $"window._readerSetRunEditMode && window._readerSetRunEditMode({(_pdfEditorIsRunEditMode ? "true" : "false")});");
     }
 
     [DllImport("user32.dll", SetLastError = true)]
@@ -3908,9 +5456,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void UpdatePdfEditorModeUi()
     {
-        var editButton = FindName("PdfEditorEditModeBtn") as Button;
-        var viewButton = FindName("PdfEditorViewModeBtn") as Button;
-        var webButton  = FindName("PdfEditorWebModeBtn")  as Button;
+        var editButton    = FindName("PdfEditorEditModeBtn") as Button;
+        var viewButton    = FindName("PdfEditorViewModeBtn") as Button;
+        var webButton     = FindName("PdfEditorWebModeBtn")  as Button;
+        var runEditButton = FindName("PdfEditorRunEditBtn")  as Button;
 
         if (editButton is null || viewButton is null)
             return;
@@ -3919,6 +5468,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         ApplyPdfEditorModeButtonState(viewButton, !_pdfEditorIsEditMode);
         if (webButton is not null)
             ApplyPdfEditorModeButtonState(webButton, _pdfEditorIsWebMode);
+        if (runEditButton is not null)
+        {
+            runEditButton.Content = (_pdfEditorIsRunEditMode ? "✏ Edit Runs: On" : "✏ Edit Runs: Off");
+            ApplyPdfEditorModeButtonState(runEditButton, _pdfEditorIsRunEditMode);
+        }
     }
 
     private static void ApplyPdfEditorModeButtonState(Button button, bool isActive)

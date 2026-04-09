@@ -64,6 +64,25 @@ public sealed class JsonStore<T> where T : class
         await _ws.BroadcastAsync(new { type = "upsert", collection = _collectionName, data = item });
     }
 
+    public async Task InsertAtAsync(T item, int index)
+    {
+        lock (_lock)
+        {
+            var id = _getId(item);
+            var existing = Items.FirstOrDefault(x => _getId(x) == id);
+            if (existing is not null)
+                Items[Items.IndexOf(existing)] = item;
+            else
+            {
+                var clamped = Math.Clamp(index, 0, Items.Count);
+                Items.Insert(clamped, item);
+            }
+            Persist();
+        }
+
+        await _ws.BroadcastAsync(new { type = "upsert", collection = _collectionName, data = item });
+    }
+
     public async Task DeleteAsync(string id)
     {
         T? removed = null;

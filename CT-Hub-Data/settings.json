@@ -1,0 +1,127 @@
+{
+  "SelectedPdfFolder": "C:\\Users\\Brent\\OneDrive\\Desktop\\AD Folder\\AD Warehouse\\CT-Rebuild-workversion\\CT-Rebuild-main\\Picking Ticket (Chase Tactical)",
+  "DevChromeEndpoint": "http://127.0.0.1:9222",
+  "DevBrowserKind": "Chrome",
+  "DevBrowserExecutablePath": "",
+  "DevUseLocalBrowserData": false,
+  "DevBrowserUserDataDir": "",
+  "DevBrowserProfileDirectory": "Default",
+  "DevAutoConnectFirstTab": true,
+  "DevUseProfileSnapshot": true,
+  "PdfEditorFileListRatio": 0.18351956249295157,
+  "PdfEditorPanelRatio": 0.24450261780104712,
+  "ColumnLayouts": {
+    "ChaseTacticalGrid": [
+      {
+        "Key": "357c8fcc-24bb-4783-a77c-b3d6e8f9429e",
+        "Width": 167,
+        "DisplayIndex": 0
+      },
+      {
+        "Key": "seed-ct-bin",
+        "Width": 75,
+        "DisplayIndex": 2
+      },
+      {
+        "Key": "e0ffd8ed-263a-43b7-9bd2-e0534713e545",
+        "Width": 163,
+        "DisplayIndex": 4
+      },
+      {
+        "Key": "seed-ct-cls",
+        "Width": 186,
+        "DisplayIndex": 5
+      },
+      {
+        "Key": "1f076894-55a7-43f9-b129-987901d1e975",
+        "Width": 156,
+        "DisplayIndex": 3
+      },
+      {
+        "Key": "seed-ct-lbl",
+        "Width": 200,
+        "DisplayIndex": 1
+      },
+      {
+        "Key": "seed-ct-qty",
+        "Width": 169,
+        "DisplayIndex": 6
+      },
+      {
+        "Key": "seed-ct-stk",
+        "Width": 182,
+        "DisplayIndex": 7
+      },
+      {
+        "Key": "seed-ct-id",
+        "Width": 220,
+        "DisplayIndex": 9
+      },
+      {
+        "Key": "1be610bb-5a58-4e2d-a693-0eb90a96735f",
+        "Width": 128,
+        "DisplayIndex": 8
+      }
+    ]
+  },
+  "StaticColumnLabels": {
+    "ChaseTacticalGrid|Qty": "Total Stock",
+    "ToughHooksGrid|Qty": "Quantity",
+    "QrMappingsGrid|QR Value": "Payload",
+    "PdfFileGrid|PDF File": "PDF",
+    "PdfFileGrid|Sales Orders": "Sales Orders",
+    "PdfFileGrid|Import Date/Time": "Import Date/Time"
+  },
+  "AppliedSeedIds": [
+    "seed-ct-bin",
+    "seed-ct-cls",
+    "seed-ct-ltr",
+    "seed-ct-cid",
+    "seed-ct-lbl",
+    "seed-ct-qty",
+    "seed-ct-stk",
+    "seed-ct-nts",
+    "seed-ct-id",
+    "seed-th-bin",
+    "seed-th-sku",
+    "seed-th-dsc",
+    "seed-th-qty",
+    "seed-th-stk",
+    "seed-th-id",
+    "seed-ss-dim",
+    "seed-ss-bdl",
+    "seed-ss-sng",
+    "seed-ss-stk",
+    "seed-ss-id",
+    "seed-qr-val",
+    "seed-qr-cls",
+    "seed-qr-dsc",
+    "seed-qr-id"
+  ],
+  "MobileCardConfig": {
+    "chasetactical": {
+      "Row1": "Label",
+      "Row2": [
+        "Bin",
+        "Notes"
+      ],
+      "Badge": "Qty"
+    },
+    "toughhooks": {
+      "Row1": "Description",
+      "Row2": [
+        "Sku",
+        "Qty"
+      ],
+      "Badge": "Qty"
+    },
+    "shippingsupplys": {
+      "Row1": "Dimensions",
+      "Row2": [
+        "Single",
+        "Bundle"
+      ],
+      "Badge": null
+    }
+  }
+}

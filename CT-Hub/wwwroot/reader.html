@@ -75,33 +75,6 @@
       justify-content:center;
       overflow:hidden;
     }
-    .sidepanel-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1200}
-    .sidepanel-bottom{
-      position:fixed;
-      bottom:0;
-      left:0;
-      right:0;
-      max-height:80vh;
-      transform:translateY(100%);
-      transition:transform .22s ease;
-      z-index:1201;
-      background:rgba(8,12,20,.96);
-      backdrop-filter:blur(8px);
-      -webkit-backdrop-filter:blur(8px);
-      border-top:2px solid var(--line);
-      border-radius:16px 16px 0 0;
-      padding:0 12px;
-      padding-bottom:max(12px,env(safe-area-inset-bottom));
-      overflow-y:auto;
-      overflow-x:hidden;
-    }
-    .panel-handle{
-      width:40px;
-      height:4px;
-      background:rgba(255,255,255,.25);
-      border-radius:2px;
-      margin:10px auto 12px;
-    }
     .page-indicator{
       position:fixed;
       bottom:max(16px,env(safe-area-inset-bottom));
@@ -180,8 +153,6 @@
     .panel-control .panel-value{font-size:12px;color:var(--muted);text-align:right}
     .panel-control .panel-check{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text);font-weight:700}
     .panel-control .panel-check input{transform:scale(1.15)}
-    body.sidepanel-bottom-open .sidepanel-bottom{transform:translateY(0)}
-    body.sidepanel-bottom-open .sidepanel-backdrop{display:block}
     canvas{
       width:auto;
       height:auto;
@@ -211,15 +182,21 @@
       justify-content:center;
     }
     body.light-mode .text-view{background:transparent}
-    .text-page{
+    .text-page-wrap{
       position:relative;
+      flex:0 0 auto;
+      overflow:hidden;
+      border-radius:8px;
+      box-shadow:0 2px 24px rgba(0,0,0,.45);
+    }
+    .text-page{
+      position:absolute;
+      top:0;
+      left:0;
       background:#fff;
       color:#111;
       overflow:visible;
-      flex:0 0 auto;
-      margin:0;
-      border-radius:8px;
-      box-shadow:0 2px 24px rgba(0,0,0,.45);
+      transform-origin:top left;
     }
     .text-run{
       position:absolute;
@@ -233,6 +210,12 @@
       transform-origin:top left;
       pointer-events:none;
       user-select:text;
+    }
+    .search-highlight{
+      background:rgba(255,214,0,.80);
+      color:#111;
+      border-radius:2px;
+      padding:0 1px;
     }
     .panel-search-wrap{
       display:flex;
@@ -438,140 +421,20 @@
       cursor:pointer;
     }
     body.run-edit-mode .text-run{ pointer-events:auto; cursor:crosshair; }
-    @keyframes pageSlideUp   { from{ transform:translateY(100%); opacity:.4 } to{ transform:translateY(0); opacity:1 } }
-    @keyframes pageSlideDown { from{ transform:translateY(-100%); opacity:.4 } to{ transform:translateY(0); opacity:1 } }
+    @keyframes pageSlideUp   { from{ transform:translateY(100%); } to{ transform:translateY(0); } }
+    @keyframes pageSlideDown { from{ transform:translateY(-100%); } to{ transform:translateY(0); } }
+    @keyframes pageExitUp    { from{ transform:translateY(0); } to{ transform:translateY(-100%); } }
+    @keyframes pageExitDown  { from{ transform:translateY(0); } to{ transform:translateY(100%); } }
     .page-enter-next{ animation:pageSlideUp   .32s cubic-bezier(0.25,0.46,0.45,0.94) both; }
     .page-enter-prev{ animation:pageSlideDown .32s cubic-bezier(0.25,0.46,0.45,0.94) both; }
+    .page-exit-next { animation:pageExitUp    .32s cubic-bezier(0.25,0.46,0.45,0.94) both; }
+    .page-exit-prev { animation:pageExitDown  .32s cubic-bezier(0.25,0.46,0.45,0.94) both; }
   </style>
 </head>
 <body>
   <p id="docName" class="sr-only">Preparing document...</p>
   <div id="status" class="sr-only" aria-live="polite">Loading PDF...</div>
 
-  <div id="sidepanelBackdrop" class="sidepanel-backdrop"></div>
-  <div id="sidepanelBottom" class="sidepanel-bottom" aria-hidden="true">
-    <div class="panel-handle"></div>
-    <p id="pageLabel" class="panel-sub" style="text-align:center;margin-bottom:8px">Page 0 / 0</p>
-    <div class="panel-stack">
-      <div class="panel-control" style="margin-bottom:2px">
-        <label for="searchInput" style="font-size:13px;color:var(--muted);font-weight:700">Search Document</label>
-        <div class="panel-search-wrap" style="margin-top:4px">
-          <input id="searchInput" type="search" placeholder="Search all pages&#x2026;" autocomplete="off" />
-          <button id="searchBtn" class="btn" type="button" style="padding:8px 12px;min-height:0">Go</button>
-        </div>
-        <button id="clearSearchBtn" class="btn" type="button" style="margin-top:6px;display:none">Clear Search</button>
-        <div id="searchResults" class="search-results"></div>
-      </div>
-      <button id="fullscreenBtn" class="btn" type="button">Fullscreen</button>
-      <div class="panel-row">
-        <button id="lockScrollBtn" class="btn primary" type="button">&#x1F512; Lock Scroll: On</button>
-        <button id="runEditModeBtn" class="btn" type="button">&#x270F; Edit Runs: Off</button>
-      </div>
-      <div class="panel-control">
-        <label for="pageZoomXRange">Page Zoom X (Width)</label>
-        <input id="pageZoomXRange" type="range" min="0.50" max="3.00" step="0.05" value="1.00" />
-        <div id="pageZoomXValue" class="panel-value">100%</div>
-      </div>
-      <div class="panel-control">
-        <label for="pageZoomYRange">Page Zoom Y (Height)</label>
-        <input id="pageZoomYRange" type="range" min="0.50" max="3.00" step="0.05" value="1.00" />
-        <div id="pageZoomYValue" class="panel-value">100%</div>
-      </div>
-      <div class="panel-control">
-        <label for="textSizeYRange">Text Size Y (Height)</label>
-        <input id="textSizeYRange" type="range" min="0.50" max="3.00" step="0.05" value="1.00" />
-        <div id="textSizeYValue" class="panel-value">100%</div>
-      </div>
-      <div class="panel-control">
-        <label for="textSizeXRange">Text Size X (Width)</label>
-        <input id="textSizeXRange" type="range" min="0.25" max="3.00" step="0.05" value="1.00" />
-        <div id="textSizeXValue" class="panel-value">100%</div>
-      </div>
-      <div class="panel-control">
-        <label for="textSpacingXRange">Text Spacing X (Letter)</label>
-        <input id="textSpacingXRange" type="range" min="-2" max="12" step="0.5" value="0" />
-        <div id="textSpacingXValue" class="panel-value">0px</div>
-      </div>
-      <div class="panel-control">
-        <label for="textSpacingYRange">Text Spacing Y (Line)</label>
-        <input id="textSpacingYRange" type="range" min="0.50" max="3.00" step="0.05" value="1.00" />
-        <div id="textSpacingYValue" class="panel-value">100%</div>
-      </div>
-      <div class="panel-control">
-        <label for="fontPickerSelect">Font</label>
-        <select id="fontPickerSelect" style="width:100%;background:rgba(255,255,255,.08);border:2px solid var(--line);border-radius:8px;color:var(--text);font-size:14px;padding:8px 10px;outline:none;appearance:none;-webkit-appearance:none;">
-          <option value="">— PDF Original —</option>
-          <optgroup label="Sans-Serif">
-            <option value="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">System UI</option>
-            <option value="'Arial',sans-serif">Arial</option>
-            <option value="'Helvetica Neue','Helvetica',sans-serif">Helvetica Neue</option>
-            <option value="'Calibri',sans-serif">Calibri</option>
-            <option value="'Verdana',sans-serif">Verdana</option>
-            <option value="'Tahoma',sans-serif">Tahoma</option>
-            <option value="'Trebuchet MS',sans-serif">Trebuchet MS</option>
-            <option value="'Gill Sans','Gill Sans MT',sans-serif">Gill Sans</option>
-            <option value="'Century Gothic',sans-serif">Century Gothic</option>
-            <option value="'Futura','Century Gothic',sans-serif">Futura</option>
-            <option value="'Optima',sans-serif">Optima</option>
-          </optgroup>
-          <optgroup label="Serif">
-            <option value="'Georgia',serif">Georgia</option>
-            <option value="'Times New Roman','Times',serif">Times New Roman</option>
-            <option value="'Palatino','Palatino Linotype',serif">Palatino</option>
-            <option value="'Book Antiqua','Palatino',serif">Book Antiqua</option>
-            <option value="'Garamond','EB Garamond',serif">Garamond</option>
-            <option value="'Baskerville','Baskerville Old Face',serif">Baskerville</option>
-            <option value="'Cambria',serif">Cambria</option>
-          </optgroup>
-          <optgroup label="Monospace">
-            <option value="'Courier New','Courier',monospace">Courier New</option>
-            <option value="'Consolas','Lucida Console',monospace">Consolas</option>
-            <option value="'Menlo','Monaco',monospace">Menlo</option>
-            <option value="'SF Mono','Fira Mono',monospace">SF Mono</option>
-          </optgroup>
-          <optgroup label="Condensed / Display">
-            <option value="'Arial Narrow',sans-serif">Arial Narrow</option>
-            <option value="'Impact','Franklin Gothic Heavy',sans-serif">Impact</option>
-            <option value="'Franklin Gothic Medium',sans-serif">Franklin Gothic</option>
-            <option value="'Rockwell',serif">Rockwell</option>
-          </optgroup>
-          <optgroup label="Rounded / Friendly">
-            <option value="'Nunito',system-ui,sans-serif">Nunito</option>
-            <option value="'Varela Round',sans-serif">Varela Round</option>
-          </optgroup>
-        </select>
-      </div>
-      <div class="panel-control">
-        <label class="panel-check" for="textBoldToggle">
-          <input id="textBoldToggle" type="checkbox" />
-          <span>Bold Text</span>
-        </label>
-      </div>
-      <div class="panel-control" style="margin-top:4px;border-top:1px solid var(--line);padding-top:10px">
-        <label style="font-size:13px;color:var(--muted);font-weight:700">Sort &amp; Filter</label>
-        <div class="panel-row" style="margin-top:6px">
-          <button id="sortBtn" class="btn" type="button" style="flex:1;text-align:left" title="Cycle sort order">Sort: Default</button>
-        </div>
-        <div style="margin-top:6px">
-          <label class="panel-check" for="hideShippedToggle">
-            <input id="hideShippedToggle" type="checkbox" />
-            <span>Hide Shipped Pages</span>
-          </label>
-        </div>
-      </div>
-      <div class="panel-control" style="margin-top:4px;border-top:1px solid var(--line);padding-top:10px">
-        <label style="font-size:13px;color:var(--muted);font-weight:700">Settings</label>
-        <div class="panel-row" style="margin-top:8px;gap:8px">
-          <button id="exportSettingsBtn" class="btn" type="button" style="flex:1">&#x2B07; Export</button>
-          <button id="importSettingsBtn" class="btn" type="button" style="flex:1">&#x2B06; Import</button>
-          <input id="importSettingsFile" type="file" accept=".json" style="display:none" />
-        </div>
-      </div>
-      <div class="panel-control" style="margin-top:4px;border-top:1px solid var(--line);padding-top:10px">
-        <button id="resetAllBtn" class="btn" type="button" style="width:100%;background:#c0392b;color:#fff;font-weight:700">&#x21BA; Reset All to Default</button>
-      </div>
-    </div>
-  </div>
 
   <div id="viewerWrap" class="viewer-wrap">
     <div id="textView" class="text-view"></div>
@@ -622,6 +485,10 @@
       const theme = localStorage.getItem('theme') || 'dark';
       if (theme === 'light') document.body.classList.add('light-mode');
 
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      let previewIOSMode = false;
+
       const viewerWrapEl = document.getElementById('viewerWrap');
 
       const qs = new URLSearchParams(window.location.search);
@@ -638,10 +505,6 @@
       const pageZoomYRange = document.getElementById('pageZoomYRange');
       const pageZoomYValue = document.getElementById('pageZoomYValue');
       const textBoldToggle = document.getElementById('textBoldToggle');
-      const searchInput = document.getElementById('searchInput');
-      const searchBtn = document.getElementById('searchBtn');
-      const searchResults = document.getElementById('searchResults');
-      const clearSearchBtn = document.getElementById('clearSearchBtn');
       const sortBtn = document.getElementById('sortBtn');
       const hideShippedToggle = document.getElementById('hideShippedToggle');
       const pickedToggle = document.getElementById('pickedToggle');
@@ -651,8 +514,6 @@
       const pickedChkBox = document.getElementById('pickedChkBox');
       const shippedChkBox = document.getElementById('shippedChkBox');
       const docStamp = document.getElementById('docStamp');
-      const sidepanelBottom = document.getElementById('sidepanelBottom');
-      const sidepanelBackdrop = document.getElementById('sidepanelBackdrop');
       const textView = document.getElementById('textView');
       const viewerWrap = document.getElementById('viewerWrap');
 
@@ -660,10 +521,7 @@
         if (statusEl) statusEl.textContent = message;
       }
 
-      function setPanelOpen(open) {
-        document.body.classList.toggle('sidepanel-bottom-open', !!open);
-        if (sidepanelBottom) sidepanelBottom.setAttribute('aria-hidden', open ? 'false' : 'true');
-      }
+      function setPanelOpen(open) {}
 
       if (!file) {
         setStatus('Missing file name in URL.');
@@ -674,6 +532,8 @@
 
       let pdfDoc = null;
       let currentPage = 1;
+      let pendingSearch = null;  // query queued before pdfDoc was ready
+      let activeSearchQuery = ''; // currently active search query, for post-render highlighting
 
       // --- Picked / Shipped state ---
       function docStateKey(suffix) {
@@ -725,100 +585,6 @@
         if (hideShipped) await buildPageList();
       });
       loadDocState();
-
-      // --- Full-document search ---
-      async function runSearch() {
-        const query = (searchInput.value || '').trim().toLowerCase();
-        searchResults.innerHTML = '';
-        if (!query || !pdfDoc) return;
-
-        const searchingEl = document.createElement('div');
-        searchingEl.className = 'search-none';
-        searchingEl.textContent = 'Searching\u2026';
-        searchResults.appendChild(searchingEl);
-
-        const matches = [];
-        for (let p = 1; p <= pdfDoc.numPages; p++) {
-          const page = await pdfDoc.getPage(p);
-          const layout = await extractStructuredTextLayout(page);
-          if (!layout || !layout.runs) continue;
-          const fullText = layout.runs.map(r => r.text).join(' ');
-          const lower = fullText.toLowerCase();
-          let idx = lower.indexOf(query);
-          while (idx !== -1) {
-            const start = Math.max(0, idx - 30);
-            const end = Math.min(fullText.length, idx + query.length + 30);
-            const before = fullText.slice(start, idx);
-            const match = fullText.slice(idx, idx + query.length);
-            const after = fullText.slice(idx + query.length, end);
-            matches.push({ page: p, before, match, after });
-            idx = lower.indexOf(query, idx + 1);
-          }
-        }
-
-        searchResults.innerHTML = '';
-        if (!matches.length) {
-          const none = document.createElement('div');
-          none.className = 'search-none';
-          none.textContent = 'No results found.';
-          searchResults.appendChild(none);
-          searchPages = [];
-          clearSearchBtn.style.display = 'none';
-          updatePager();
-          return;
-        }
-
-        // Collect unique pages in sort/filter order and activate filter
-        const allFilteredPages = searchPages.length ? searchPages : Array.from({length: pdfDoc.numPages}, (_,i)=>i+1);
-        const matchedSet = new Set(matches.map(m => m.page));
-        searchPages = allFilteredPages.filter(p => matchedSet.has(p));
-        clearSearchBtn.style.display = '';
-        if (!searchPages.length) {
-          const none = document.createElement('div');
-          none.className = 'search-none';
-          none.textContent = 'No results in current page set.';
-          searchResults.appendChild(none);
-          updatePager();
-          return;
-        }
-        currentPage = searchPages[0];
-        await renderPage();
-
-        for (const m of matches) {
-          const item = document.createElement('div');
-          item.className = 'search-result-item';
-          const pg = document.createElement('div');
-          pg.className = 'search-result-page';
-          pg.textContent = 'Page ' + m.page;
-          const snippet = document.createElement('div');
-          snippet.className = 'search-result-snippet';
-          snippet.innerHTML = (m.before.length === 30 ? '\u2026' : '') +
-            escHtml(m.before) + '<em>' + escHtml(m.match) + '</em>' + escHtml(m.after) +
-            (m.after.length === 30 ? '\u2026' : '');
-          item.appendChild(pg);
-          item.appendChild(snippet);
-          item.addEventListener('click', async () => {
-            currentPage = m.page;
-            await renderPage();
-            setPanelOpen(false);
-          });
-          searchResults.appendChild(item);
-        }
-      }
-
-      function escHtml(str) {
-        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      }
-
-      searchBtn.addEventListener('click', runSearch);
-      searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
-      clearSearchBtn.addEventListener('click', async () => {
-        searchInput.value = '';
-        searchResults.innerHTML = '';
-        clearSearchBtn.style.display = 'none';
-        // Rebuild page list with current sort/filter (don't reset those)
-        await buildPageList();
-      });
 
       const textOverrideFonts = ['Nunito','Varela Round'];
       function loadGoogleFont(name) {
@@ -958,17 +724,61 @@
         }
       }
 
-      sortBtn.addEventListener('click', async () => {
+      sortBtn?.addEventListener('click', async () => {
         const idx = SORT_MODES.indexOf(sortMode);
         sortMode = SORT_MODES[(idx + 1) % SORT_MODES.length];
-        sortBtn.textContent = SORT_LABELS[sortMode];
+        if (sortBtn) sortBtn.textContent = SORT_LABELS[sortMode];
         await buildPageList();
       });
 
-      hideShippedToggle.addEventListener('change', async () => {
+      hideShippedToggle?.addEventListener('change', async () => {
         hideShipped = hideShippedToggle.checked;
         await buildPageList();
       });
+
+      // Applies yellow highlight to runs in textView that contain the current search query.
+      function applySearchHighlights() {
+        if (!activeSearchQuery) return;
+        const q = activeSearchQuery.toLowerCase();
+        for (const span of textView.querySelectorAll('.text-run')) {
+          const text = span.textContent || '';
+          const lower = text.toLowerCase();
+          const idx = lower.indexOf(q);
+          if (idx === -1) continue;
+          // Rebuild span content using DOM nodes (no innerHTML injection)
+          while (span.firstChild) span.removeChild(span.firstChild);
+          if (idx > 0) span.appendChild(document.createTextNode(text.slice(0, idx)));
+          const mark = document.createElement('span');
+          mark.className = 'search-highlight';
+          mark.appendChild(document.createTextNode(text.slice(idx, idx + q.length)));
+          span.appendChild(mark);
+          if (idx + q.length < text.length)
+            span.appendChild(document.createTextNode(text.slice(idx + q.length)));
+        }
+      }
+
+      // Headless search — called by Android via evaluateJavascript
+      // Filters pages to only those containing the query text, then renders first match.
+      window.runSearch = async function(queryOverride) {
+        const input = document.getElementById('searchInput');
+        const query = (queryOverride != null ? String(queryOverride) : (input ? input.value : '')).trim().toLowerCase();
+        if (!query) { activeSearchQuery = ''; await buildPageList(); return; }
+        if (!pdfDoc) { pendingSearch = queryOverride; return; }  // PDF still loading — replay when ready
+        const matches = new Set();
+        for (let p = 1; p <= pdfDoc.numPages; p++) {
+          const layout = textCache.get(p) ||
+            await extractStructuredTextLayout(await pdfDoc.getPage(p)).catch(() => null);
+          if (!layout || !layout.runs) continue;
+          const text = layout.runs.map(r => r.text).join(' ').toLowerCase();
+          if (text.includes(query)) matches.add(p);
+        }
+        if (!matches.size) return;
+        const allPages = Array.from({length: pdfDoc.numPages}, (_, i) => i + 1);
+        searchPages = allPages.filter(p => matches.has(p));
+        currentPage = searchPages[0];
+        activeSearchQuery = query;
+        await renderPage();
+      };
 
       function updateTextControlsUi() {
         if (pageZoomXRange) pageZoomXRange.value = String(textViewSettings.pageZoomX);
@@ -1095,12 +905,7 @@
         if (!layout || !Array.isArray(layout.runs) || !layout.runs.length) {
           const empty = document.createElement('div');
           empty.className = 'text-page';
-          empty.style.width = '100%';
-          empty.style.height = '100%';
-          empty.style.display = 'flex';
-          empty.style.alignItems = 'center';
-          empty.style.justifyContent = 'center';
-          empty.style.fontSize = '18px';
+          empty.style.cssText = 'position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;border-radius:8px;';
           empty.textContent = '[No extractable text on this page]';
           textView.appendChild(empty);
           return;
@@ -1108,22 +913,35 @@
 
         const wrapW = Math.max(1, viewerWrap?.clientWidth || window.innerWidth);
         const wrapH = Math.max(1, viewerWrap?.clientHeight || window.innerHeight);
-        // fill-fit: scale each axis independently so the page fills the entire viewport
+        // Contain-fit base scale — page fits entirely within the container
         const fitScaleW = wrapW / Math.max(1, layout.pageWidth);
         const fitScaleH = wrapH / Math.max(1, layout.pageHeight);
-        // Independent X and Y layout scales — 1.00/1.00 is now a neutral full-page fit
-        const scaleX = fitScaleW * textViewSettings.pageZoomX;
-        const scaleY = fitScaleH * textViewSettings.pageZoomY;
-        // fontScaleY: controls font-size (glyph height); fontScaleX: applied via scaleX transform (glyph width)
-        const fontScaleY = Math.sqrt(scaleX * scaleY) * textViewSettings.textSizeY;
-        const fontScaleX = textViewSettings.textSizeX;
-        const outW = Math.max(1, Math.floor(layout.pageWidth * scaleX));
+        const fitScale = Math.min(fitScaleW, fitScaleH);
+
+        // iOS offset: renders +0.6 taller than the stored pageZoomY value (fills bottom black bar)
+        const useIOSOffset = isIOS || previewIOSMode;
+        const scaleX = fitScale * textViewSettings.pageZoomX;
+        const scaleY = fitScale * (useIOSOffset ? textViewSettings.pageZoomY + 0.6 : textViewSettings.pageZoomY);
+
+        // Final visual pixel dimensions of the rendered page
+        const outW = Math.max(1, Math.floor(layout.pageWidth  * scaleX));
         const outH = Math.max(1, Math.floor(layout.pageHeight * scaleY));
 
+        // Wrapper: occupies the correct layout space so flex centering works
+        const wrapperEl = document.createElement('div');
+        wrapperEl.className = 'text-page-wrap';
+        wrapperEl.style.width  = outW + 'px';
+        wrapperEl.style.height = outH + 'px';
+
+        // Page: natural PDF coordinate dimensions, CSS transform handles final scaling
+        // This eliminates accumulated floating-point drift and prevents run overlap
         const pageEl = document.createElement('div');
         pageEl.className = 'text-page';
-        pageEl.style.width = outW + 'px';
-        pageEl.style.height = outH + 'px';
+        pageEl.style.width  = layout.pageWidth  + 'px';
+        pageEl.style.height = layout.pageHeight + 'px';
+        pageEl.style.transform = 'scale(' + scaleX + ',' + scaleY + ')';
+
+        // Font scaling: pure textSizeY multiplier on natural PDF font sizes — no geometric mean
 
         for (let ri = 0; ri < layout.runs.length; ri++) {
           const run = layout.runs[ri];
@@ -1133,23 +951,27 @@
           span.className = 'text-run';
           span.dataset.runKey = overrideKey;
           span.textContent = run.text;
-          const baseLeft = run.left * scaleX;
-          const baseTop  = run.top  * scaleY * textViewSettings.textSpacingY;
-          const baseFs   = Math.max(6, run.fontSize * fontScaleY);
+          // Positions in natural PDF coordinate space; CSS transform applies visual scaling
+          const baseLeft = run.left;
+          const baseTop  = run.top * textViewSettings.textSpacingY;
+          const baseFs   = Math.max(6, run.fontSize * textViewSettings.textSizeY);
           span.dataset.origLeft     = baseLeft + 'px';
           span.dataset.origTop      = baseTop  + 'px';
           span.dataset.origFontSize = baseFs    + 'px';
-          span.style.left = (baseLeft + ov.dx) + 'px';
-          span.style.top  = (baseTop  + ov.dy) + 'px';
-          if (textViewSettings.textSpacingX !== 0) span.style.letterSpacing = textViewSettings.textSpacingX + 'px';
+          span.style.left     = (baseLeft + ov.dx) + 'px';
+          span.style.top      = (baseTop  + ov.dy) + 'px';
           span.style.fontSize = Math.max(6, baseFs * ov.sizeScale) + 'px';
-          if (fontScaleX !== 1) span.style.transform = 'scaleX(' + fontScaleX + ')';
-          if (textViewSettings.forceBold) { span.style.fontWeight = '700'; }
+          if (textViewSettings.textSpacingX !== 0) span.style.letterSpacing = textViewSettings.textSpacingX + 'px';
+          // Divide out textSizeY to cancel the horizontal growth that font-size increase causes
+          const spanScaleX = textViewSettings.textSizeX / textViewSettings.textSizeY;
+          if (Math.abs(spanScaleX - 1) > 0.001) span.style.transform = 'scaleX(' + spanScaleX + ')';
+          if (textViewSettings.forceBold) span.style.fontWeight = '700';
           span.style.fontFamily = textViewSettings.fontOverride || run.fontFamily;
           pageEl.appendChild(span);
         }
 
-        textView.appendChild(pageEl);
+        wrapperEl.appendChild(pageEl);
+        textView.appendChild(wrapperEl);
       }
 
       function detectContentBoundsFromImageData(imageData, width, height) {
@@ -1215,15 +1037,118 @@
         };
       }
 
+      // ── Page fragment cache ──────────────────────────────────────────────
+      // Stores pre-rendered div elements keyed by page number.
+      // Keeps prev, current, and next so the slide animation can show them
+      // instantly without waiting for extractStructuredTextLayout.
+      const pageCache = new Map(); // pageNum -> HTMLDivElement (detached)
+
+      function invalidatePageCache() { pageCache.clear(); }
+
+      async function buildPageFragment(pageNum) {
+        if (!pdfDoc || pageNum < 1 || pageNum > pdfDoc.numPages) return null;
+        if (pageCache.has(pageNum)) return pageCache.get(pageNum);
+        const page   = await pdfDoc.getPage(pageNum);
+        const layout = await extractStructuredTextLayout(page);
+        // Build into a detached container so viewerWrap layout isn't disturbed
+        const container = document.createElement('div');
+        container.style.cssText = 'width:100%;height:100%;';
+        // Temporarily point textView at this container so renderStructuredTextLayout works
+        const real = textView;
+        // We shadow the variable for the duration of this call by passing container directly
+        _renderLayoutInto(container, layout);
+        pageCache.set(pageNum, container);
+        return container;
+      }
+
+      // Renders a layout into an arbitrary target element (does not touch textView)
+      function _renderLayoutInto(target, layout) {
+        target.innerHTML = '';
+        if (!layout || !Array.isArray(layout.runs) || !layout.runs.length) {
+          const empty = document.createElement('div');
+          empty.className = 'text-page';
+          empty.style.cssText = 'position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;border-radius:8px;';
+          empty.textContent = '[No extractable text on this page]';
+          target.appendChild(empty);
+          return;
+        }
+        // Reuse all the same sizing logic from renderStructuredTextLayout
+        const wrapW = Math.max(1, viewerWrap?.clientWidth || window.innerWidth);
+        const wrapH = Math.max(1, viewerWrap?.clientHeight || window.innerHeight);
+        const fitScaleW = wrapW / Math.max(1, layout.pageWidth);
+        const fitScaleH = wrapH / Math.max(1, layout.pageHeight);
+        const fitScale  = Math.min(fitScaleW, fitScaleH);
+        const useIOSOffset = isIOS || previewIOSMode;
+        const scaleX = fitScale * textViewSettings.pageZoomX;
+        const scaleY = fitScale * (useIOSOffset ? textViewSettings.pageZoomY + 0.6 : textViewSettings.pageZoomY);
+        const outW = Math.max(1, Math.floor(layout.pageWidth  * scaleX));
+        const outH = Math.max(1, Math.floor(layout.pageHeight * scaleY));
+        const wrapperEl = document.createElement('div');
+        wrapperEl.className = 'text-page-wrap';
+        wrapperEl.style.width  = outW + 'px';
+        wrapperEl.style.height = outH + 'px';
+        const pageEl = document.createElement('div');
+        pageEl.className = 'text-page';
+        pageEl.style.width  = layout.pageWidth  + 'px';
+        pageEl.style.height = layout.pageHeight + 'px';
+        // Copy the transform that renderStructuredTextLayout would apply
+        pageEl.style.transformOrigin = 'top left';
+        pageEl.style.transform = `scaleX(${scaleX}) scaleY(${scaleY})`;
+        // Append runs with same positioning logic as renderStructuredTextLayout
+        for (const run of layout.runs) {
+          const el = document.createElement('span');
+          el.className = 'text-run';
+          el.textContent = run.text ?? '';
+          const baseLeft = run.left;
+          const baseTop  = run.top * textViewSettings.textSpacingY;
+          const baseFs   = Math.max(6, run.fontSize * textViewSettings.textSizeY);
+          el.style.left     = baseLeft + 'px';
+          el.style.top      = baseTop  + 'px';
+          el.style.fontSize = baseFs   + 'px';
+          if (textViewSettings.textSpacingX !== 0) el.style.letterSpacing = textViewSettings.textSpacingX + 'px';
+          const spanScaleX = textViewSettings.textSizeX / textViewSettings.textSizeY;
+          if (Math.abs(spanScaleX - 1) > 0.001) el.style.transform = 'scaleX(' + spanScaleX + ')';
+          if (textViewSettings.forceBold) el.style.fontWeight = '700';
+          el.style.fontFamily = textViewSettings.fontOverride || run.fontFamily;
+          pageEl.appendChild(el);
+        }
+        wrapperEl.appendChild(pageEl);
+        target.appendChild(wrapperEl);
+      }
+
+      async function preloadAdjacentPages() {
+        // Fire-and-forget: warm cache for prev and next without blocking
+        const prev = currentPage - 1;
+        const next = currentPage + 1;
+        if (prev >= 1)                  buildPageFragment(prev).catch(() => {});
+        if (pdfDoc && next <= pdfDoc.numPages) buildPageFragment(next).catch(() => {});
+      }
+
       async function renderPage() {
         if (!pdfDoc) return;
         updatePager();
         setStatus('Rendering page ' + currentPage + '...');
-        const page = await pdfDoc.getPage(currentPage);
-        const layout = await extractStructuredTextLayout(page);
-        renderStructuredTextLayout(layout);
+        // Use cached fragment if available, otherwise build it now
+        let container = pageCache.get(currentPage);
+        if (!container) {
+          const page   = await pdfDoc.getPage(currentPage);
+          const layout = await extractStructuredTextLayout(page);
+          container = document.createElement('div');
+          container.style.cssText = 'width:100%;height:100%;';
+          _renderLayoutInto(container, layout);
+          pageCache.set(currentPage, container);
+        }
+        // Swap content into textView from the cached container clone
+        // (clone so the cache entry stays reusable)
+        textView.innerHTML = '';
+        for (const child of Array.from(container.childNodes)) {
+          textView.appendChild(child.cloneNode(true));
+        }
         setStatus('Page ' + currentPage + ' of ' + pdfDoc.numPages + '.');
         loadDocState();
+        applySearchHighlights();
+        // Warm adjacent pages in the background
+        preloadAdjacentPages();
       }
 
       function showTextViewError(msg) {
@@ -1270,9 +1195,17 @@
           currentPage = 1;
           await loadHubOverrides();
           updatePager();
-          await renderPage();
+          await renderPage();  // renders page 1 and warms pages 2
           await buildPageList();
           setStatus('Loaded. Swipe up from bottom to open controls.');
+          // Replay any search that arrived before the PDF finished loading
+          if (pendingSearch != null) {
+            const q = pendingSearch;
+            pendingSearch = null;
+            await window.runSearch(q);
+          }
+          // Pre-build page 1 cache entry is already done; page 2 warmed by renderPage
+          // buildPageList extracted text for all pages so getPage calls are fast from here
         } catch (err) {
           const msg = 'Failed to load PDF.\n' + (err && err.message ? err.message : 'Unknown error');
           setStatus(msg);
@@ -1288,6 +1221,7 @@
         textViewSettings.pageZoomX = Math.max(0.5, Math.min(3, next));
         localStorage.setItem('readerPageZoomX', String(textViewSettings.pageZoomX));
         updateTextControlsUi();
+        invalidatePageCache();
         await renderPage();
       });
 
@@ -1298,6 +1232,7 @@
         textViewSettings.pageZoomY = Math.max(0.5, Math.min(3, next));
         localStorage.setItem('readerPageZoomY', String(textViewSettings.pageZoomY));
         updateTextControlsUi();
+        invalidatePageCache();
         await renderPage();
       });
 
@@ -1308,6 +1243,7 @@
         textViewSettings.textSpacingX = Math.max(-2, Math.min(12, next));
         localStorage.setItem('readerTextSpacingX', String(textViewSettings.textSpacingX));
         updateTextControlsUi();
+        invalidatePageCache();
         await renderPage();
       });
 
@@ -1318,6 +1254,7 @@
         textViewSettings.textSpacingY = Math.max(0.5, Math.min(3, next));
         localStorage.setItem('readerTextSpacingY', String(textViewSettings.textSpacingY));
         updateTextControlsUi();
+        invalidatePageCache();
         await renderPage();
       });
 
@@ -1327,6 +1264,7 @@
         textViewSettings.textSizeY = Math.max(0.5, Math.min(3, next));
         localStorage.setItem('readerTextSizeY', String(textViewSettings.textSizeY));
         updateTextControlsUi();
+        invalidatePageCache();
         await renderPage();
       });
 
@@ -1337,6 +1275,7 @@
         textViewSettings.textSizeX = Math.max(0.25, Math.min(3, next));
         localStorage.setItem('readerTextSizeX', String(textViewSettings.textSizeX));
         updateTextControlsUi();
+        invalidatePageCache();
         await renderPage();
       });
 
@@ -1345,6 +1284,7 @@
         localStorage.setItem('readerForceBold', textViewSettings.forceBold ? '1' : '0');
         updateTextControlsUi();
         if (currentMode === 'text') {
+          invalidatePageCache();
           await renderPage();
         }
       });
@@ -1357,19 +1297,13 @@
         textOverrideFonts.forEach(name => {
           if (fp.value.includes(name)) loadGoogleFont(name);
         });
+        invalidatePageCache();
         await renderPage();
       });
 
-      // Lock scroll
+      // Lock scroll — always on
       let scrollLocked = true;
       textView.classList.add('scroll-locked');
-      document.getElementById('lockScrollBtn')?.addEventListener('click', () => {
-        scrollLocked = !scrollLocked;
-        textView.classList.toggle('scroll-locked', scrollLocked);
-        const btn = document.getElementById('lockScrollBtn');
-        if (btn) btn.textContent = '\uD83D\uDD12 Lock Scroll: ' + (scrollLocked ? 'On' : 'Off');
-        if (btn) btn.classList.toggle('primary', scrollLocked);
-      });
 
       // Run edit mode
       let runEditMode = false;
@@ -1386,6 +1320,17 @@
 
       document.getElementById('runEditModeBtn')?.addEventListener('click', () => {
         setRunEditMode(!runEditMode);
+      });
+
+      // Preview iOS mode: shows Hub the +0.6 scaleY offset iOS users see. Hidden on actual iOS.
+      const previewIOSBtnEl = document.getElementById('previewIOSBtn');
+      if (!isIOS && previewIOSBtnEl) previewIOSBtnEl.style.display = '';
+      previewIOSBtnEl?.addEventListener('click', async () => {
+        previewIOSMode = !previewIOSMode;
+        previewIOSBtnEl.textContent = '\uD83D\uDCF1 Preview iOS: ' + (previewIOSMode ? 'On' : 'Off');
+        previewIOSBtnEl.classList.toggle('primary', previewIOSMode);
+        invalidatePageCache();
+        await renderPage();
       });
 
       function closeRunEditor() {
@@ -1492,7 +1437,7 @@
         openRunEditor(span);
       });
 
-      fullscreenBtn.addEventListener('click', async () => {
+      fullscreenBtn?.addEventListener('click', async () => {
         try {
           if (!document.fullscreenElement) {
             await viewerWrap.requestFullscreen();
@@ -1582,12 +1527,7 @@
         const dy = t.clientY - touchStartY;
         const verticalDominant = Math.abs(dy) > Math.abs(dx);
 
-        // Swipe up from lower quarter of screen → open controls panel
         const nearBottom = touchStartY > window.innerHeight * 0.75;
-        if (nearBottom && dy < -45 && verticalDominant) {
-          setPanelOpen(true);
-          return;
-        }
 
         if (!verticalDominant || Math.abs(dy) < 45) return;
 
@@ -1595,51 +1535,44 @@
         if (dy < 0 && currentPage < pdfDoc.numPages) {
           if (searchPages.length) {
             const pos = searchPages.indexOf(currentPage);
-            if (pos < searchPages.length - 1) { currentPage = searchPages[pos + 1]; await renderPage(); animatePage('next'); }
+            if (pos < searchPages.length - 1) { const s = snapshotTextView(); currentPage = searchPages[pos + 1]; await renderPage(); animatePage('next', s); }
           } else {
-            currentPage += 1; await renderPage(); animatePage('next');
+            const s = snapshotTextView(); currentPage += 1; await renderPage(); animatePage('next', s);
           }
         } else if (dy > 0 && currentPage > 1) {
           if (searchPages.length) {
             const pos = searchPages.indexOf(currentPage);
-            if (pos > 0) { currentPage = searchPages[pos - 1]; await renderPage(); animatePage('prev'); }
+            if (pos > 0) { const s = snapshotTextView(); currentPage = searchPages[pos - 1]; await renderPage(); animatePage('prev', s); }
           } else {
-            currentPage -= 1; await renderPage(); animatePage('prev');
+            const s = snapshotTextView(); currentPage -= 1; await renderPage(); animatePage('prev', s);
           }
         }
       }, { passive: true });
 
-      function animatePage(dir) {
-        textView.classList.remove('page-enter-next', 'page-enter-prev');
-        void textView.offsetWidth; // force reflow
-        const cls = dir === 'next' ? 'page-enter-next' : 'page-enter-prev';
-        textView.classList.add(cls);
-        textView.addEventListener('animationend', () => textView.classList.remove(cls), { once: true });
+      function snapshotTextView() {
+        const clone = textView.cloneNode(true);
+        clone.removeAttribute('id');
+        clone.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:2;overflow:hidden;';
+        viewerWrap.appendChild(clone);
+        return clone;
       }
 
-      sidepanelBackdrop?.addEventListener('click', () => setPanelOpen(false));
-      pageIndicator?.addEventListener('click', () => setPanelOpen(true));
+      function animatePage(dir, exitClone) {
+        // Animate incoming page (new content already in textView)
+        textView.classList.remove('page-enter-next', 'page-enter-prev');
+        void textView.offsetWidth; // force reflow
+        const enterCls = dir === 'next' ? 'page-enter-next' : 'page-enter-prev';
+        textView.classList.add(enterCls);
+        textView.addEventListener('animationend', () => textView.classList.remove(enterCls), { once: true });
+        // Animate outgoing page (snapshot of old content)
+        if (exitClone) {
+          const exitCls = dir === 'next' ? 'page-exit-next' : 'page-exit-prev';
+          exitClone.classList.add(exitCls);
+          exitClone.addEventListener('animationend', () => exitClone.remove(), { once: true });
+        }
+      }
 
-      let panelTouchStartX = 0;
-      let panelTouchStartY = 0;
-      let panelSwipeIgnored = false;
-      sidepanelBottom?.addEventListener('touchstart', (e) => {
-        const t = e.changedTouches && e.changedTouches[0];
-        if (!t) return;
-        panelSwipeIgnored = e.target?.tagName === 'INPUT' && e.target?.type === 'range';
-        panelTouchStartX = t.clientX;
-        panelTouchStartY = t.clientY;
-      }, { passive: true });
 
-      sidepanelBottom?.addEventListener('touchend', (e) => {
-        if (panelSwipeIgnored) return;
-        const t = e.changedTouches && e.changedTouches[0];
-        if (!t) return;
-        const dx = t.clientX - panelTouchStartX;
-        const dy = t.clientY - panelTouchStartY;
-        const isDownSwipe = dy > 45 && Math.abs(dy) > Math.abs(dx);
-        if (isDownSwipe) setPanelOpen(false);
-      }, { passive: true });
 
       // Expose live-settings API for Hub desktop integration.
       // Called via ExecuteScriptAsync when the Hub PDF editor settings change.
@@ -1651,6 +1584,10 @@
       window._readerApplySettings = function(bundle) {
         applySettingsBundle(bundle);
         renderPage();
+      };
+
+      window._readerSetRunEditMode = function(on) {
+        setRunEditMode(!!on);
       };
 
       updateTextControlsUi();

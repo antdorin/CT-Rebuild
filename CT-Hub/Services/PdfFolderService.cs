@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Text.RegularExpressions;
+using PdfSharp.Pdf.IO;
 
 namespace CTHub.Services;
 
@@ -172,6 +173,19 @@ public sealed class PdfFolderService : IDisposable
 
     // ── Metadata ──────────────────────────────────────────────────────────────
 
+    private static int TryGetPageCount(string fullPath)
+    {
+        try
+        {
+            using var doc = PdfReader.Open(fullPath, PdfDocumentOpenMode.Import);
+            return doc.PageCount;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
     /// Returns filename + last-modified (UTC ISO 8601) for each PDF in the folder.
     public IReadOnlyList<PdfFileMeta> GetFileMeta()
     {
@@ -186,7 +200,7 @@ public sealed class PdfFolderService : IDisposable
             .Select(f => new FileInfo(f))
             .Where(fi => fi.Exists)
             .OrderBy(fi => fi.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(fi => new PdfFileMeta(fi.Name, fi.LastWriteTimeUtc.ToString("o"), sourceCatalog))
+            .Select(fi => new PdfFileMeta(fi.Name, fi.LastWriteTimeUtc.ToString("o"), sourceCatalog, TryGetPageCount(fi.FullName)))
             .ToList();
     }
 }
@@ -195,4 +209,4 @@ public sealed class PdfFolderService : IDisposable
 public sealed record PdfFileRow(string Name, string SalesOrders, DateTime ImportDateTime);
 
 /// <summary>Filename + UTC last-modified timestamp for a single PDF.</summary>
-public sealed record PdfFileMeta(string Name, string Modified, string SourceCatalog);
+public sealed record PdfFileMeta(string Name, string Modified, string SourceCatalog, int PageCount);

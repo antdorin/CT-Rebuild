@@ -177,8 +177,24 @@ final class ReaderWebViewCache: NSObject, ObservableObject, WKNavigationDelegate
         webView.load(request)
     }
 
+    private(set) var fontPercent: Int = 100
+
+    func setFontPercent(_ percent: Int) {
+        fontPercent = percent
+        webView.evaluateJavaScript(
+            "document.documentElement.style.fontSize='\(percent)%'",
+            completionHandler: nil
+        )
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        DispatchQueue.main.async { self.isReady = true }
+        DispatchQueue.main.async {
+            self.isReady = true
+            webView.evaluateJavaScript(
+                "document.documentElement.style.fontSize='\(self.fontPercent)%'",
+                completionHandler: nil
+            )
+        }
     }
 }
 
@@ -486,6 +502,7 @@ private struct PdfDetailView: View {
     @AppStorage("pdfSinglePageMode") private var singlePageMode = false
     @State private var autoCropEnabled = true
     @AppStorage("pdfViewMode") private var viewMode: ViewMode = .pdf
+    @AppStorage("pdfReaderFontPercent") private var readerFontPercent: Int = 100
     @State private var isPicked: Bool = false
     @State private var isShipped: Bool = false
     @AppStorage("panel_showMaterial") private var showMaterial = true
@@ -603,7 +620,32 @@ private struct PdfDetailView: View {
                         }
                         .buttonStyle(.plain)
                     case .reader:
-                        EmptyView()
+                        Button {
+                            readerFontPercent = max(50, readerFontPercent - 10)
+                            readerCache.setFontPercent(readerFontPercent)
+                        } label: {
+                            Image(systemName: "textformat.size.smaller")
+                                .font(.system(size: 13))
+                                .foregroundColor(.white.opacity(0.45))
+                                .padding(.horizontal, 8).padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+
+                        Text("\(readerFontPercent)%")
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.35))
+                            .frame(minWidth: 32)
+
+                        Button {
+                            readerFontPercent = min(200, readerFontPercent + 10)
+                            readerCache.setFontPercent(readerFontPercent)
+                        } label: {
+                            Image(systemName: "textformat.size.larger")
+                                .font(.system(size: 13))
+                                .foregroundColor(.white.opacity(0.45))
+                                .padding(.horizontal, 8).padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
                     }
 
                     Spacer()
@@ -616,6 +658,9 @@ private struct PdfDetailView: View {
             soTitle = soDisplayTitle(from: displayDoc)
             isPicked  = UserDefaults.standard.bool(forKey: "docpicked:\(title)")
             isShipped = UserDefaults.standard.bool(forKey: "docshipped:\(title)")
+        }
+        .onChange(of: readerCache.isReady) { ready in
+            if ready { readerCache.setFontPercent(readerFontPercent) }
         }
     }
 

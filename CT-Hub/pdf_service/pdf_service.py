@@ -185,6 +185,28 @@ def invalidate_cache():
     return "", 204
 
 
+@app.get("/text")
+def text():
+    pdf_path = request.args.get("path", "")
+    if not pdf_path:
+        return jsonify({"error": "missing path"}), 400
+    if not os.path.isfile(pdf_path):
+        return jsonify({"error": "not found"}), 404
+    try:
+        pages_out = []
+        with open(pdf_path, "rb") as f:
+            raw = f.read()
+        with pdfplumber.open(io.BytesIO(raw)) as pdf:
+            for page in pdf.pages:
+                pages_out.append({
+                    "page": page.page_number,
+                    "text": page.extract_text() or "",
+                })
+        return jsonify({"pages": pages_out})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.get("/page-count")
 def page_count():
     pdf_path = request.args.get("path", "")

@@ -27,7 +27,29 @@ public sealed class AppSettings
     public bool DevAutoConnectFirstTab { get; set; } = true;
     public bool DevUseProfileSnapshot { get; set; } = true;
     public double PdfEditorFileListRatio { get; set; }
-    public double PdfEditorPanelRatio { get; set; }
+    public double PdfEditorPanelRatio    { get; set; }
+
+    /// <summary>
+    /// Persisted column widths and display-indexes, keyed by DataGrid.Name.
+    /// </summary>
+    public Dictionary<string, List<ColumnLayoutEntry>> ColumnLayouts { get; set; } = new();
+
+    /// <summary>
+    /// User-renamed static column headers. Key = "GridName|OriginalHeader", Value = renamed label.
+    /// </summary>
+    public Dictionary<string, string> StaticColumnLabels { get; set; } = new();
+
+    /// <summary>
+    /// IDs of seed column definitions that have been applied at least once.
+    /// Prevents re-seeding after a user deliberately deletes a seeded column.
+    /// </summary>
+    public HashSet<string> AppliedSeedIds { get; set; } = new();
+
+    /// <summary>
+    /// Per-table card layout for the Android scan picker.
+    /// Key = tableName (lowercase). Seeded with sensible defaults on first run.
+    /// </summary>
+    public Dictionary<string, MobileCardEntry> MobileCardConfig { get; set; } = new();
 
     // ── Singleton ─────────────────────────────────────────────────────────────
 
@@ -58,4 +80,27 @@ public sealed class AppSettings
         }
         catch { /* best-effort */ }
     }
+}
+
+public sealed class ColumnLayoutEntry
+{
+    public string Key          { get; set; } = string.Empty;
+    public double Width        { get; set; } = double.NaN;
+    public int    DisplayIndex { get; set; }
+}
+
+/// <summary>
+/// Defines how Android renders a single-row card in the scan entry picker.
+/// All fields are BindingPath values (e.g. "Label", "Bin", "Qty").
+/// </summary>
+public sealed class MobileCardEntry
+{
+    /// <summary>Primary (bold) title field. Null = first non-ID column.</summary>
+    public string? Row1  { get; set; }
+
+    /// <summary>Secondary line fields, joined with  ·  separator. Up to 2 entries.</summary>
+    public List<string> Row2  { get; set; } = new();
+
+    /// <summary>Badge pill field (e.g. Qty). Null = no badge.</summary>
+    public string? Badge { get; set; }
 }

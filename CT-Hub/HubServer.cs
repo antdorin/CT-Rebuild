@@ -34,13 +34,16 @@ public sealed class HubServer
     public readonly JsonStore<ShippingSupplyEntry> ShippingSupplys;
     public readonly JsonStore<QrClassMapping>     QrMappings;
     public readonly JsonStore<CatalogLinkEntry>   CatalogLinks;
+    public readonly JsonStore<ColumnDefinition>   Columns;
+    public readonly JsonStore<BarcodeLinkEntry>   BarcodeLinks;
     public readonly PdfFolderService  PdfFolder = new();
     public readonly PdfSidecarService PdfSidecar = new();
 
     private static readonly JsonSerializerOptions _jsonOpts = new()
     {
         PropertyNameCaseInsensitive = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
     };
 
     public HubServer()
@@ -68,6 +71,14 @@ public sealed class HubServer
         CatalogLinks = new JsonStore<CatalogLinkEntry>(
             Path.Combine(dataDir, "catalog_links.json"),
             e => e.Id, WsManager, "catalog_links");
+
+        Columns = new JsonStore<ColumnDefinition>(
+            Path.Combine(dataDir, "columndefinitions.json"),
+            e => e.Id, WsManager, "columndefinitions");
+
+        BarcodeLinks = new JsonStore<BarcodeLinkEntry>(
+            Path.Combine(dataDir, "barcodelinks.json"),
+            e => e.Id, WsManager, "barcodelinks");
 
         PdfFolder.LoadSavedFolder();
     }
@@ -266,6 +277,55 @@ public sealed class HubServer
             // ── REST routing ──────────────────────────────────────────────────
             switch ((req.HttpMethod, path))
             {
+                // ── Mobile card config ────────────────────────────────────
+                case ("GET", "/api/mobile-card-config"):
+                    await WriteJsonAsync(res, AppSettings.Instance.MobileCardConfig);
+                    break;
+
+                case ("POST", _) when path.StartsWith("/api/mobile-card-config/"):
+                {
+                    var tableName = path["/api/mobile-card-config/".Length..].ToLowerInvariant();
+                    if (string.IsNullOrWhiteSpace(tableName)) { res.StatusCode = 400; break; }
+                    var entry = await ReadJsonAsync<CTHub.Services.MobileCardEntry>(req);
+                    if (entry is null) { res.StatusCode = 400; break; }
+                    AppSettings.Instance.MobileCardConfig[tableName] = entry;
+                    AppSettings.Instance.Save();
+                    res.StatusCode = 204;
+                    break;
+                }
+
+                // ── Column definitions ────────────────────────────────────
+                case ("GET", _) when path.StartsWith("/api/columns/"):
+                {
+                    var tableName = path["/api/columns/".Length..].ToLowerInvariant();
+                    if (string.IsNullOrWhiteSpace(tableName)) { res.StatusCode = 400; break; }
+                    var defs = Columns.GetAll()
+                        .Where(c => c.TableName.Equals(tableName, StringComparison.OrdinalIgnoreCase))
+                        .OrderBy(c => c.SortOrder)
+                        .ToList();
+                    await WriteJsonAsync(res, defs);
+                    break;
+                }
+
+                case ("POST", "/api/columns"):
+                {
+                    var colDef = await ReadJsonAsync<ColumnDefinition>(req);
+                    if (colDef is null || string.IsNullOrWhiteSpace(colDef.TableName)
+                        || string.IsNullOrWhiteSpace(colDef.HeaderText))
+                    { res.StatusCode = 400; break; }
+                    colDef.TableName = colDef.TableName.ToLowerInvariant().Trim();
+                    if (string.IsNullOrWhiteSpace(colDef.Id)) colDef.Id = Guid.NewGuid().ToString();
+                    if (string.IsNullOrWhiteSpace(colDef.CreatedAtUtc))
+                        colDef.CreatedAtUtc = DateTime.UtcNow.ToString("o");
+                    await Columns.UpsertAsync(colDef);
+                    await WriteJsonAsync(res, colDef);
+                    break;
+                }
+
+                case ("DELETE", _) when path.StartsWith("/api/columns/"):
+                    await Columns.DeleteAsync(path["/api/columns/".Length..]);
+                    res.StatusCode = 204; break;
+
                 case ("GET", "/api/chasetactical"):
                     await WriteJsonAsync(res, ChaseTactical.GetAll()); break;
 
@@ -373,6 +433,35 @@ public sealed class HubServer
 
                 case ("DELETE", _) when path.StartsWith("/api/links/"):
                     await CatalogLinks.DeleteAsync(path["/api/links/".Length..]);
+                    res.StatusCode = 204; break;
+
+                // ── Barcode links ─────────────────────────────────────────
+                case ("GET", "/api/barcodelinks"):
+                    await WriteJsonAsync(res, BarcodeLinks.GetAll());
+                    break;
+
+                case ("POST", "/api/barcodelinks"):
+                {
+                    var bl = await ReadJsonAsync<BarcodeLinkEntry>(req);
+                    if (bl is null
+                        || string.IsNullOrWhiteSpace(bl.SourceBarcodeValue)
+                        || string.IsNullOrWhiteSpace(bl.SourceColumnId)
+                        || string.IsNullOrWhiteSpace(bl.SourceTableName)
+                        || string.IsNullOrWhiteSpace(bl.TargetTableName)
+                        || string.IsNullOrWhiteSpace(bl.TargetEntryId))
+                    { res.StatusCode = 400; break; }
+
+                    if (string.IsNullOrWhiteSpace(bl.Id)) bl.Id = Guid.NewGuid().ToString();
+                    if (string.IsNullOrWhiteSpace(bl.CreatedAtUtc))
+                        bl.CreatedAtUtc = DateTime.UtcNow.ToString("o");
+
+                    await BarcodeLinks.UpsertAsync(bl);
+                    await WriteJsonAsync(res, bl);
+                    break;
+                }
+
+                case ("DELETE", _) when path.StartsWith("/api/barcodelinks/"):
+                    await BarcodeLinks.DeleteAsync(path["/api/barcodelinks/".Length..]);
                     res.StatusCode = 204; break;
 
                 case ("GET", "/api/pdfs/context"):
@@ -538,8 +627,7 @@ public sealed class HubServer
 
                     if (string.IsNullOrWhiteSpace(folder)
                         || filename.Contains('/') || filename.Contains('\\')
-                        || filename.Contains("..")
-                        || !filename.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                        || filename.Contains(".."))
                     {
                         res.StatusCode = 400; break;
                     }
@@ -578,6 +666,36 @@ public sealed class HubServer
                     res.ContentType     = "application/json; charset=utf-8";
                     res.ContentLength64 = jsonBytes.Length;
                     await res.OutputStream.WriteAsync(jsonBytes, ct);
+                    break;
+                }
+
+                // ── PDF plain text (all pages) — for bin extraction on Android ──
+                case ("GET", _) when path.StartsWith("/api/pdf-text/"):
+                {
+                    var filename = Uri.UnescapeDataString(path["/api/pdf-text/".Length..]);
+                    var folder   = PdfFolder.CurrentFolder;
+                    if (string.IsNullOrWhiteSpace(folder)
+                        || filename.Contains('/') || filename.Contains('\\')
+                        || filename.Contains(".."))
+                    { res.StatusCode = 400; break; }
+
+                    var fullPath   = Path.GetFullPath(Path.Combine(folder, filename));
+                    var folderFull = Path.GetFullPath(folder);
+                    if (!fullPath.StartsWith(folderFull + Path.DirectorySeparatorChar))
+                    { res.StatusCode = 400; break; }
+                    if (!File.Exists(fullPath)) { res.StatusCode = 404; break; }
+
+                    try
+                    {
+                        var encoded     = Uri.EscapeDataString(fullPath);
+                        var sidecarResp = await PdfSidecarService.Http.GetAsync(
+                            $"/text?path={encoded}", ct);
+                        var body = await sidecarResp.Content.ReadAsByteArrayAsync(ct);
+                        res.ContentType     = "application/json; charset=utf-8";
+                        res.ContentLength64 = body.Length;
+                        await res.OutputStream.WriteAsync(body, ct);
+                    }
+                    catch { res.StatusCode = 502; }
                     break;
                 }
 
@@ -636,7 +754,7 @@ public sealed class HubServer
 
     private static async Task WriteJsonAsync(HttpListenerResponse res, object data)
     {
-        var json  = JsonSerializer.Serialize(data);
+        var json  = JsonSerializer.Serialize(data, _jsonOpts);
         var bytes = Encoding.UTF8.GetBytes(json);
         res.ContentType     = "application/json; charset=utf-8";
         res.ContentLength64 = bytes.Length;

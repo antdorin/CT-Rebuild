@@ -87,7 +87,7 @@ struct LeftPanelView: View {
         let dotsH   = safeArea.bottom + 26
         let pageH   = geo.size.height - headerH - dotsH
         let cellH   = (pageH - 16 - 12 - 10 * 4) / 12
-        let cellW   = (geo.size.width - 16 - (CGFloat(totalColumns - 1) * 4)) / CGFloat(totalColumns * 2)
+        let cellW   = (geo.size.width - 16 - 5 * 4) / 6
         let cellSize = max(min(cellW, cellH), 28)
         let col     = colNum(for: columnPage)
 
@@ -141,7 +141,7 @@ struct LeftPanelView: View {
 
     @ViewBuilder
     private func sectionGrid(colNum: Int, sectionLetter: String, positions: Int, blankCount: Int = 0, cellSize: CGFloat) -> some View {
-        let columnCode = "\(colNum)\(sectionLetter)"
+        let columnCode = "\(colNum)-\(sectionLetter)"
 
         VStack(spacing: 4) {
             ForEach(levelLabels, id: \.self) { level in
@@ -341,7 +341,7 @@ private struct LeftWheelSelector: View {
     @ViewBuilder
     private func sectionSnapshot(col: Int, section: String, positions: Int, blanks: Int, cs: CGFloat, binQuantities: [String: Int]) -> some View {
         let levels = ["A","B","C","D","E","F"]
-        let code   = "\(col)\(section)"
+        let code   = "\(col)-\(section)"
         let fs     = max(cs * 0.17, 8)
         VStack(spacing: 4) {
             ForEach(levels, id: \.self) { level in

@@ -1,0 +1,112 @@
+[
+  {
+    "id": "63fb0751-fd91-496d-bece-25859b9dec02",
+    "sourceBarcodeValue": "111111111111",
+    "sourceColumnId": "fea51ef1-b659-4798-9873-183893d715c7",
+    "sourceTableName": "shippingsupplys",
+    "targetTableName": "shippingsupplys",
+    "targetEntryId": "330535bb-0261-4e3f-bf80-755710f00c64",
+    "targetEntryLabelSnapshot": "13 x 10 x 2  \u2013 0",
+    "createdAtUtc": "2026-04-08T15:53:35.2053925Z"
+  },
+  {
+    "id": "95206113-c628-46c5-8aa2-d3a1f17cf23c",
+    "sourceBarcodeValue": "111111111112",
+    "sourceColumnId": "fea51ef1-b659-4798-9873-183893d715c7",
+    "sourceTableName": "shippingsupplys",
+    "targetTableName": "shippingsupplys",
+    "targetEntryId": "e1183ceb-dd68-4fbc-8eef-fcf94eae826b",
+    "targetEntryLabelSnapshot": "13 x 10 x 4 \u2013 0",
+    "createdAtUtc": "2026-04-08T15:55:46.7018027Z"
+  },
+  {
+    "id": "737b4a9c-4ab9-4d2d-9a41-74110c66b438",
+    "sourceBarcodeValue": "111111111113",
+    "sourceColumnId": "fea51ef1-b659-4798-9873-183893d715c7",
+    "sourceTableName": "shippingsupplys",
+    "targetTableName": "shippingsupplys",
+    "targetEntryId": "2ffbcee0-d00f-46d3-bb1a-d1698383ca98",
+    "targetEntryLabelSnapshot": "13 x 10 x 7 \u2013 0",
+    "createdAtUtc": "2026-04-08T15:56:54.7706935Z"
+  },
+  {
+    "id": "f9e5493c-f567-41a6-ae4a-50e2047ff8bd",
+    "sourceBarcodeValue": "111111111114",
+    "sourceColumnId": "fea51ef1-b659-4798-9873-183893d715c7",
+    "sourceTableName": "shippingsupplys",
+    "targetTableName": "shippingsupplys",
+    "targetEntryId": "4f903380-e3b3-4c0b-9070-8941d85646c8",
+    "targetEntryLabelSnapshot": "14 x 10 x 10 \u2013 0",
+    "createdAtUtc": "2026-04-08T15:57:42.3647467Z"
+  },
+  {
+    "id": "5a6403eb-3410-46c0-9883-6342a09893ff",
+    "sourceBarcodeValue": "111111111115",
+    "sourceColumnId": "fea51ef1-b659-4798-9873-183893d715c7",
+    "sourceTableName": "shippingsupplys",
+    "targetTableName": "shippingsupplys",
+    "targetEntryId": "4c03fe0a-6027-48b0-9b62-a33b53d8f5d8",
+    "targetEntryLabelSnapshot": "18 x 14.5 x 12 \u2013 0",
+    "createdAtUtc": "2026-04-08T15:58:43.1733085Z"
+  },
+  {
+    "id": "f17a727b-2b9a-446f-9233-57641f7638ee",
+    "sourceBarcodeValue": "111111111116",
+    "sourceColumnId": "fea51ef1-b659-4798-9873-183893d715c7",
+    "sourceTableName": "shippingsupplys",
+    "targetTableName": "shippingsupplys",
+    "targetEntryId": "d081394f-e0ee-451c-8ff3-811318e7273c",
+    "targetEntryLabelSnapshot": "24 x 12 x 6 \u2013 0",
+    "createdAtUtc": "2026-04-08T15:59:00.8024846Z"
+  },
+  {
+    "id": "ab57c300-331e-4b24-b9e2-227156a676a2",
+    "sourceBarcodeValue": "111111111117",
+    "sourceColumnId": "fea51ef1-b659-4798-9873-183893d715c7",
+    "sourceTableName": "shippingsupplys",
+    "targetTableName": "shippingsupplys",
+    "targetEntryId": "c5edd335-639d-406e-be5a-a32d099292cf",
+    "targetEntryLabelSnapshot": "12 x 12 x 12  \u2013 0",
+    "createdAtUtc": "2026-04-08T15:59:36.0604949Z"
+  },
+  {
+    "id": "6a9c26ab-a71e-4b47-8831-4f53660a4b5b",
+    "sourceBarcodeValue": "111111111118",
+    "sourceColumnId": "fea51ef1-b659-4798-9873-183893d715c7",
+    "sourceTableName": "shippingsupplys",
+    "targetTableName": "shippingsupplys",
+    "targetEntryId": "543499ad-a4a2-42cf-91a1-19b30f172e96",
+    "targetEntryLabelSnapshot": "19 x 13 x 12 \u2013 0",
+    "createdAtUtc": "2026-04-08T16:00:23.0861365Z"
+  },
+  {
+    "id": "4b185595-a08d-42bd-81ae-84434c9a30db",
+    "sourceBarcodeValue": "111111111119",
+    "sourceColumnId": "fea51ef1-b659-4798-9873-183893d715c7",
+    "sourceTableName": "shippingsupplys",
+    "targetTableName": "shippingsupplys",
+    "targetEntryId": "599aa98a-db48-49e3-a19d-96f419b100c1",
+    "targetEntryLabelSnapshot": "20 x 14 x 14 \u2013 0",
+    "createdAtUtc": "2026-04-08T16:00:42.0208473Z"
+  },
+  {
+    "id": "29d3230e-4d63-4fc5-a0e1-665da4bbd1d2",
+    "sourceBarcodeValue": "1111111111110",
+    "sourceColumnId": "fea51ef1-b659-4798-9873-183893d715c7",
+    "sourceTableName": "shippingsupplys",
+    "targetTableName": "shippingsupplys",
+    "targetEntryId": "fc51af01-8c73-494b-a17b-50573e7a4c5b",
+    "targetEntryLabelSnapshot": "24 x 18 x 18 \u2013 0",
+    "createdAtUtc": "2026-04-08T16:01:43.8686212Z"
+  },
+  {
+    "id": "6f0f1a74-00db-4b2f-ae54-501ad396917e",
+    "sourceBarcodeValue": "1111111111111",
+    "sourceColumnId": "fea51ef1-b659-4798-9873-183893d715c7",
+    "sourceTableName": "shippingsupplys",
+    "targetTableName": "shippingsupplys",
+    "targetEntryId": "4fe4df42-5f9d-4b63-bf2b-3aa0b6e42571",
+    "targetEntryLabelSnapshot": "22 x 22 x 22 \u2013 0",
+    "createdAtUtc": "2026-04-08T16:02:31.2101709Z"
+  }
+]

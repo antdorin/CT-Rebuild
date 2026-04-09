@@ -8,6 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>CT-Hub</AssemblyName>
     <RootNamespace>CTHub</RootNamespace>
+    <ApplicationIcon>..\CT_Logo.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

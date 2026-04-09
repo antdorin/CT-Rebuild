@@ -1,0 +1,68 @@
+[
+  {
+    "id": "fddd0c78-7474-44a7-a635-eeb37e1e1776",
+    "qrValue": "111111111111",
+    "classification": "13 x 10 x 2  \u2013 0",
+    "description": "fea51ef1-b659-4798-9873-183893d715c7"
+  },
+  {
+    "id": "60df9150-367b-49f9-9526-260a21d55493",
+    "qrValue": "111111111112",
+    "classification": "13 x 10 x 4 \u2013 0",
+    "description": "fea51ef1-b659-4798-9873-183893d715c7"
+  },
+  {
+    "id": "1005c0bb-e27c-4d81-9bdd-fd2f2f3e1220",
+    "qrValue": "111111111113",
+    "classification": "13 x 10 x 7 \u2013 0",
+    "description": "fea51ef1-b659-4798-9873-183893d715c7"
+  },
+  {
+    "id": "c7cde776-790c-4867-9d2e-d4595fb651b6",
+    "qrValue": "111111111114",
+    "classification": "14 x 10 x 10 \u2013 0",
+    "description": "fea51ef1-b659-4798-9873-183893d715c7"
+  },
+  {
+    "id": "795a9e7e-9d4f-4a92-94e9-8a96a7dac4db",
+    "qrValue": "111111111115",
+    "classification": "18 x 14.5 x 12 \u2013 0",
+    "description": "fea51ef1-b659-4798-9873-183893d715c7"
+  },
+  {
+    "id": "45808ff8-b34e-4b8a-afa1-069363ddc22d",
+    "qrValue": "111111111116",
+    "classification": "24 x 12 x 6 \u2013 0",
+    "description": "fea51ef1-b659-4798-9873-183893d715c7"
+  },
+  {
+    "id": "318d3ae4-9245-4545-b935-3aa1a4429647",
+    "qrValue": "111111111117",
+    "classification": "12 x 12 x 12  \u2013 0",
+    "description": "fea51ef1-b659-4798-9873-183893d715c7"
+  },
+  {
+    "id": "d0e7fe08-043f-4635-aab2-d8cb98736800",
+    "qrValue": "111111111118",
+    "classification": "19 x 13 x 12 \u2013 0",
+    "description": "fea51ef1-b659-4798-9873-183893d715c7"
+  },
+  {
+    "id": "f1a9bebf-0783-465e-bd9b-09aca1eb4691",
+    "qrValue": "111111111119",
+    "classification": "20 x 14 x 14 \u2013 0",
+    "description": "fea51ef1-b659-4798-9873-183893d715c7"
+  },
+  {
+    "id": "f9e1a169-cb00-4418-a582-3388b217cdc7",
+    "qrValue": "1111111111110",
+    "classification": "24 x 18 x 18 \u2013 0",
+    "description": "fea51ef1-b659-4798-9873-183893d715c7"
+  },
+  {
+    "id": "4a2b64bb-e7e8-486d-b726-cf8fd8e439a7",
+    "qrValue": "1111111111111",
+    "classification": "22 x 22 x 22 \u2013 0",
+    "description": "fea51ef1-b659-4798-9873-183893d715c7"
+  }
+]
